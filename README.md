@@ -6,6 +6,24 @@ Rust backend (Axum + SQLite) + embedded Vite/React/TypeScript frontend. The rele
 
 ## Getting started (self-host)
 
+### Fastest: one-command install (Linux / macOS)
+
+On a systemd Linux box (Raspberry Pi, VPS, …) this downloads the signed binary
+for your platform, verifies it, and installs it as a service that restarts on
+crash and starts on boot:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/merrypatch/bramblekeep/master/install.sh | sudo bash
+```
+
+Then open `http://localhost:8080` (or `http://<host-ip>:8080` on your LAN). The
+script is inspectable — read [`install.sh`](./install.sh) before piping it to a
+shell. Options: `VERSION=v0.1.3` to pin a version, `NO_SERVICE=1` to just drop
+the binary without the service. Remove with `… | sudo bash -s -- --uninstall`
+(your data in `/opt/bramblekeep` is kept).
+
+### Manual (any platform)
+
 1. Download the binary for your platform from the [latest release](https://github.com/merrypatch/bramblekeep/releases/latest).
 2. Make it executable and run it:
 
@@ -101,7 +119,9 @@ Stop-Service Bramblekeep       # manual stop
 
 ## Status
 
-Walking skeleton: backend that applies migrations + `/api/health`, frontend that pings the API. **Next milestone (V1 truth):** a page edited in BlockNote, synchronized via WebSocket (yrs), persisted in `yjs_updates`, projected in `blocks`, surviving a restart of the binary.
+Active development. Working today: rich pages edited in BlockNote synced over WebSocket (yrs CRDT), persisted in `yjs_updates` and projected to `blocks` (survives a binary restart), full-text search, file uploads (content-addressed), account/session auth with per-item sharing, and structured databases with multiple views. Signed release binaries with an in-app update checker.
+
+Not yet: public (login-free) pages, S3 file storage, email/AI integrations — reserved in the schema, built when their version arrives.
 
 ## Prerequisites
 
@@ -116,7 +136,7 @@ After a `git pull`, a single command installs frontend dependencies and starts t
 ./scripts/dev.sh
 ```
 
-Open http://localhost:5173 — the page pings `/api/health`. `Ctrl-C` stops both.
+Open http://localhost:5173 — the frontend proxies `/api` to the backend. `Ctrl-C` stops both.
 
 <details><summary>Manual equivalent (2 terminals)</summary>
 
