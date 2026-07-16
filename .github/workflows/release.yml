@@ -82,6 +82,30 @@ jobs:
           path: dist/${{ matrix.asset }}
           if-no-files-found: error
 
+      # Linux only: a convenience .tar.gz bundling the binary + deploy/ so a
+      # first install is `tar xzf … && sudo ./deploy/install.sh`. systemd is
+      # Linux-specific, so macOS/Windows ship the bare binary only. This tarball
+      # is NOT referenced by latest.json — the in-app updater always fetches the
+      # bare binary + its .minisig.
+      - name: Bundle Linux tarball (binary + deploy scripts)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          stage="pkg/${{ matrix.asset }}"
+          mkdir -p "$stage/deploy"
+          cp "dist/${{ matrix.asset }}" "$stage/${{ matrix.asset }}"
+          cp deploy/install.sh deploy/bramblekeep.service "$stage/deploy/"
+          chmod +x "$stage/${{ matrix.asset }}" "$stage/deploy/install.sh"
+          tar -C pkg -czf "dist/${{ matrix.asset }}.tar.gz" "${{ matrix.asset }}"
+
+      - name: Upload Linux tarball artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}.tar.gz
+          path: dist/${{ matrix.asset }}.tar.gz
+          if-no-files-found: error
+
   # 2) Signs all artifacts, assembles + signs the manifest, creates the Release.
   release:
     needs: build
@@ -113,6 +137,9 @@ jobs:
           artifacts_json="[]"
           cd staging
           for f in bramblekeep-*; do
+            # Skip convenience tarballs: they are for manual install only and
+            # must NOT enter latest.json (the updater fetches the bare binary).
+            case "$f" in *.tar.gz|*.minisig) continue ;; esac
             # Detached signature (.minisig) — verified on APPLY by the binary.
             minisign -S -s ../minisign.key -m "$f" -x "$f.minisig"
             sha=$(sha256sum "$f" | cut -d' ' -f1)
@@ -122,6 +149,12 @@ jobs:
               --arg os "$os" --arg arch "$arch" \
               --arg url "$base/$f" --arg sha "$sha" \
               '. += [{os:$os, arch:$arch, url:$url, sha256:$sha}]' <<<"$artifacts_json")
+          done
+          # Sign the Linux tarball(s) too (integrity for manual installs), kept
+          # out of the manifest above.
+          for t in bramblekeep-*.tar.gz; do
+            [ -e "$t" ] || continue
+            minisign -S -s ../minisign.key -m "$t" -x "$t.minisig"
           done
           jq -n \
             --arg version "$ver" \

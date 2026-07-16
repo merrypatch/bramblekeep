@@ -1,0 +1,30 @@
+[Unit]
+Description=Bramblekeep — self-hosted single-binary workspace
+Documentation=https://github.com/merrypatch/bramblekeep
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bramblekeep
+WorkingDirectory=/opt/bramblekeep
+ExecStart=/opt/bramblekeep/bramblekeep
+# Optional: a `.env` next to the binary. The leading `-` makes it optional —
+# the service still starts if the file is absent.
+EnvironmentFile=-/opt/bramblekeep/.env
+
+# Restart on crash / non-zero exit, but NOT on a manual `systemctl stop`.
+Restart=on-failure
+RestartSec=2
+
+# Hardening (safe defaults; the data dir stays writable).
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/bramblekeep
+
+[Install]
+# `systemctl enable` wires this in → the service starts on every boot,
+# which covers servers that power off overnight and come back in the morning.
+WantedBy=multi-user.target

@@ -29,6 +29,38 @@ For a real deployment (public domain, email sign-in, HTTPS), create a `.env` fil
 
 Run it behind a reverse proxy (Caddy, nginx, Traefik) for TLS.
 
+### Run as a service (auto-restart + start on boot)
+
+For a real deployment you want Bramblekeep to come back on its own after a crash
+or a reboot (e.g. a server that powers off overnight), while still letting you
+stop it by hand. On systemd Linux, grab the `.tar.gz` from the release (it
+bundles the installer) and run one command:
+
+```bash
+tar xzf bramblekeep-linux-x64.tar.gz
+cd bramblekeep-linux-x64
+sudo ./deploy/install.sh
+```
+
+(Already have just the bare binary? `sudo ./deploy/install.sh ./bramblekeep-linux-x64` works too.)
+
+This installs the binary to `/opt/bramblekeep`, runs it as a dedicated
+`bramblekeep` user, and enables a systemd service. From then on:
+
+| Event | Result |
+| --- | --- |
+| Crash / non-zero exit | restarts automatically |
+| Reboot or power-off → power-on | starts automatically |
+| `sudo systemctl stop bramblekeep` | stays stopped until the next boot |
+| `sudo systemctl disable --now bramblekeep` | stays stopped across reboots too |
+
+Re-run the same command to update the binary in place. Remove everything with
+`sudo ./deploy/install.sh --uninstall` (your data in `/opt/bramblekeep` is kept).
+
+Logs: `journalctl -u bramblekeep -f`. The service file lives at
+[`deploy/bramblekeep.service`](./deploy/bramblekeep.service) if you prefer to
+install it by hand.
+
 ## Status
 
 Walking skeleton: backend that applies migrations + `/api/health`, frontend that pings the API. **Next milestone (V1 truth):** a page edited in BlockNote, synchronized via WebSocket (yrs), persisted in `yjs_updates`, projected in `blocks`, surviving a restart of the binary.
