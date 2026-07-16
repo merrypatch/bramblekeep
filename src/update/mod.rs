@@ -110,10 +110,10 @@ fn artifact_for_current(manifest: &Manifest) -> Option<Artifact> {
         .cloned()
 }
 
-/// Minisign public key for verification. Empty by default: **apply is refused
-/// until a key is configured** (no verification possible = no install).
-/// To be REPLACED with the real prod public key (or supplied via `UPDATE_PUBLIC_KEY`).
-const EMBEDDED_PUBKEY: &str = "";
+/// Minisign public key for verification. Public by design (safe to commit); the
+/// matching secret key lives only in the CI secret `MINISIGN_SECRET_KEY`.
+/// Can be overridden at runtime via `UPDATE_PUBLIC_KEY`.
+const EMBEDDED_PUBKEY: &str = "RWS6a2U/D90FeiS7WUJ1WHCAHbiiZNoS+ySU+tCBs5r1SzIAcyLAwjao";
 
 /// Effective public key: `UPDATE_PUBLIC_KEY` otherwise the embedded key. `None` if
 /// neither → apply disabled.
