@@ -1,5 +1,7 @@
 # Bramblekeep
 
+[![good first issues](https://img.shields.io/github/issues/merrypatch/bramblekeep/good%20first%20issue?label=good%20first%20issues&color=7057ff)](https://github.com/merrypatch/bramblekeep/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
+
 Unified, self-hosted, **single-binary** workspace — a free, open-source alternative to the proprietary all-in-one tools (Notion, Coda, Confluence, ClickUp, and the like), without the vendor lock-in. Your data stays in a single file you own.
 
 Rust backend (Axum + SQLite) + embedded Vite/React/TypeScript frontend. The release binary + `bramblekeep.db` + the `files/` folder = the complete installation.
