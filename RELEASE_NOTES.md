@@ -1,29 +1,21 @@
-## Bramblekeep v0.1.2
+## Bramblekeep v0.1.3
 
-Deployment quality-of-life and an update-check fix.
-
-### Fixed
-
-- **Update-check opt-in now persists.** Accepting the first-launch "check for
-  updates" prompt could be silently overwritten by the dialog's own close event,
-  leaving the setting off. The opt-in is now saved reliably.
+Adds ARM64 Linux builds — Raspberry Pi and ARM servers are now supported.
 
 ### Added
 
-- **Run as a service (auto-restart + start on boot).** New `deploy/` with a
-  systemd unit and a one-command installer:
+- **Linux ARM64 (`aarch64`) binary + tarball.** New `bramblekeep-linux-arm64`
+  and `bramblekeep-linux-arm64.tar.gz` assets, so Bramblekeep runs on a
+  Raspberry Pi (64-bit OS) or ARM server:
 
   ```bash
-  tar xzf bramblekeep-linux-x64.tar.gz
-  cd bramblekeep-linux-x64
+  tar xzf bramblekeep-linux-arm64.tar.gz
+  cd bramblekeep-linux-arm64
   sudo ./deploy/install.sh
   ```
 
-  Bramblekeep then restarts on crash and comes back on boot (handy for servers
-  that power off overnight), while a manual `systemctl stop` is still respected.
-- **Linux release now ships a `bramblekeep-linux-x64.tar.gz`** bundling the
-  binary + installer. macOS/Windows still ship the bare binary (systemd is
-  Linux-specific); the README documents the launchd and NSSM equivalents.
+  The in-app updater recognizes this platform (`linux/arm64`) and updates it
+  like the others.
 
-The in-app updater is unchanged: it still downloads the bare signed binary, so
-existing installs update exactly as before.
+Everything from v0.1.2 (systemd installer, Linux tarball, update-check opt-in
+fix) applies here too.
