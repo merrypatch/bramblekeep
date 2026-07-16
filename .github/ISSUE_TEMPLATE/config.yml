@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or discussion
+    url: https://github.com/merrypatch/bramblekeep/discussions
+    about: For usage questions, ideas, and open-ended discussion (not bugs).
+  - name: Security vulnerability
+    url: https://github.com/merrypatch/bramblekeep/security/advisories/new
+    about: Report security issues privately — please do NOT open a public issue.

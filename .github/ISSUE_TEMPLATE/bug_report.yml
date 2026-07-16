@@ -1,0 +1,54 @@
+name: Bug report
+description: Something isn't working as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in what you can —
+        a clear reproduction is worth more than a long description.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        1. Ran `./bramblekeep-linux-arm64`
+        2. Opened http://localhost:8080
+        3. Expected the page to load; got a blank screen.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `bramblekeep --version`, or the release tag you downloaded.
+      placeholder: v0.1.3
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux x64
+        - Linux arm64 (Raspberry Pi / ARM)
+        - macOS arm64
+        - macOS x64
+        - Windows x64
+        - Built from source
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Console output or `journalctl -u bramblekeep` (redact any secrets).
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
