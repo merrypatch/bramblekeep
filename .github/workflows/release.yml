@@ -111,6 +111,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # Needed for RELEASE_NOTES.md (release body). Artifacts land in staging/.
+      - uses: actions/checkout@v4
+
       - name: Collect artifacts
         uses: actions/download-artifact@v4
         with:
@@ -167,6 +170,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # Curated notes (RELEASE_NOTES.md) shown first; GitHub appends the
+          # auto-generated commit/PR list below them.
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: true
           files: |
             staging/bramblekeep-*
             staging/latest.json
