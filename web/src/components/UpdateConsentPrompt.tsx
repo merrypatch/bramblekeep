@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -22,6 +22,10 @@ import { getUpdateConsent, setUpdateConsent, type Role } from "@/lib/api";
 export function UpdateConsentPrompt({ role }: { role: Role }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // Guard: closing the dialog via the Accept button also fires `onOpenChange`,
+  // which would otherwise race a `decide("off")` against the intended
+  // `decide("on")` and clobber the opt-in. First decision wins.
+  const decidedRef = useRef(false);
 
   useEffect(() => {
     if (role !== "owner" && role !== "admin") return;
@@ -35,6 +39,8 @@ export function UpdateConsentPrompt({ role }: { role: Role }) {
   }, [role]);
 
   const decide = (value: "on" | "off") => {
+    if (decidedRef.current) return;
+    decidedRef.current = true;
     setOpen(false);
     void setUpdateConsent(value).catch(() => {});
   };
