@@ -30,13 +30,19 @@ fn env_opt(key: &str) -> Option<String> {
 
 impl Config {
     pub fn from_env() -> Self {
+        let bind_addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into());
         Self {
             database_url: std::env::var("DATABASE_URL")
                 .unwrap_or_else(|_| "sqlite://bramblekeep.db".into()),
-            bind_addr: std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into()),
             files_dir: std::env::var("FILES_DIR").unwrap_or_else(|_| "files".into()),
-            public_base_url: std::env::var("PUBLIC_BASE_URL")
-                .unwrap_or_else(|_| "http://localhost:5173".into()),
+            // Default = the binary's own address (the embedded frontend is served
+            // here). In dev the `.env` overrides this with the Vite URL (:5173),
+            // where the frontend actually runs and proxies /api to the backend.
+            public_base_url: std::env::var("PUBLIC_BASE_URL").unwrap_or_else(|_| {
+                let port = bind_addr.rsplit(':').next().unwrap_or("8080");
+                format!("http://localhost:{port}")
+            }),
+            bind_addr,
             cookie_secure: env_opt("COOKIE_SECURE").is_some_and(|v| v == "true" || v == "1"),
             smtp_host: env_opt("SMTP_HOST"),
             smtp_port: env_opt("SMTP_PORT").and_then(|p| p.parse().ok()).unwrap_or(587),

@@ -4,6 +4,31 @@ Unified, self-hosted, **single-binary** workspace — a free, open-source altern
 
 Rust backend (Axum + SQLite) + embedded Vite/React/TypeScript frontend. The release binary + `bramblekeep.db` + the `files/` folder = the complete installation.
 
+## Getting started (self-host)
+
+1. Download the binary for your platform from the [latest release](https://github.com/merrypatch/bramblekeep/releases/latest).
+2. Make it executable and run it:
+
+   ```bash
+   chmod +x bramblekeep-linux-x64
+   ./bramblekeep-linux-x64
+   ```
+
+3. Open the URL it prints (default `http://localhost:8080`). On first launch it creates `bramblekeep.db` and a `files/` folder next to itself.
+
+That's enough for a local trial — no email needed, sign-in links are printed in the console.
+
+### Configuration (optional)
+
+For a real deployment (public domain, email sign-in, HTTPS), create a `.env` file next to the binary. Copy [`.env.example`](./.env.example) and edit:
+
+- `PUBLIC_BASE_URL` — the URL users actually reach (e.g. `https://notes.example.com`); sign-in and shared-page links are built from it. Defaults to the binary's own address.
+- `SMTP_*` — send sign-in / invitation emails. Without it, those links are logged to the console.
+- `COOKIE_SECURE=true` — set when serving over HTTPS.
+- `BIND_ADDR` — change the listen address/port (default `0.0.0.0:8080`).
+
+Run it behind a reverse proxy (Caddy, nginx, Traefik) for TLS.
+
 ## Status
 
 Walking skeleton: backend that applies migrations + `/api/health`, frontend that pings the API. **Next milestone (V1 truth):** a page edited in BlockNote, synchronized via WebSocket (yrs), persisted in `yjs_updates`, projected in `blocks`, surviving a restart of the binary.

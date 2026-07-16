@@ -80,6 +80,16 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::from_str(&config.bind_addr)?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("bramblekeep listening on http://{addr}");
+    // Friendly first-run banner (stdout, independent of RUST_LOG) so a
+    // non-technical self-hoster who just launched the binary knows what to do.
+    println!("\n  Bramblekeep is running.");
+    println!("  → Open {}", config.public_base_url);
+    if config.smtp_host.is_none() {
+        println!("  No email configured (SMTP): sign-in links are printed in this console.");
+    }
+    println!(
+        "  Config (public URL, email, …): create a .env next to the binary — see .env.example.\n"
+    );
     // `ConnectInfo`: exposes the source IP to handlers (login rate-limiting).
     axum::serve(
         listener,
