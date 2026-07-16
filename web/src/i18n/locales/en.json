@@ -1,0 +1,1042 @@
+{
+  "pageMenu": {
+    "options": "Options",
+    "favorite": "Add to favorites",
+    "unfavorite": "Remove from favorites",
+    "share": "Share",
+    "history": "Edit history",
+    "exportMd": "Export to Markdown",
+    "exportPdf": "Export to PDF (print)",
+    "exportCsv": "Export to CSV",
+    "deletePage": "Delete page",
+    "deleteDb": "Delete database"
+  },
+  "auth": {
+    "brandSubtitle": "Passwordless sign-in — get a link by email.",
+    "verifying": "Signing in…",
+    "linkInvalid": "This link is invalid or expired.",
+    "sendFailed": "Couldn't send the link. Please try again.",
+    "sent": "Link sent to {{email}}. Open it to sign in.",
+    "emailPlaceholder": "you@example.com",
+    "getLink": "Get the link"
+  },
+  "search": {
+    "placeholder": "Search…",
+    "noResults": "No results."
+  },
+  "iconPicker": {
+    "emoji": "Emoji",
+    "icons": "Icons",
+    "remove": "Remove",
+    "searchPlaceholder": "Search an icon…",
+    "noIcons": "No icon."
+  },
+  "pageLinkDialog": {
+    "titleDb": "Link an existing database",
+    "titlePage": "Link to a page",
+    "descDb": "Insert an existing database, rendered inline.",
+    "descPage": "Reference an existing page (without moving it).",
+    "searchDb": "Search a database…",
+    "searchPage": "Search a page…",
+    "emptyDb": "No database.",
+    "emptyPage": "No page."
+  },
+  "publishConsent": {
+    "title": "This sub-page will be public",
+    "body": "The parent page is published to the web. This sub-page will be accessible to anyone, without signing in, via the same public link. You can unpublish it at any time.",
+    "confirm": "Create the sub-page"
+  },
+  "db": {
+    "columnType": {
+      "text": "Text",
+      "number": "Number",
+      "checkbox": "Checkbox",
+      "select": "Select",
+      "multiselect": "Multi-select",
+      "status": "Status",
+      "date": "Date",
+      "phone": "Phone",
+      "email": "Email",
+      "url": "URL",
+      "files": "Files & media",
+      "relation": "Relation",
+      "rollup": "Rollup",
+      "formula": "Formula",
+      "created_time": "Created time",
+      "created_by": "Created by",
+      "last_edited_time": "Last edited time",
+      "last_edited_by": "Last edited by"
+    },
+    "statusGroup": {
+      "todo": "To do",
+      "doing": "In progress",
+      "done": "Done"
+    }
+  },
+  "dbview": {
+    "agg": {
+      "count": "All",
+      "count_values": "Values",
+      "count_empty": "Empty",
+      "count_unique": "Unique",
+      "percent_filled": "% filled",
+      "percent_empty": "% empty",
+      "sum": "Sum",
+      "avg": "Average",
+      "min": "Min",
+      "max": "Max",
+      "checked": "Checked",
+      "unchecked": "Unchecked",
+      "percent_checked": "% checked"
+    },
+    "typeDesc": {
+      "text": "Free text.",
+      "number": "Numeric value.",
+      "checkbox": "Checkbox (yes / no).",
+      "select": "One option from a list (colored badge).",
+      "multiselect": "Several options from a list.",
+      "status": "State with a colored dot, groupable as a kanban.",
+      "date": "A date, optionally with an end and/or time.",
+      "phone": "Phone number (call link).",
+      "email": "Email address (mailto link).",
+      "url": "Web link.",
+      "files": "Attached files and images.",
+      "relation": "Link to other pages.",
+      "rollup": "Aggregates a property of linked rows (via a relation).",
+      "formula": "Value computed by an expression (prop, if, math…).",
+      "created_time": "Creation date (auto, read-only).",
+      "created_by": "Creator (auto, read-only).",
+      "last_edited_time": "Last edit date (auto).",
+      "last_edited_by": "Last editor (auto)."
+    },
+    "statusSeed": {
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "done": "Done"
+    },
+    "calc": {
+      "calculate": "Calculate",
+      "none": "None",
+      "quantity": "Quantity",
+      "percentage": "Percentage",
+      "number": "Number",
+      "checkbox": "Checkbox",
+      "countAll": "Count all",
+      "countValues": "Count values",
+      "countEmpty": "Count empty",
+      "countUnique": "Count unique",
+      "percentFilled": "% filled",
+      "percentEmpty": "% empty",
+      "sum": "Sum",
+      "avg": "Average",
+      "min": "Minimum",
+      "max": "Maximum",
+      "checked": "Checked",
+      "unchecked": "Unchecked",
+      "percentChecked": "% checked"
+    },
+    "toast": {
+      "loadRowsFailed": "Failed to load rows.",
+      "iconFailed": "Failed to change the icon.",
+      "updateFailed": "Update failed.",
+      "schemaSaveFailed": "Failed to save the schema.",
+      "reciprocalCreateFailed": "Could not create the reciprocal column in the target database.",
+      "reciprocalSyncFailed": "Reciprocal relation sync incomplete.",
+      "rowCreateFailed": "Failed to create the row.",
+      "templateCreateFailed": "Failed to create from the template.",
+      "templateSaveFailed": "Failed to create the template.",
+      "templateDuplicateFailed": "Failed to duplicate the template.",
+      "rowDeleteForbidden": "Can't delete: only this row's creator can delete it.",
+      "rowDeleteFailed": "Failed to delete the row.",
+      "rowsDeleteFailed_one": "{{count}} row not deleted (insufficient rights).",
+      "rowsDeleteFailed_other": "{{count}} rows not deleted (insufficient rights).",
+      "duplicateFailed": "Duplication failed.",
+      "rowRenameFailed": "Failed to rename the row.",
+      "cellUpdateFailed": "Failed to update the cell."
+    },
+    "col": {
+      "change": "Change",
+      "decimals": "Decimals",
+      "auto": "Auto",
+      "integer": "0 (integer)",
+      "targetValue": "Target value (chart)",
+      "none": "None",
+      "sourceBase": "Source base",
+      "chooseBase": "Choose a base…",
+      "sourceLockedHint": "The source base can't be changed after creation (it would break existing links). Delete the column to start over.",
+      "chooseBaseHint": "Choose the base: only its rows will be selectable.",
+      "singleValue": "Single value",
+      "bidirectional": "Bidirectional",
+      "mirrorHint": "A mirror column will be created in the target base and kept in sync.",
+      "sourceRelation": "Source relation",
+      "choose": "— choose —",
+      "addRelationFirst": "Add a Relation column first.",
+      "aggregatedProp": "Aggregated property (linked base)",
+      "title": "Title",
+      "includeEnd": "Include an end date",
+      "includeTime": "Include time",
+      "default": "Default",
+      "defaultUpper": "DEFAULT",
+      "removeOpt": "Remove {{name}}",
+      "addToGroup": "Add to “{{name}}”",
+      "addOption": "Add an option (Enter)",
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "notConfigured": "base not configured",
+      "configureSource": "Configure the column's source base",
+      "rollupAgg": {
+        "count": "Linked row count",
+        "sum": "Sum",
+        "avg": "Average",
+        "min": "Minimum",
+        "max": "Maximum",
+        "values": "Value list"
+      },
+      "namePlaceholder": "Name"
+    },
+    "header": {
+      "sortAsc": "Sort ascending",
+      "sortDesc": "Sort descending",
+      "insertLeft": "Insert left",
+      "insertRight": "Insert right",
+      "edit": "Edit",
+      "wrap": "Wrap text",
+      "hideInView": "Hide in this view",
+      "delete": "Delete"
+    },
+    "view": {
+      "filter": "Filter",
+      "renameHint": "Double-click to rename",
+      "hideViewHere": "Hide the view here",
+      "deleteView": "Delete the view",
+      "hideViewHint": "Hide in this block (doesn't affect the database)",
+      "newView": "View",
+      "search": "Search…",
+      "settings": "Settings",
+      "hiddenViews_one": "{{count}} hidden",
+      "hiddenViews_other": "{{count}} hidden",
+      "newRow": "New row",
+      "emptyRow": "Empty row",
+      "templates": "Templates",
+      "templateFallback": "Template",
+      "defaultView": "Default (view)",
+      "default": "Default",
+      "removeDefault": "Remove default",
+      "useDefault": "Set as default",
+      "newTemplate": "New template",
+      "group": "Group",
+      "grouped": "Grouped: {{name}}",
+      "none": "None",
+      "sortLabel": "Sort:",
+      "actions": "Actions",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "clearSelection": "Clear selection",
+      "selectAll": "Select all",
+      "selectRow": "Select row",
+      "reorderRow": "Reorder row",
+      "addProperty": "Add a property",
+      "edit": "Edit",
+      "rowsSelected_one": "{{count}} row selected",
+      "rowsSelected_other": "{{count}} rows selected",
+      "image": "Image",
+      "imageCover": "Page cover",
+      "imageNone": "None",
+      "name": "Name",
+      "open": "Open",
+      "rowFallback": "Row",
+      "remove": "Remove"
+    },
+    "empty": {
+      "noRowsCreate": "No rows — click “New row” to start.",
+      "noRows": "No rows.",
+      "noResults": "No results for these filters."
+    },
+    "chart": {
+      "type": "Chart type",
+      "stack": "Stack series",
+      "axisX": "X axis (group by)",
+      "byName": "Name (one row per axis)",
+      "groupDates": "Group dates",
+      "splitSeries": "Split into series",
+      "none": "None",
+      "calc": "Calculation",
+      "colNumber": "Column (number)",
+      "transform": "Transformation",
+      "doneCol": "Status column (done)",
+      "ideal": "Ideal line",
+      "sortX": "X axis sort",
+      "sortByAxis": "By axis value",
+      "sortByValue": "By value (descending)",
+      "kind": {
+        "bar": "Bars",
+        "line": "Lines",
+        "area": "Areas",
+        "pie": "Ring",
+        "radar": "Radar",
+        "radial": "Radial"
+      },
+      "bucket": {
+        "day": "By day",
+        "week": "By week",
+        "month": "By month"
+      },
+      "agg": {
+        "count": "Row count",
+        "sum": "Sum",
+        "avg": "Average",
+        "min": "Minimum",
+        "max": "Maximum"
+      },
+      "transformKind": {
+        "none": "None",
+        "cumulative": "Cumulative",
+        "remaining": "Remaining (total − cumulative)",
+        "burndown": "Burndown (scope − done)"
+      }
+    },
+    "grid": {
+      "size": "Card size",
+      "s": "Small",
+      "m": "Medium",
+      "l": "Large"
+    },
+    "calMode": {
+      "display": "Display",
+      "month": "Month",
+      "week": "Week",
+      "day": "Day"
+    },
+    "viewCols": {
+      "table": "Displayed columns",
+      "card": "Card properties"
+    },
+    "hint": {
+      "kanbanNeedsSelect": "This kanban view needs a Select column.",
+      "calendarNeedsDate": "This calendar view needs a Date column.",
+      "chartNeedsAxis": "Pick an axis column (“Group by”) in “Settings”."
+    },
+    "dialog": {
+      "deleteColTitle": "Delete this column?",
+      "deleteColDesc": "The column “{{name}}” and its values in all rows will be permanently deleted.",
+      "deleteRowTitle": "Delete this row?",
+      "deleteRowDesc": "“{{name}}” will be permanently deleted.",
+      "bulkTitle_one": "Delete {{count}} row?",
+      "bulkTitle_other": "Delete {{count}} rows?",
+      "bulkDesc": "The selected rows will be permanently deleted.",
+      "defaultTplTitle": "Default template",
+      "defaultTplDesc": "Apply this template by default to all views of the database, or only the current view?",
+      "thisView": "This view",
+      "allViews": "All views",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "untitled": "Untitled"
+    },
+    "addView": {
+      "title": "New view",
+      "namePlaceholder": "Name",
+      "needCol": "Add a {{type}} column first.",
+      "colSelect": "Selection",
+      "colDate": "Date",
+      "colSelectOrDate": "Selection or Date",
+      "create": "Create",
+      "cancel": "Cancel",
+      "type": {
+        "table": "Table",
+        "board": "Board (kanban)",
+        "calendar": "Calendar",
+        "grid": "Gallery",
+        "chart": "Chart"
+      }
+    },
+    "viewName": {
+      "table": "Table",
+      "board": "Board",
+      "calendar": "Calendar",
+      "grid": "Gallery",
+      "chart": "Chart"
+    },
+    "act": {
+      "rowActions": "Row actions",
+      "deleteRow": "Delete row",
+      "noValue": "No value",
+      "noOptions": "No option.",
+      "addFile": "Add a file",
+      "resizeCol": "Resize column",
+      "addColumn": "Add a column",
+      "typeLabel": "Type",
+      "newCard": "New",
+      "add": "Add",
+      "collapse": "Collapse"
+    },
+    "filter": {
+      "contains": "contains…",
+      "remove": "Remove filter"
+    },
+    "inline": {
+      "unavailable": "Database unavailable.",
+      "unlock": "Unlock the view",
+      "lock": "Lock the view",
+      "locked": "Locked view (read-only)"
+    },
+    "color": {
+      "aria": "Option color",
+      "gray": "Gray",
+      "red": "Red",
+      "orange": "Orange",
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "purple": "Purple",
+      "pink": "Pink"
+    },
+    "prop": {
+      "show": "Show",
+      "hide": "Hide",
+      "hidden_one": "{{count}} hidden property",
+      "hidden_other": "{{count}} hidden properties"
+    },
+    "rel": {
+      "linkRow": "Link a row"
+    }
+  },
+  "errors": {
+    "unauthorized": "You are not signed in.",
+    "forbidden": "Access denied.",
+    "not_found": "Not found.",
+    "conflict": "This resource is already in the requested state.",
+    "too_many_requests": "Too many requests. Please try again shortly.",
+    "bad_request": "Invalid request.",
+    "server": "Something went wrong. Please try again.",
+    "network": "Cannot reach the server."
+  },
+  "settings": {
+    "title": "Settings",
+    "nav": {
+      "general": "General",
+      "account": "Account",
+      "trash": "Trash",
+      "members": "Members",
+      "workspace": "Workspace"
+    },
+    "role": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    },
+    "caps": {
+      "ownerAllAdmin": "All admin rights",
+      "ownerPromote": "Promote or demote admins",
+      "ownerDisable": "Disable an admin",
+      "ownerTransfer": "Transfer ownership (single role in the space)",
+      "adminInvite": "Invite and disable members",
+      "adminRename": "Rename the space and set the registration policy",
+      "adminPending": "View pending invitations",
+      "memberAccess": "Access the space's content",
+      "memberEdit": "Create and edit pages"
+    },
+    "profile": {
+      "title": "Profile",
+      "avatar": "Avatar",
+      "fullName": "Full name",
+      "save": "Save",
+      "prefs": "Preferences",
+      "appearance": "Appearance",
+      "updated": "Profile updated.",
+      "updateFailed": "Update failed."
+    },
+    "theme": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "grid": {
+      "label": "Background grid",
+      "plus": "Crosses",
+      "dots": "Dots",
+      "lines": "Lines",
+      "none": "None"
+    },
+    "accent": {
+      "label": "Accent color",
+      "zinc": "Zinc",
+      "blue": "Blue",
+      "violet": "Violet",
+      "green": "Green",
+      "amber": "Amber",
+      "rose": "Rose"
+    },
+    "language": {
+      "label": "Language"
+    },
+    "avatar": {
+      "edit": "Edit avatar",
+      "random": "Random",
+      "save": "Save",
+      "cancel": "Cancel",
+      "reset": "Reset",
+      "updated": "Avatar updated.",
+      "updateFailed": "Update failed.",
+      "style": "Style",
+      "hair": "Hair",
+      "ears": "Ears",
+      "eyes": "Eyes",
+      "eyebrows": "Eyebrows",
+      "nose": "Nose",
+      "glasses": "Glasses",
+      "mouth": "Mouth",
+      "hat": "Hat",
+      "clothing": "Clothing",
+      "bg": "Background",
+      "skin": "Skin",
+      "hatColor": "Hat",
+      "clothingColor": "Clothing",
+      "gradient": "Background gradient",
+      "opt": {
+        "man": "Male",
+        "woman": "Female",
+        "normal": "Normal",
+        "thick": "Thick",
+        "mohawk": "Mohawk",
+        "womanLong": "Long",
+        "womanShort": "Short",
+        "small": "Small",
+        "big": "Big",
+        "circle": "Round",
+        "oval": "Oval",
+        "smile": "Smiling",
+        "up": "Normal",
+        "upWoman": "Thin",
+        "short": "Short",
+        "long": "Long",
+        "round": "Round",
+        "none": "None",
+        "square": "Square",
+        "laugh": "Laugh",
+        "peace": "Neutral",
+        "beanie": "Beanie",
+        "turban": "Turban",
+        "hoody": "Hoodie",
+        "polo": "Polo",
+        "tshirt": "T-shirt"
+      }
+    },
+    "account": {
+      "title": "Account",
+      "email": "Email",
+      "role": "Role",
+      "memberSince": "Member since",
+      "logout": "Sign out"
+    },
+    "rolePerm": {
+      "question": "What can each role do?"
+    },
+    "members": {
+      "title": "Members",
+      "inviteByEmail": "Invite by email",
+      "invitePlaceholder": "collaborator@example.com",
+      "invite": "Invite",
+      "inviteSent": "Invitation sent to {{email}}.",
+      "inviteFailed": "Invitation failed.",
+      "actionDenied": "Action denied.",
+      "pending": "Pending invitations",
+      "revoke": "Revoke invitation",
+      "revoked": "Invitation revoked.",
+      "disabled": "disabled",
+      "viewPages": "View their pages",
+      "transfer": "Transfer ownership",
+      "disableMember": "Disable member",
+      "roleAria": "Role",
+      "roleUpdated": "Role updated.",
+      "promoteTitle": "Promote {{name}} to admin?",
+      "demoteTitle": "Demote {{name}} to member?",
+      "promoteBody": "{{name}} will be able to invite and disable members, rename the space and change the registration policy.",
+      "demoteBody": "{{name}} will lose access to member and workspace management.",
+      "promoteConfirm": "Promote admin",
+      "demoteConfirm": "Demote member",
+      "transferTitle": "Transfer ownership to {{name}}?",
+      "transferBody": "{{name}} will become the owner of the space. You'll be demoted to admin and lose owner-only rights. This action is irreversible without the new owner's consent.",
+      "transferConfirm": "Transfer ownership",
+      "transferred": "Ownership transferred.",
+      "removeTitle": "Disable {{name}}?",
+      "removeBody": "{{name}} will immediately lose access to the space and their sessions will be closed. The account can be re-enabled later.",
+      "removeConfirm": "Disable",
+      "removed": "Member disabled.",
+      "challenge": "To confirm, retype {{value}} below."
+    },
+    "level": {
+      "read": "Read",
+      "edit": "Edit",
+      "creator": "Creator",
+      "admin": "Admin"
+    },
+    "supervision": {
+      "back": "Members",
+      "note": "Administration: you can open, edit, manage shares and delete these pages. Every action is logged in the page history.",
+      "loadFailed": "Could not load this member's pages.",
+      "owned": "Owned pages ({{count}})",
+      "noOwned": "No owned pages.",
+      "sharedWith": "Invited on ({{count}})",
+      "noShared": "No pages shared with this member.",
+      "untitled": "Untitled"
+    },
+    "trash": {
+      "title": "Trash",
+      "retention": "Deleted pages are kept for 30 days, then permanently erased.",
+      "loadFailed": "Could not load the trash.",
+      "empty": "Trash is empty.",
+      "selectAll": "Select all",
+      "selected_one": "{{count}} selected",
+      "selected_other": "{{count}} selected",
+      "restore": "Restore",
+      "delete": "Delete",
+      "mine": "My pages ({{count}})",
+      "none": "None.",
+      "others": "Other members ({{count}})",
+      "deletedOn": "deleted on {{date}}",
+      "selectItem": "Select {{name}}",
+      "purge": "Delete permanently",
+      "untitled": "Untitled",
+      "restoredToast_one": "{{count}} page restored.",
+      "restoredToast_other": "{{count}} pages restored.",
+      "purgedToast_one": "{{count}} page permanently deleted.",
+      "purgedToast_other": "{{count}} pages permanently deleted.",
+      "failedToast_one": "{{count}} action failed.",
+      "failedToast_other": "{{count}} actions failed.",
+      "purgeTitle_one": "Permanently delete {{count}} page?",
+      "purgeTitle_other": "Permanently delete {{count}} pages?",
+      "restoreTitle_one": "Restore {{count}} page?",
+      "restoreTitle_other": "Restore {{count}} pages?",
+      "purgeDesc": "Irreversible: these pages (and their sub-pages) will be erased immediately, without waiting for the 30 days.",
+      "restoreDesc": "These pages (and their sub-pages) will return to their original location."
+    },
+    "workspace": {
+      "title": "Workspace",
+      "name": "Name",
+      "save": "Save",
+      "renamed": "Workspace renamed.",
+      "renameFailed": "Rename failed.",
+      "registration": "Registration",
+      "regUpdated": "Registration policy updated.",
+      "failed": "Failed.",
+      "inviteOnly": "Invite only",
+      "inviteOnlyDesc": "Only emails invited by an admin can join.",
+      "open": "Open",
+      "openDesc": "Anyone can create an account and become a member."
+    },
+    "updates": {
+      "title": "Updates",
+      "check": "Check for updates",
+      "checkDesc": "Periodically check for new releases and notify you. The only outgoing network request; sends no data about you.",
+      "current": "Current version: {{version}}",
+      "checkNow": "Check now",
+      "available": "Update available: {{version}}",
+      "upToDate": "You're up to date.",
+      "checkFailed": "Update check failed.",
+      "checking": "Checking…",
+      "viewRelease": "View release"
+    },
+    "cancel": "Cancel"
+  },
+  "formula": {
+    "group": {
+      "logic": "Logic",
+      "numbers": "Numbers",
+      "text": "Text",
+      "dates": "Dates"
+    },
+    "fn": {
+      "if": "Returns a value based on a condition.",
+      "and": "True if all arguments are true.",
+      "or": "True if at least one argument is true.",
+      "not": "Inverts a boolean.",
+      "empty": "True if the value is empty (null or \"\").",
+      "round": "Rounds to N decimals (0 by default).",
+      "abs": "Absolute value.",
+      "floor": "Rounds down to the nearest integer.",
+      "ceil": "Rounds up to the nearest integer.",
+      "sqrt": "Square root.",
+      "pow": "Power (base ^ exponent).",
+      "min": "Smallest value.",
+      "max": "Largest value.",
+      "sum": "Sum of the arguments.",
+      "number": "Converts to a number.",
+      "concat": "Concatenates texts.",
+      "text": "Converts to text.",
+      "len": "Length of a text.",
+      "upper": "Uppercases.",
+      "lower": "Lowercases.",
+      "trim": "Removes leading and trailing spaces.",
+      "contains": "True if the text contains the substring.",
+      "replace": "Replaces all occurrences.",
+      "substring": "Extracts a portion of text.",
+      "now": "Current date and time.",
+      "year": "Year of a date.",
+      "month": "Month of a date (1–12).",
+      "day": "Day of month of a date.",
+      "dateBetween": "Difference between two dates in the chosen unit."
+    },
+    "err": {
+      "unterminatedString": "Unterminated string",
+      "invalidNumber": "Invalid number: {{value}}",
+      "unexpectedChar": "Unexpected character: « {{char}} »",
+      "malformed": "Malformed expression",
+      "missingCloseParen": "Missing closing parenthesis",
+      "bareIdentifier": "« {{name}} »: use prop(\"{{name}}\") to reference a column",
+      "expected": "Expression expected",
+      "notANumber": "« {{value}} » is not a number",
+      "dateExpected": "Date expected",
+      "divByZero": "Division by zero",
+      "unknownOperator": "Unknown operator: {{op}}",
+      "unknownFunction": "Unknown function: {{name}}",
+      "circular": "Circular reference"
+    },
+    "ui": {
+      "expression": "Expression",
+      "refHintPre": "Column ref:",
+      "refHintPost": ". Click a column or a function to insert it.",
+      "searchPlaceholder": "Search a function…",
+      "noFunction": "No function.",
+      "example": "Example",
+      "hoverHint": "Hover a function to see its syntax and an example."
+    },
+    "value": {
+      "yes": "Yes",
+      "no": "No"
+    }
+  },
+  "share": {
+    "level": {
+      "read": "Reader",
+      "edit": "Editor",
+      "creator": "Creator",
+      "admin": "Admin"
+    },
+    "levelDesc": {
+      "read": "Can see everything.",
+      "edit": "View + edit data (cells, content).",
+      "creator": "Editor + create rows, columns and views.",
+      "admin": "Creator + delete rows and pages (not the database)."
+    },
+    "title": "Share the page",
+    "byEmail": "By email. An existing account is added right away; otherwise an invitation is emailed.",
+    "publishToggle": "Publish to the web",
+    "publishHint": "Readable by anyone with the link, without signing in.",
+    "includeSub": "Include sub-pages",
+    "publishedPages": "{{count}} published pages:",
+    "untitled": "Untitled",
+    "invitePlaceholder": "collaborator@example.com",
+    "invite": "Invite",
+    "rolesAria": "Roles",
+    "addMember": "Add a workspace member…",
+    "notShared": "Not shared yet.",
+    "accessLevel": "Access level",
+    "revoke": "Revoke access",
+    "invited": "Invited",
+    "copyLink": "Copy link",
+    "revokeTitle": "Remove access?",
+    "revokeDesc": "The person will lose access to this page immediately. To confirm, retype their email:",
+    "revokePlaceholder": "Retype the email here",
+    "cancel": "Cancel",
+    "revokeConfirm": "Remove access",
+    "publishWarnTitle": "Publish this page to the web?",
+    "publishWarnDesc": "Anyone with the link can view it without signing in{{sub}}. Don't publish anything confidential. You can unpublish at any time.",
+    "publishWarnSub": ", including its sub-pages",
+    "publish": "Publish",
+    "errPublish": "publishing failed",
+    "errUpdate": "update failed",
+    "errShare": "sharing failed",
+    "inviteSent": "Invitation sent to {{email}}.",
+    "status": {
+      "active": "Active",
+      "suspended": "Suspended"
+    }
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "back": "Back",
+    "continue": "Continue",
+    "start": "Get started",
+    "saveError": "Couldn't save. Please try again.",
+    "language": {
+      "title": "Choose your language",
+      "body": "You can change it later in settings."
+    },
+    "pitch": {
+      "intro": {
+        "title": "Welcome to {{app}}",
+        "body": "Your unified, self-hosted workspace. Let's take thirty seconds to set it up."
+      },
+      "pages": {
+        "title": "Everything is a page",
+        "body": "Notes, projects, databases: one block foundation. Nest sub-pages, drag, turn a paragraph into a heading or a table on the fly."
+      },
+      "collab": {
+        "title": "Together, in real time",
+        "body": "Edit together simultaneously, share a page with a colleague, or publish it read-only to the web via a simple link."
+      }
+    },
+    "name": {
+      "title": "What's your name?",
+      "body": "This name appears on your pages and to your teammates.",
+      "placeholder": "Your name"
+    },
+    "avatar": {
+      "title": "Your avatar",
+      "body": "An avatar generated just for you. Shuffle until you find one you like.",
+      "shuffle": "Generate another"
+    },
+    "theme": {
+      "title": "Light or dark?",
+      "body": "Changeable anytime in settings.",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "appearance": {
+      "title": "Your style",
+      "body": "An accent color and a background grid. Changeable anytime in settings."
+    },
+    "done": {
+      "title": "All set, {{name}}!",
+      "body": "Create your first page from the sidebar and start writing."
+    }
+  },
+  "editor": {
+    "pageLink": {
+      "deleted": "Page deleted or inaccessible",
+      "unavailable": "Page unavailable"
+    },
+    "err": {
+      "backendDown": "Cannot reach the server. Is the backend running (cargo run, :8080)?",
+      "disconnected": "Connection lost — your changes are no longer saved."
+    },
+    "reload": "Reload",
+    "group": {
+      "basic": "Basic"
+    },
+    "item": {
+      "subpage": {
+        "title": "Sub-page",
+        "subtext": "New nested page"
+      },
+      "linkPage": {
+        "title": "Link to a page",
+        "subtext": "Reference an existing page"
+      },
+      "database": {
+        "title": "Database (sub-page)",
+        "subtext": "Table of pages with properties (dedicated page)"
+      },
+      "inlineDb": {
+        "title": "Inline database",
+        "subtext": "Insert a database directly in the page"
+      },
+      "linkDb": {
+        "title": "Link an existing database",
+        "subtext": "Insert an already-created database inline"
+      }
+    },
+    "newPage": "New page"
+  },
+  "history": {
+    "title": "History",
+    "desc": "Latest changes and page analytics.",
+    "tab": {
+      "changes": "Latest changes",
+      "analytics": "Analytics"
+    },
+    "noChanges": "No changes recorded yet.",
+    "noViews": "No views recorded yet.",
+    "verb": {
+      "created": "created",
+      "modified": "edited",
+      "content": "edited the content of",
+      "deleted": "deleted"
+    },
+    "viewsWord_one": "view",
+    "viewsWord_other": "views",
+    "readersWord_one": "reader",
+    "readersWord_other": "readers"
+  },
+  "common": {
+    "changeIcon": "Change icon",
+    "subItem": "(sub-item)",
+    "cancel": "Cancel",
+    "untitled": "Untitled",
+    "empty": "empty",
+    "trashPage": {
+      "dbTitle": "Move this database to trash?",
+      "pageTitle": "Move this page to trash?",
+      "retention": "It can be restored from the trash for 30 days, then permanently deleted.",
+      "dbRows": "All its rows go to the trash too.",
+      "subpages_one": "Its {{count}} sub-page goes with it (restored together).",
+      "subpages_other": "Its {{count}} sub-pages go with it (restored together).",
+      "confirm": "Move to trash"
+    },
+    "unknownError": "Unknown error"
+  },
+  "sidebar": {
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "actions": "Actions",
+    "add": "Add",
+    "createSub": "Create a sub-page",
+    "rename": "Rename",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "pages": "Pages",
+    "favorites": "Favorites",
+    "favorite": "Add to favorites",
+    "unfavorite": "Remove from favorites",
+    "allPages": "All pages",
+    "allPagesCount": "All pages ({{count}})",
+    "newPage": "New page",
+    "newDatabase": "New database",
+    "settings": "Settings",
+    "logout": "Sign out",
+    "renameTitle": "Rename the page",
+    "titleLabel": "Title",
+    "renameConfirm": "Rename",
+    "credits": {
+      "title": "Support the project",
+      "body": "{{app}} is free and open. See what makes it possible.",
+      "cta": "Learn more"
+    }
+  },
+  "credits": {
+    "title": "What makes {{app}} possible",
+    "intro": "{{app}} is a free project, built by a small team on the shoulders of the open-source ecosystem — and, in full transparency, with the help of artificial intelligence. Here's who we owe it all to, and how you can contribute.",
+    "built": {
+      "title": "Built on open source",
+      "body": "Every building block below is an open-source project maintained by its community. Without their work, {{app}} wouldn't exist."
+    },
+    "ai": {
+      "title": "AI in the loop",
+      "body": "Let's be honest: much of {{app}} was designed and written with the help of AI agents. It lets a tiny team ship ambitious software — we'd rather own that clearly than hide it."
+    },
+    "contribute": {
+      "title": "How to contribute"
+    },
+    "sponsor": {
+      "title": "Sponsoring",
+      "body": "A one-off or recurring donation supports the time spent on the project and the AI assistant subscriptions that speed up its development. Every contribution counts.",
+      "cta": "Become a sponsor"
+    },
+    "oss": {
+      "title": "Open-source contribution",
+      "body": "Code, bug reports, translations, docs: the repository is open. All hands welcome.",
+      "cta": "View the repo"
+    },
+    "thanks": "Thanks for using {{app}}. ♥"
+  },
+  "home": {
+    "greeting": "Hello {{name}}",
+    "empty": "Create or select a page to start."
+  },
+  "allPages": {
+    "title": "All pages",
+    "count": "{{count}} accessible",
+    "search": "Filter pages…",
+    "empty": "You don't have any pages yet.",
+    "noMatch": "No page matches your search."
+  },
+  "updateConsent": {
+    "title": "Check for updates?",
+    "body": "{{app}} can check for new releases and notify you when one is available. This is the only outgoing network request it makes, and it sends no data about you. You can change this anytime in settings.",
+    "accept": "Enable update checks",
+    "decline": "Not now"
+  },
+  "notif": {
+    "title": "Notifications",
+    "inbox": "Inbox",
+    "archive": "Archive",
+    "empty": "No notifications",
+    "archiveAll": "Archive all",
+    "archiveOne": "Archive",
+    "msg": {
+      "share": "<b>{{actor}}</b> invited you to <b>{{page}}</b>",
+      "update": "A new version is available: <b>{{version}}</b>"
+    }
+  },
+  "invite": {
+    "fallbackPage": "a page",
+    "invalid": "This invitation is invalid or expired.",
+    "goHome": "Go to home",
+    "mismatch": "This invitation is for {{email}}, but you're signed in as {{me}}.",
+    "switchAccount": "Sign out and switch account",
+    "sent": "Link sent to {{email}}. Open it to sign in and join “{{title}}”.",
+    "devNote": "(In dev without SMTP: the link is in the server logs.)",
+    "title": "Invitation",
+    "inviterInvites": "{{inviter}} invites you to collaborate on “{{title}}”.",
+    "getLink": "Get a sign-in link",
+    "passwordless": "Passwordless sign-in. An account is created if needed."
+  },
+  "page": {
+    "publicNotFound": "This public page can't be found or is no longer shared.",
+    "noAccess": "You don't have access to this page",
+    "coverChange": "Change",
+    "coverRemove": "Remove",
+    "addIcon": "Add an icon",
+    "addCover": "Add a cover",
+    "networkTitle": "Cannot reach the server",
+    "unavailableTitle": "Page unavailable",
+    "networkBody": "Is the backend running (cargo run, :8080)?",
+    "unavailableBody": "This page no longer exists or your access was removed.",
+    "backHome": "Back to home",
+    "templateBadge": "Template · variables",
+    "templateInstructions": "Insert these variables in the title, a text property or a date column. They're replaced when a row is created from this template.",
+    "copy": "Copy",
+    "egPrefix": "e.g."
+  },
+  "calendar": {
+    "today": "Today",
+    "add": "Add",
+    "noEntries": "No entries.",
+    "prev": "Previous",
+    "next": "Next",
+    "addEntry": "Add an entry on this day",
+    "rowActions": "Row actions",
+    "deleteRow": "Delete row"
+  },
+  "chart": {
+    "all": "All",
+    "noDate": "No date",
+    "remaining": "Remaining",
+    "ideal": "Ideal",
+    "target": "Target",
+    "rowCount": "Row count",
+    "noData": "No data to display."
+  },
+  "templateTokens": {
+    "date": "Row creation date.",
+    "datetime": "Creation date and time.",
+    "time": "Creation time.",
+    "year": "Creation year.",
+    "month": "Month (2 digits).",
+    "day": "Day of month (2 digits).",
+    "n": "Auto-incremented sequence number.",
+    "nPad": "Sequence number on N digits (leading zeros).",
+    "user": "Name of the person creating the row."
+  },
+  "updateApply": {
+    "apply": "Update",
+    "confirmTitle": "Update to {{version}}?",
+    "disclaimer": "The server will download, verify and install the new version, then restart — briefly interrupting all connected users. Your database is backed up first. This cannot be undone (roll back by restoring the backup and the previous binary).",
+    "confirm": "Update and restart",
+    "applying": "Updating…",
+    "doNotClose": "Do not close this window.",
+    "done": "Updated to {{version}}",
+    "doneBody": "The server restarted on the new version. Reload to continue.",
+    "reload": "Reload",
+    "failed": "Update failed",
+    "step": {
+      "downloading": "Downloading…",
+      "verifying": "Verifying signature…",
+      "backingUp": "Backing up the database…",
+      "swapping": "Installing…",
+      "restarting": "Restarting…"
+    }
+  }
+}

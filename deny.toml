@@ -1,0 +1,48 @@
+# cargo-deny policy (supply chain, cf. spec §7 "Supply chain & CI").
+# Blocks in CI: known vulnerabilities (RustSec), untrusted sources, licenses
+# outside the approved list. Complements `cargo audit` (advisories) and `pnpm audit` (frontend).
+
+[advisories]
+version = 2
+# No vulnerabilities tolerated by default (native behavior of v2).
+# Justified exceptions are declared here, never silently.
+ignore = [
+    # rsa timing sidechannel (Marvin attack). Pulled ONLY by sqlx-mysql, which
+    # is not compiled: sqlx is built with the sqlite feature only, so rsa never
+    # enters the binary. No patch exists upstream. Re-evaluate if MySQL is ever
+    # enabled. Matched by cargo-audit via the same --ignore in CI.
+    "RUSTSEC-2023-0071",
+]
+
+[licenses]
+version = 2
+# Permissive licenses allowed for the dependency tree. Any new dep
+# under a license missing from here fails the CI → explicit decision required.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "0BSD",
+    "ISC",
+    "Zlib",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+# `bramblekeep` is the application binary (not published on crates.io): no
+# `license` field required on itself.
+private = { ignore = true }
+
+[bans]
+# Multiple versions of the same crate: tolerated (common in a real tree), non-
+# blocking. The real risk (vulnerability) is covered by [advisories].
+multiple-versions = "allow"
+wildcards = "allow"
+
+[sources]
+# Only accept crates.io: no unreviewed git/registry dependencies allowed.
+unknown-registry = "deny"
+unknown-git = "deny"

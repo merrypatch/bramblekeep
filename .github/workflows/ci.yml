@@ -1,0 +1,80 @@
+name: CI
+
+# `main` always green (cf. CLAUDE.md). Gate = the project validation command
+# + supply chain audits (spec §7, blocking).
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Backend: strict clippy + tests (the Rust half of the validation command).
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # web/dist must exist for rust-embed (build.rs). A placeholder is sufficient
+      # to compile/test the backend (tests do not serve the real frontend).
+      - run: mkdir -p web/dist && touch web/dist/index.html
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  # Frontend: typecheck + real lint (ESLint) + unit tests (vitest).
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+  # Supply chain (blocking, spec §7): RustSec advisories +
+  # licenses/sources (cargo-deny), and an OSV scan of the frontend lockfile.
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: cargo audit (advisories RustSec)
+        # RUSTSEC-2023-0071 (rsa Marvin timing sidechannel): pulled only by
+        # sqlx-mysql, which is NOT compiled (sqlx is built sqlite-only), so rsa
+        # never enters the binary. No upstream patch. Also ignored in deny.toml.
+        run: cargo audit --ignore RUSTSEC-2023-0071
+      - name: cargo deny (advisories, licenses, sources)
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses sources
+      - name: frontend dependency audit (OSV, pnpm lockfile)
+        # npm retired the audit endpoint `pnpm audit` calls (HTTP 410). OSV
+        # scanning the lockfile is the maintained replacement — the OSV DB
+        # aggregates GHSA/npm advisories. Non-zero exit if any advisory is found.
+        run: |
+          curl -sSL https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_amd64 -o "$RUNNER_TEMP/osv-scanner"
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+          "$RUNNER_TEMP/osv-scanner" --lockfile=web/pnpm-lock.yaml

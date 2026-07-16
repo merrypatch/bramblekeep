@@ -1,0 +1,1042 @@
+{
+  "pageMenu": {
+    "options": "Options",
+    "favorite": "Ajouter aux favoris",
+    "unfavorite": "Retirer des favoris",
+    "share": "Partager",
+    "history": "Historique des modifications",
+    "exportMd": "Exporter en Markdown",
+    "exportPdf": "Exporter en PDF (impression)",
+    "exportCsv": "Exporter en CSV",
+    "deletePage": "Supprimer la page",
+    "deleteDb": "Supprimer la base"
+  },
+  "auth": {
+    "brandSubtitle": "Connexion sans mot de passe — reçois un lien par email.",
+    "verifying": "Connexion…",
+    "linkInvalid": "Lien invalide ou expiré.",
+    "sendFailed": "Impossible d'envoyer le lien. Réessaie.",
+    "sent": "Lien envoyé à {{email}}. Ouvre-le pour te connecter.",
+    "emailPlaceholder": "toi@exemple.com",
+    "getLink": "Recevoir le lien"
+  },
+  "search": {
+    "placeholder": "Rechercher…",
+    "noResults": "Aucun résultat."
+  },
+  "iconPicker": {
+    "emoji": "Emoji",
+    "icons": "Icônes",
+    "remove": "Retirer",
+    "searchPlaceholder": "Rechercher une icône…",
+    "noIcons": "Aucune icône."
+  },
+  "pageLinkDialog": {
+    "titleDb": "Lier une base existante",
+    "titlePage": "Lien vers une page",
+    "descDb": "Insère une base de données existante, rendue en ligne.",
+    "descPage": "Référence une page existante (sans la déplacer).",
+    "searchDb": "Rechercher une base…",
+    "searchPage": "Rechercher une page…",
+    "emptyDb": "Aucune base.",
+    "emptyPage": "Aucune page."
+  },
+  "publishConsent": {
+    "title": "Cette sous-page sera publique",
+    "body": "La page parente est publiée sur le web. Cette sous-page sera accessible à tous, sans connexion, via le même lien public. Vous pourrez la dépublier à tout moment.",
+    "confirm": "Créer la sous-page"
+  },
+  "db": {
+    "columnType": {
+      "text": "Texte",
+      "number": "Nombre",
+      "checkbox": "Case",
+      "select": "Sélection",
+      "multiselect": "Multi-sélection",
+      "status": "État",
+      "date": "Date",
+      "phone": "Téléphone",
+      "email": "E-mail",
+      "url": "URL",
+      "files": "Fichiers & médias",
+      "relation": "Relation",
+      "rollup": "Rollup",
+      "formula": "Formule",
+      "created_time": "Date de création",
+      "created_by": "Créé par",
+      "last_edited_time": "Dernière modification",
+      "last_edited_by": "Modifié par"
+    },
+    "statusGroup": {
+      "todo": "À faire",
+      "doing": "En cours",
+      "done": "Terminé"
+    }
+  },
+  "dbview": {
+    "agg": {
+      "count": "Tout",
+      "count_values": "Valeurs",
+      "count_empty": "Vides",
+      "count_unique": "Uniques",
+      "percent_filled": "% remplies",
+      "percent_empty": "% vides",
+      "sum": "Somme",
+      "avg": "Moyenne",
+      "min": "Min",
+      "max": "Max",
+      "checked": "Cochées",
+      "unchecked": "Décochées",
+      "percent_checked": "% cochées"
+    },
+    "typeDesc": {
+      "text": "Texte libre.",
+      "number": "Valeur numérique.",
+      "checkbox": "Case à cocher (oui / non).",
+      "select": "Une option parmi une liste (badge coloré).",
+      "multiselect": "Plusieurs options parmi une liste.",
+      "status": "État avec pastille de couleur, groupable en kanban.",
+      "date": "Une date, avec fin et/ou heure en option.",
+      "phone": "Numéro de téléphone (lien d'appel).",
+      "email": "Adresse e-mail (lien mailto).",
+      "url": "Lien web.",
+      "files": "Fichiers et images joints.",
+      "relation": "Lien vers d'autres pages.",
+      "rollup": "Agrège une propriété des lignes liées (via une relation).",
+      "formula": "Valeur calculée par une expression (prop, if, math…).",
+      "created_time": "Date de création (auto, lecture seule).",
+      "created_by": "Auteur de la création (auto, lecture seule).",
+      "last_edited_time": "Date de dernière modification (auto).",
+      "last_edited_by": "Dernier modificateur (auto)."
+    },
+    "statusSeed": {
+      "notStarted": "Pas commencé",
+      "inProgress": "En cours",
+      "done": "Terminé"
+    },
+    "calc": {
+      "calculate": "Calculer",
+      "none": "Aucun",
+      "quantity": "Quantité",
+      "percentage": "Pourcentage",
+      "number": "Nombre",
+      "checkbox": "Case",
+      "countAll": "Compter tout",
+      "countValues": "Compter les valeurs",
+      "countEmpty": "Compter les vides",
+      "countUnique": "Compter les uniques",
+      "percentFilled": "% rempli",
+      "percentEmpty": "% vide",
+      "sum": "Somme",
+      "avg": "Moyenne",
+      "min": "Minimum",
+      "max": "Maximum",
+      "checked": "Cochées",
+      "unchecked": "Décochées",
+      "percentChecked": "% cochées"
+    },
+    "toast": {
+      "loadRowsFailed": "Le chargement des lignes a échoué.",
+      "iconFailed": "Le changement d'icône a échoué.",
+      "updateFailed": "La mise à jour a échoué.",
+      "schemaSaveFailed": "L'enregistrement du schéma a échoué.",
+      "reciprocalCreateFailed": "Impossible de créer la colonne réciproque dans la base cible.",
+      "reciprocalSyncFailed": "Synchronisation de la relation réciproque incomplète.",
+      "rowCreateFailed": "La création de la ligne a échoué.",
+      "templateCreateFailed": "La création depuis le modèle a échoué.",
+      "templateSaveFailed": "La création du modèle a échoué.",
+      "templateDuplicateFailed": "La duplication du modèle a échoué.",
+      "rowDeleteForbidden": "Suppression impossible : seul le créateur de cette ligne peut la supprimer.",
+      "rowDeleteFailed": "La suppression de la ligne a échoué.",
+      "rowsDeleteFailed_one": "{{count}} ligne non supprimée (droits insuffisants).",
+      "rowsDeleteFailed_other": "{{count}} lignes non supprimées (droits insuffisants).",
+      "duplicateFailed": "La duplication a échoué.",
+      "rowRenameFailed": "Le renommage de la ligne a échoué.",
+      "cellUpdateFailed": "La modification de la cellule a échoué."
+    },
+    "col": {
+      "change": "Changer",
+      "decimals": "Décimales",
+      "auto": "Auto",
+      "integer": "0 (entier)",
+      "targetValue": "Valeur cible (graphique)",
+      "none": "Aucune",
+      "sourceBase": "Base source",
+      "chooseBase": "Choisir une base…",
+      "sourceLockedHint": "La base source ne peut pas être changée après création (elle briserait les liens existants). Supprime la colonne pour repartir.",
+      "chooseBaseHint": "Choisis la base : seules ses lignes seront sélectionnables.",
+      "singleValue": "Une seule valeur",
+      "bidirectional": "Bidirectionnelle",
+      "mirrorHint": "Une colonne miroir sera créée dans la base cible et tenue synchronisée.",
+      "sourceRelation": "Relation source",
+      "choose": "— choisir —",
+      "addRelationFirst": "Ajoute d'abord une colonne Relation.",
+      "aggregatedProp": "Propriété agrégée (base liée)",
+      "title": "Titre",
+      "includeEnd": "Inclure une date de fin",
+      "includeTime": "Inclure l'heure",
+      "default": "Défaut",
+      "defaultUpper": "PAR DÉFAUT",
+      "removeOpt": "Retirer {{name}}",
+      "addToGroup": "Ajouter à « {{name}} »",
+      "addOption": "Ajouter une option (Entrée)",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "delete": "Supprimer",
+      "notConfigured": "base non configurée",
+      "configureSource": "Configure la base source de la colonne",
+      "rollupAgg": {
+        "count": "Nombre de lignes liées",
+        "sum": "Somme",
+        "avg": "Moyenne",
+        "min": "Minimum",
+        "max": "Maximum",
+        "values": "Liste des valeurs"
+      },
+      "namePlaceholder": "Nom"
+    },
+    "header": {
+      "sortAsc": "Trier croissant",
+      "sortDesc": "Trier décroissant",
+      "insertLeft": "Insérer à gauche",
+      "insertRight": "Insérer à droite",
+      "edit": "Modifier",
+      "wrap": "Retour à la ligne",
+      "hideInView": "Masquer dans cette vue",
+      "delete": "Supprimer"
+    },
+    "view": {
+      "filter": "Filtrer",
+      "renameHint": "Double-cliquer pour renommer",
+      "hideViewHere": "Masquer la vue ici",
+      "deleteView": "Supprimer la vue",
+      "hideViewHint": "Masquer dans ce bloc (n'affecte pas la base)",
+      "newView": "Vue",
+      "search": "Rechercher…",
+      "settings": "Paramètres",
+      "hiddenViews_one": "{{count}} masquée",
+      "hiddenViews_other": "{{count}} masquées",
+      "newRow": "Nouvelle ligne",
+      "emptyRow": "Ligne vide",
+      "templates": "Modèles",
+      "templateFallback": "Modèle",
+      "defaultView": "Défaut (vue)",
+      "default": "Défaut",
+      "removeDefault": "Retirer par défaut",
+      "useDefault": "Utiliser par défaut",
+      "newTemplate": "Nouveau modèle",
+      "group": "Grouper",
+      "grouped": "Groupé : {{name}}",
+      "none": "Aucun",
+      "sortLabel": "Tri :",
+      "actions": "Actions",
+      "duplicate": "Dupliquer",
+      "delete": "Supprimer",
+      "clearSelection": "Annuler la sélection",
+      "selectAll": "Tout sélectionner",
+      "selectRow": "Sélectionner la ligne",
+      "reorderRow": "Réordonner la ligne",
+      "addProperty": "Ajouter une propriété",
+      "edit": "Modifier",
+      "rowsSelected_one": "{{count}} ligne sélectionnée",
+      "rowsSelected_other": "{{count}} lignes sélectionnées",
+      "image": "Image",
+      "imageCover": "Couverture de la page",
+      "imageNone": "Aucune",
+      "name": "Nom",
+      "open": "Ouvrir",
+      "rowFallback": "Ligne",
+      "remove": "Retirer"
+    },
+    "empty": {
+      "noRowsCreate": "Aucune ligne — clique sur « Nouvelle ligne » pour commencer.",
+      "noRows": "Aucune ligne.",
+      "noResults": "Aucun résultat pour ces filtres."
+    },
+    "chart": {
+      "type": "Type de graphique",
+      "stack": "Empiler les séries",
+      "axisX": "Axe X (grouper par)",
+      "byName": "Nom (une ligne par axe)",
+      "groupDates": "Regrouper les dates",
+      "splitSeries": "Découper en séries",
+      "none": "Aucune",
+      "calc": "Calcul",
+      "colNumber": "Colonne (nombre)",
+      "transform": "Transformation",
+      "doneCol": "Colonne d'état (terminé)",
+      "ideal": "Ligne idéale",
+      "sortX": "Tri de l'axe X",
+      "sortByAxis": "Par valeur d'axe",
+      "sortByValue": "Par valeur (décroissant)",
+      "kind": {
+        "bar": "Barres",
+        "line": "Lignes",
+        "area": "Aires",
+        "pie": "Anneau",
+        "radar": "Radar",
+        "radial": "Radial"
+      },
+      "bucket": {
+        "day": "Par jour",
+        "week": "Par semaine",
+        "month": "Par mois"
+      },
+      "agg": {
+        "count": "Nombre de lignes",
+        "sum": "Somme",
+        "avg": "Moyenne",
+        "min": "Minimum",
+        "max": "Maximum"
+      },
+      "transformKind": {
+        "none": "Aucune",
+        "cumulative": "Cumulatif",
+        "remaining": "Restant (total − cumul)",
+        "burndown": "Burndown (scope − terminé)"
+      }
+    },
+    "grid": {
+      "size": "Taille des cartes",
+      "s": "Petite",
+      "m": "Moyenne",
+      "l": "Grande"
+    },
+    "calMode": {
+      "display": "Affichage",
+      "month": "Mois",
+      "week": "Semaine",
+      "day": "Jour"
+    },
+    "viewCols": {
+      "table": "Colonnes affichées",
+      "card": "Propriétés sur la carte"
+    },
+    "hint": {
+      "kanbanNeedsSelect": "Cette vue kanban a besoin d'une colonne de type Sélection.",
+      "calendarNeedsDate": "Cette vue calendrier a besoin d'une colonne de type Date.",
+      "chartNeedsAxis": "Choisis une colonne d'axe (« Grouper par ») dans « Paramètres »."
+    },
+    "dialog": {
+      "deleteColTitle": "Supprimer cette colonne ?",
+      "deleteColDesc": "La colonne « {{name}} » et ses valeurs dans toutes les lignes seront supprimées définitivement.",
+      "deleteRowTitle": "Supprimer cette ligne ?",
+      "deleteRowDesc": "« {{name}} » sera supprimée définitivement.",
+      "bulkTitle_one": "Supprimer {{count}} ligne ?",
+      "bulkTitle_other": "Supprimer {{count}} lignes ?",
+      "bulkDesc": "Les lignes sélectionnées seront supprimées définitivement.",
+      "defaultTplTitle": "Modèle par défaut",
+      "defaultTplDesc": "Appliquer ce modèle par défaut à toutes les vues de la base, ou seulement à la vue courante ?",
+      "thisView": "Cette vue",
+      "allViews": "Toutes les vues",
+      "cancel": "Annuler",
+      "delete": "Supprimer",
+      "untitled": "Sans titre"
+    },
+    "addView": {
+      "title": "Nouvelle vue",
+      "namePlaceholder": "Nom",
+      "needCol": "Ajoute d'abord une colonne {{type}}.",
+      "colSelect": "Sélection",
+      "colDate": "Date",
+      "colSelectOrDate": "Sélection ou Date",
+      "create": "Créer",
+      "cancel": "Annuler",
+      "type": {
+        "table": "Table",
+        "board": "Tableau (kanban)",
+        "calendar": "Calendrier",
+        "grid": "Grille (galerie)",
+        "chart": "Graphique"
+      }
+    },
+    "viewName": {
+      "table": "Table",
+      "board": "Tableau",
+      "calendar": "Calendrier",
+      "grid": "Grille",
+      "chart": "Graphique"
+    },
+    "act": {
+      "rowActions": "Actions de la ligne",
+      "deleteRow": "Supprimer la ligne",
+      "noValue": "Sans valeur",
+      "noOptions": "Aucune option.",
+      "addFile": "Ajouter un fichier",
+      "resizeCol": "Redimensionner la colonne",
+      "addColumn": "Ajouter une colonne",
+      "typeLabel": "Type",
+      "newCard": "Nouvelle",
+      "add": "Ajouter",
+      "collapse": "Replier"
+    },
+    "filter": {
+      "contains": "contient…",
+      "remove": "Retirer le filtre"
+    },
+    "inline": {
+      "unavailable": "Base de données indisponible.",
+      "unlock": "Déverrouiller la vue",
+      "lock": "Verrouiller la vue",
+      "locked": "Vue verrouillée (lecture seule)"
+    },
+    "color": {
+      "aria": "Couleur de l'option",
+      "gray": "Gris",
+      "red": "Rouge",
+      "orange": "Orange",
+      "yellow": "Jaune",
+      "green": "Vert",
+      "blue": "Bleu",
+      "purple": "Violet",
+      "pink": "Rose"
+    },
+    "prop": {
+      "show": "Afficher",
+      "hide": "Masquer",
+      "hidden_one": "{{count}} propriété masquée",
+      "hidden_other": "{{count}} propriétés masquées"
+    },
+    "rel": {
+      "linkRow": "Lier une ligne"
+    }
+  },
+  "errors": {
+    "unauthorized": "Vous n'êtes pas connecté.",
+    "forbidden": "Accès refusé.",
+    "not_found": "Introuvable.",
+    "conflict": "Cette ressource est déjà dans l'état demandé.",
+    "too_many_requests": "Trop de requêtes. Réessayez dans un instant.",
+    "bad_request": "Requête invalide.",
+    "server": "Une erreur est survenue. Réessayez.",
+    "network": "Impossible de joindre le serveur."
+  },
+  "settings": {
+    "title": "Paramètres",
+    "nav": {
+      "general": "Général",
+      "account": "Compte",
+      "trash": "Corbeille",
+      "members": "Membres",
+      "workspace": "Espace de travail"
+    },
+    "role": {
+      "owner": "Propriétaire",
+      "admin": "Admin",
+      "member": "Membre"
+    },
+    "caps": {
+      "ownerAllAdmin": "Tous les droits d'un admin",
+      "ownerPromote": "Promouvoir ou rétrograder les admins",
+      "ownerDisable": "Désactiver un admin",
+      "ownerTransfer": "Transférer la propriété (rôle unique dans l'espace)",
+      "adminInvite": "Inviter et désactiver des membres",
+      "adminRename": "Renommer l'espace et régler la politique d'inscription",
+      "adminPending": "Consulter les invitations en attente",
+      "memberAccess": "Accéder au contenu de l'espace",
+      "memberEdit": "Créer et éditer des pages"
+    },
+    "profile": {
+      "title": "Profil",
+      "avatar": "Avatar",
+      "fullName": "Nom complet",
+      "save": "Enregistrer",
+      "prefs": "Préférences",
+      "appearance": "Apparence",
+      "updated": "Profil mis à jour.",
+      "updateFailed": "Échec de la mise à jour."
+    },
+    "theme": {
+      "system": "Système",
+      "light": "Clair",
+      "dark": "Sombre"
+    },
+    "grid": {
+      "label": "Trame de fond",
+      "plus": "Croix",
+      "dots": "Points",
+      "lines": "Lignes",
+      "none": "Aucune"
+    },
+    "accent": {
+      "label": "Couleur d'accent",
+      "zinc": "Zinc",
+      "blue": "Bleu",
+      "violet": "Violet",
+      "green": "Vert",
+      "amber": "Ambre",
+      "rose": "Rose"
+    },
+    "language": {
+      "label": "Langue"
+    },
+    "avatar": {
+      "edit": "Éditer l'avatar",
+      "random": "Aléatoire",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "reset": "Réinitialiser",
+      "updated": "Avatar mis à jour.",
+      "updateFailed": "Échec de la mise à jour.",
+      "style": "Style",
+      "hair": "Cheveux",
+      "ears": "Oreilles",
+      "eyes": "Yeux",
+      "eyebrows": "Sourcils",
+      "nose": "Nez",
+      "glasses": "Lunettes",
+      "mouth": "Bouche",
+      "hat": "Chapeau",
+      "clothing": "Vêtement",
+      "bg": "Fond",
+      "skin": "Peau",
+      "hatColor": "Chapeau",
+      "clothingColor": "Vêtement",
+      "gradient": "Dégradé de fond",
+      "opt": {
+        "man": "Masculin",
+        "woman": "Féminin",
+        "normal": "Normal",
+        "thick": "Épais",
+        "mohawk": "Crête",
+        "womanLong": "Longs",
+        "womanShort": "Courts",
+        "small": "Petites",
+        "big": "Grandes",
+        "circle": "Ronds",
+        "oval": "Ovales",
+        "smile": "Rieurs",
+        "up": "Normaux",
+        "upWoman": "Fins",
+        "short": "Court",
+        "long": "Long",
+        "round": "Rond",
+        "none": "Aucune",
+        "square": "Carrées",
+        "laugh": "Rire",
+        "peace": "Neutre",
+        "beanie": "Bonnet",
+        "turban": "Turban",
+        "hoody": "Sweat",
+        "polo": "Polo",
+        "tshirt": "T-shirt"
+      }
+    },
+    "account": {
+      "title": "Compte",
+      "email": "Email",
+      "role": "Rôle",
+      "memberSince": "Membre depuis",
+      "logout": "Se déconnecter"
+    },
+    "rolePerm": {
+      "question": "Que peut faire chaque rôle ?"
+    },
+    "members": {
+      "title": "Membres",
+      "inviteByEmail": "Inviter par email",
+      "invitePlaceholder": "collaborateur@exemple.com",
+      "invite": "Inviter",
+      "inviteSent": "Invitation envoyée à {{email}}.",
+      "inviteFailed": "Échec de l'invitation.",
+      "actionDenied": "Action refusée.",
+      "pending": "Invitations en attente",
+      "revoke": "Révoquer l'invitation",
+      "revoked": "Invitation révoquée.",
+      "disabled": "désactivé",
+      "viewPages": "Voir ses pages",
+      "transfer": "Transférer la propriété",
+      "disableMember": "Désactiver le membre",
+      "roleAria": "Rôle",
+      "roleUpdated": "Rôle mis à jour.",
+      "promoteTitle": "Promouvoir {{name}} admin ?",
+      "demoteTitle": "Rétrograder {{name}} membre ?",
+      "promoteBody": "{{name}} pourra inviter et désactiver des membres, renommer l'espace et changer la politique d'inscription.",
+      "demoteBody": "{{name}} perdra l'accès à la gestion des membres et de l'espace de travail.",
+      "promoteConfirm": "Promouvoir admin",
+      "demoteConfirm": "Rétrograder membre",
+      "transferTitle": "Transférer la propriété à {{name}} ?",
+      "transferBody": "{{name}} deviendra propriétaire de l'espace. Vous serez rétrogradé au rang d'admin et perdrez les droits réservés au propriétaire. Cette action est irréversible sans l'accord du nouveau propriétaire.",
+      "transferConfirm": "Transférer la propriété",
+      "transferred": "Propriété transférée.",
+      "removeTitle": "Désactiver {{name}} ?",
+      "removeBody": "{{name}} perdra immédiatement l'accès à l'espace et ses sessions seront fermées. Le compte pourra être réactivé plus tard.",
+      "removeConfirm": "Désactiver",
+      "removed": "Membre désactivé.",
+      "challenge": "Pour confirmer, recopiez {{value}} ci-dessous."
+    },
+    "level": {
+      "read": "Lecture",
+      "edit": "Édition",
+      "creator": "Créateur",
+      "admin": "Admin"
+    },
+    "supervision": {
+      "back": "Membres",
+      "note": "Administration : vous pouvez ouvrir, modifier, gérer les partages et supprimer ces pages. Chaque action est tracée dans l'historique de la page.",
+      "loadFailed": "Impossible de charger les pages de ce membre.",
+      "owned": "Pages possédées ({{count}})",
+      "noOwned": "Aucune page possédée.",
+      "sharedWith": "Invité sur ({{count}})",
+      "noShared": "Aucune page partagée avec ce membre.",
+      "untitled": "Sans titre"
+    },
+    "trash": {
+      "title": "Corbeille",
+      "retention": "Les pages supprimées sont conservées 30 jours, puis effacées définitivement.",
+      "loadFailed": "Impossible de charger la corbeille.",
+      "empty": "Corbeille vide.",
+      "selectAll": "Tout sélectionner",
+      "selected_one": "{{count}} sélectionnée",
+      "selected_other": "{{count}} sélectionnées",
+      "restore": "Restaurer",
+      "delete": "Supprimer",
+      "mine": "Mes pages ({{count}})",
+      "none": "Aucune.",
+      "others": "Autres membres ({{count}})",
+      "deletedOn": "supprimée le {{date}}",
+      "selectItem": "Sélectionner {{name}}",
+      "purge": "Supprimer définitivement",
+      "untitled": "Sans titre",
+      "restoredToast_one": "{{count}} page restaurée.",
+      "restoredToast_other": "{{count}} pages restaurées.",
+      "purgedToast_one": "{{count}} page supprimée définitivement.",
+      "purgedToast_other": "{{count}} pages supprimées définitivement.",
+      "failedToast_one": "{{count}} action en échec.",
+      "failedToast_other": "{{count}} actions en échec.",
+      "purgeTitle_one": "Supprimer définitivement {{count}} page ?",
+      "purgeTitle_other": "Supprimer définitivement {{count}} pages ?",
+      "restoreTitle_one": "Restaurer {{count}} page ?",
+      "restoreTitle_other": "Restaurer {{count}} pages ?",
+      "purgeDesc": "Action irréversible : ces pages (et leurs sous-pages) seront effacées immédiatement, sans attendre les 30 jours.",
+      "restoreDesc": "Ces pages (et leurs sous-pages) reviendront à leur emplacement d'origine."
+    },
+    "workspace": {
+      "title": "Espace de travail",
+      "name": "Nom",
+      "save": "Enregistrer",
+      "renamed": "Espace de travail renommé.",
+      "renameFailed": "Échec du renommage.",
+      "registration": "Inscription",
+      "regUpdated": "Politique d'inscription mise à jour.",
+      "failed": "Échec.",
+      "inviteOnly": "Sur invitation",
+      "inviteOnlyDesc": "Seuls les emails invités par un admin peuvent rejoindre.",
+      "open": "Ouverte",
+      "openDesc": "N'importe qui peut créer un compte et devenir membre."
+    },
+    "updates": {
+      "title": "Mises à jour",
+      "check": "Vérifier les mises à jour",
+      "checkDesc": "Vérifie périodiquement les nouvelles versions et vous notifie. Seul appel réseau sortant ; n'envoie aucune donnée vous concernant.",
+      "current": "Version actuelle : {{version}}",
+      "checkNow": "Vérifier maintenant",
+      "available": "Mise à jour disponible : {{version}}",
+      "upToDate": "Vous êtes à jour.",
+      "checkFailed": "Échec de la vérification.",
+      "checking": "Vérification…",
+      "viewRelease": "Voir la release"
+    },
+    "cancel": "Annuler"
+  },
+  "formula": {
+    "group": {
+      "logic": "Logique",
+      "numbers": "Nombres",
+      "text": "Texte",
+      "dates": "Dates"
+    },
+    "fn": {
+      "if": "Renvoie une valeur selon une condition.",
+      "and": "Vrai si tous les arguments sont vrais.",
+      "or": "Vrai si au moins un argument est vrai.",
+      "not": "Inverse un booléen.",
+      "empty": "Vrai si la valeur est vide (null ou \"\").",
+      "round": "Arrondit à N décimales (0 par défaut).",
+      "abs": "Valeur absolue.",
+      "floor": "Arrondit à l'entier inférieur.",
+      "ceil": "Arrondit à l'entier supérieur.",
+      "sqrt": "Racine carrée.",
+      "pow": "Puissance (base ^ exposant).",
+      "min": "Plus petite valeur.",
+      "max": "Plus grande valeur.",
+      "sum": "Somme des arguments.",
+      "number": "Convertit en nombre.",
+      "concat": "Concatène des textes.",
+      "text": "Convertit en texte.",
+      "len": "Longueur d'un texte.",
+      "upper": "Met en majuscules.",
+      "lower": "Met en minuscules.",
+      "trim": "Retire les espaces aux extrémités.",
+      "contains": "Vrai si le texte contient la sous-chaîne.",
+      "replace": "Remplace toutes les occurrences.",
+      "substring": "Extrait une portion de texte.",
+      "now": "Date et heure actuelles.",
+      "year": "Année d'une date.",
+      "month": "Mois d'une date (1–12).",
+      "day": "Jour du mois d'une date.",
+      "dateBetween": "Écart entre deux dates dans l'unité choisie."
+    },
+    "err": {
+      "unterminatedString": "Chaîne non terminée",
+      "invalidNumber": "Nombre invalide : {{value}}",
+      "unexpectedChar": "Caractère inattendu : « {{char}} »",
+      "malformed": "Expression mal formée",
+      "missingCloseParen": "Parenthèse fermante manquante",
+      "bareIdentifier": "« {{name}} » : utilisez prop(\"{{name}}\") pour référencer une colonne",
+      "expected": "Expression attendue",
+      "notANumber": "« {{value}} » n'est pas un nombre",
+      "dateExpected": "Date attendue",
+      "divByZero": "Division par zéro",
+      "unknownOperator": "Opérateur inconnu : {{op}}",
+      "unknownFunction": "Fonction inconnue : {{name}}",
+      "circular": "Référence circulaire"
+    },
+    "ui": {
+      "expression": "Expression",
+      "refHintPre": "Réf. colonne :",
+      "refHintPost": ". Clique une colonne ou une fonction pour l'insérer.",
+      "searchPlaceholder": "Rechercher une fonction…",
+      "noFunction": "Aucune fonction.",
+      "example": "Exemple",
+      "hoverHint": "Survole une fonction pour voir sa syntaxe et un exemple."
+    },
+    "value": {
+      "yes": "Oui",
+      "no": "Non"
+    }
+  },
+  "share": {
+    "level": {
+      "read": "Lecteur",
+      "edit": "Éditeur",
+      "creator": "Créateur",
+      "admin": "Admin"
+    },
+    "levelDesc": {
+      "read": "Peut tout voir.",
+      "edit": "Voir + modifier les données (cellules, contenu).",
+      "creator": "Éditeur + créer des lignes, colonnes et vues.",
+      "admin": "Créateur + supprimer des lignes et pages (pas la base)."
+    },
+    "title": "Partager la page",
+    "byEmail": "Par email. Un compte existant est ajouté aussitôt ; sinon une invitation part par email.",
+    "publishToggle": "Publier sur le web",
+    "publishHint": "Accessible en lecture à toute personne disposant du lien, sans connexion.",
+    "includeSub": "Inclure les sous-pages",
+    "publishedPages": "{{count}} pages publiées :",
+    "untitled": "Sans titre",
+    "invitePlaceholder": "collaborateur@exemple.com",
+    "invite": "Inviter",
+    "rolesAria": "Rôles",
+    "addMember": "Ajouter un membre du workspace…",
+    "notShared": "Pas encore partagée.",
+    "accessLevel": "Niveau d'accès",
+    "revoke": "Révoquer l'accès",
+    "invited": "Invité",
+    "copyLink": "Copier le lien",
+    "revokeTitle": "Retirer l'accès ?",
+    "revokeDesc": "La personne perdra l'accès à cette page immédiatement. Pour confirmer, recopie son email :",
+    "revokePlaceholder": "Recopie l'email ici",
+    "cancel": "Annuler",
+    "revokeConfirm": "Retirer l'accès",
+    "publishWarnTitle": "Publier cette page sur le web ?",
+    "publishWarnDesc": "Toute personne disposant du lien pourra la consulter sans connexion{{sub}}. Ne publiez rien de confidentiel. Vous pourrez la dépublier à tout moment.",
+    "publishWarnSub": ", ainsi que ses sous-pages",
+    "publish": "Publier",
+    "errPublish": "échec de la publication",
+    "errUpdate": "échec de la mise à jour",
+    "errShare": "échec du partage",
+    "inviteSent": "Invitation envoyée à {{email}}.",
+    "status": {
+      "active": "Actif",
+      "suspended": "Suspendu"
+    }
+  },
+  "onboarding": {
+    "skip": "Passer",
+    "back": "Retour",
+    "continue": "Continuer",
+    "start": "Commencer",
+    "saveError": "Impossible d'enregistrer. Réessayez.",
+    "language": {
+      "title": "Choisissez votre langue",
+      "body": "Modifiable plus tard dans les réglages."
+    },
+    "pitch": {
+      "intro": {
+        "title": "Bienvenue dans {{app}}",
+        "body": "Votre espace de travail unifié, auto-hébergé. Prenons trente secondes pour le configurer."
+      },
+      "pages": {
+        "title": "Tout est une page",
+        "body": "Notes, projets, bases de données : un même socle de blocs. Imbriquez des sous-pages, glissez, transformez un paragraphe en titre ou en tableau à la volée."
+      },
+      "collab": {
+        "title": "À plusieurs, en temps réel",
+        "body": "Éditez à plusieurs simultanément, partagez une page à un collègue ou publiez-la en lecture sur le web via un simple lien."
+      }
+    },
+    "name": {
+      "title": "Comment vous appelez-vous ?",
+      "body": "Ce nom apparaît sur vos pages et auprès de vos collègues.",
+      "placeholder": "Votre nom"
+    },
+    "avatar": {
+      "title": "Votre avatar",
+      "body": "Un avatar généré rien que pour vous. Tirez-en un qui vous plaît.",
+      "shuffle": "En générer un autre"
+    },
+    "theme": {
+      "title": "Clair ou sombre ?",
+      "body": "Modifiable à tout moment dans les réglages.",
+      "light": "Clair",
+      "dark": "Sombre",
+      "system": "Système"
+    },
+    "appearance": {
+      "title": "Votre style",
+      "body": "Une couleur d'accent et une trame de fond. Modifiable à tout moment dans les réglages."
+    },
+    "done": {
+      "title": "Tout est prêt, {{name}} !",
+      "body": "Créez votre première page depuis la barre latérale et commencez à écrire."
+    }
+  },
+  "editor": {
+    "pageLink": {
+      "deleted": "Page supprimée ou inaccessible",
+      "unavailable": "Page indisponible"
+    },
+    "err": {
+      "backendDown": "Connexion au serveur impossible. Backend lancé (cargo run, :8080) ?",
+      "disconnected": "Connexion interrompue — vos changements ne sont plus enregistrés."
+    },
+    "reload": "Recharger",
+    "group": {
+      "basic": "Basique"
+    },
+    "item": {
+      "subpage": {
+        "title": "Sous-page",
+        "subtext": "Nouvelle page imbriquée"
+      },
+      "linkPage": {
+        "title": "Lien vers une page",
+        "subtext": "Référencer une page existante"
+      },
+      "database": {
+        "title": "Database (sous-page)",
+        "subtext": "Table de pages avec propriétés (page dédiée)"
+      },
+      "inlineDb": {
+        "title": "Base de données en ligne",
+        "subtext": "Insère une base directement dans la page"
+      },
+      "linkDb": {
+        "title": "Lier une base existante",
+        "subtext": "Insère en ligne une base déjà créée"
+      }
+    },
+    "newPage": "Nouvelle page"
+  },
+  "history": {
+    "title": "Historique",
+    "desc": "Dernières modifications et données analytiques de la page.",
+    "tab": {
+      "changes": "Dernières modifications",
+      "analytics": "Données analytiques"
+    },
+    "noChanges": "Aucune modification enregistrée.",
+    "noViews": "Aucune consultation enregistrée.",
+    "verb": {
+      "created": "a créé",
+      "modified": "a modifié",
+      "content": "a modifié le contenu de",
+      "deleted": "a supprimé"
+    },
+    "viewsWord_one": "vue",
+    "viewsWord_other": "vues",
+    "readersWord_one": "lecteur",
+    "readersWord_other": "lecteurs"
+  },
+  "common": {
+    "changeIcon": "Changer l'icône",
+    "subItem": "(sous-élément)",
+    "cancel": "Annuler",
+    "untitled": "Sans titre",
+    "empty": "vide",
+    "trashPage": {
+      "dbTitle": "Mettre cette base à la corbeille ?",
+      "pageTitle": "Mettre cette page à la corbeille ?",
+      "retention": "Elle sera restaurable depuis la corbeille pendant 30 jours, puis supprimée définitivement.",
+      "dbRows": "Toutes ses lignes partent aussi à la corbeille.",
+      "subpages_one": "Sa {{count}} sous-page part avec elle (restaurables ensemble).",
+      "subpages_other": "Ses {{count}} sous-pages partent avec elle (restaurables ensemble).",
+      "confirm": "Mettre à la corbeille"
+    },
+    "unknownError": "Erreur inconnue"
+  },
+  "sidebar": {
+    "expand": "Déplier",
+    "collapse": "Replier",
+    "actions": "Actions",
+    "add": "Ajouter",
+    "createSub": "Créer une sous-page",
+    "rename": "Renommer",
+    "duplicate": "Dupliquer",
+    "delete": "Supprimer",
+    "pages": "Pages",
+    "favorites": "Favoris",
+    "favorite": "Ajouter aux favoris",
+    "unfavorite": "Retirer des favoris",
+    "allPages": "Toutes les pages",
+    "allPagesCount": "Toutes les pages ({{count}})",
+    "newPage": "Nouvelle page",
+    "newDatabase": "Nouvelle database",
+    "settings": "Paramètres",
+    "logout": "Se déconnecter",
+    "renameTitle": "Renommer la page",
+    "titleLabel": "Titre",
+    "renameConfirm": "Renommer",
+    "credits": {
+      "title": "Soutenir le projet",
+      "body": "{{app}} est libre et ouvert. Voyez ce qui le rend possible.",
+      "cta": "En savoir plus"
+    }
+  },
+  "credits": {
+    "title": "Ce qui rend {{app}} possible",
+    "intro": "{{app}} est un projet libre, bâti par une petite équipe sur les épaules de l'écosystème open-source — et, en toute transparence, avec l'aide de l'intelligence artificielle. Voici à qui l'on doit tout ça, et comment vous pouvez y contribuer.",
+    "built": {
+      "title": "Bâti sur l'open-source",
+      "body": "Chaque brique ci-dessous est un projet open-source maintenu par sa communauté. Sans leur travail, {{app}} n'existerait pas."
+    },
+    "ai": {
+      "title": "L'IA dans la boucle",
+      "body": "Soyons honnêtes : une grande partie de {{app}} a été conçue et écrite avec l'assistance d'agents d'IA. Cela permet à une équipe réduite de livrer un logiciel ambitieux — nous préférons l'assumer clairement plutôt que le cacher."
+    },
+    "contribute": {
+      "title": "Comment contribuer"
+    },
+    "sponsor": {
+      "title": "Sponsoring",
+      "body": "Un don, ponctuel ou récurrent, soutient le temps passé sur le projet et les abonnements aux assistants IA qui en accélèrent le développement. Chaque contribution compte.",
+      "cta": "Devenir sponsor"
+    },
+    "oss": {
+      "title": "Contribution open-source",
+      "body": "Code, rapports de bugs, traductions, docs : le dépôt est ouvert. Toutes les mains sont les bienvenues.",
+      "cta": "Voir le dépôt"
+    },
+    "thanks": "Merci d'utiliser {{app}}. ♥"
+  },
+  "home": {
+    "greeting": "Bonjour {{name}}",
+    "empty": "Crée ou sélectionne une page pour commencer."
+  },
+  "allPages": {
+    "title": "Toutes les pages",
+    "count": "{{count}} accessibles",
+    "search": "Filtrer les pages…",
+    "empty": "Vous n'avez encore aucune page.",
+    "noMatch": "Aucune page ne correspond à votre recherche."
+  },
+  "updateConsent": {
+    "title": "Vérifier les mises à jour ?",
+    "body": "{{app}} peut vérifier les nouvelles versions et vous notifier quand une mise à jour est disponible. C'est le seul appel réseau sortant qu'il effectue, et il n'envoie aucune donnée vous concernant. Modifiable à tout moment dans les réglages.",
+    "accept": "Activer la vérification",
+    "decline": "Pas maintenant"
+  },
+  "notif": {
+    "title": "Notifications",
+    "inbox": "Boîte de réception",
+    "archive": "Archives",
+    "empty": "Aucune notification",
+    "archiveAll": "Tout archiver",
+    "archiveOne": "Archiver",
+    "msg": {
+      "share": "<b>{{actor}}</b> vous a invité à <b>{{page}}</b>",
+      "update": "Une nouvelle version est disponible : <b>{{version}}</b>"
+    }
+  },
+  "invite": {
+    "fallbackPage": "une page",
+    "invalid": "Cette invitation est invalide ou expirée.",
+    "goHome": "Aller à l'accueil",
+    "mismatch": "Cette invitation vise {{email}}, mais vous êtes connecté en tant que {{me}}.",
+    "switchAccount": "Se déconnecter et changer de compte",
+    "sent": "Lien envoyé à {{email}}. Ouvre-le pour te connecter et rejoindre « {{title}} ».",
+    "devNote": "(En dev sans SMTP : le lien est dans les logs du serveur.)",
+    "title": "Invitation",
+    "inviterInvites": "{{inviter}} vous invite à collaborer sur « {{title}} ».",
+    "getLink": "Recevoir un lien de connexion",
+    "passwordless": "Connexion sans mot de passe. Un compte est créé si besoin."
+  },
+  "page": {
+    "publicNotFound": "Cette page publique est introuvable ou n'est plus partagée.",
+    "noAccess": "Vous n'avez pas accès à cette page",
+    "coverChange": "Changer",
+    "coverRemove": "Retirer",
+    "addIcon": "Ajouter une icône",
+    "addCover": "Ajouter une couverture",
+    "networkTitle": "Connexion au serveur impossible",
+    "unavailableTitle": "Page indisponible",
+    "networkBody": "Le backend est-il lancé (cargo run, :8080) ?",
+    "unavailableBody": "Cette page n'existe plus ou son accès vous a été retiré.",
+    "backHome": "Retour à l'accueil",
+    "templateBadge": "Modèle · variables",
+    "templateInstructions": "Insère ces variables dans le titre, une propriété texte ou une colonne date. Elles sont remplacées à la création d'une ligne depuis ce modèle.",
+    "copy": "Copier",
+    "egPrefix": "ex."
+  },
+  "calendar": {
+    "today": "Aujourd'hui",
+    "add": "Ajouter",
+    "noEntries": "Aucune entrée.",
+    "prev": "Précédent",
+    "next": "Suivant",
+    "addEntry": "Ajouter une entrée ce jour",
+    "rowActions": "Actions de la ligne",
+    "deleteRow": "Supprimer la ligne"
+  },
+  "chart": {
+    "all": "Tout",
+    "noDate": "Sans date",
+    "remaining": "Restant",
+    "ideal": "Idéal",
+    "target": "Cible",
+    "rowCount": "Nombre de lignes",
+    "noData": "Aucune donnée à afficher."
+  },
+  "templateTokens": {
+    "date": "Date de création de la ligne.",
+    "datetime": "Date et heure de création.",
+    "time": "Heure de création.",
+    "year": "Année de création.",
+    "month": "Mois (2 chiffres).",
+    "day": "Jour du mois (2 chiffres).",
+    "n": "Numéro d'ordre auto-incrémenté.",
+    "nPad": "Numéro d'ordre sur N chiffres (zéros devant).",
+    "user": "Nom de la personne qui crée la ligne."
+  },
+  "updateApply": {
+    "apply": "Mettre à jour",
+    "confirmTitle": "Mettre à jour vers {{version}} ?",
+    "disclaimer": "Le serveur va télécharger, vérifier et installer la nouvelle version, puis redémarrer — interrompant brièvement tous les utilisateurs connectés. La base est sauvegardée au préalable. Action irréversible (retour arrière : restaurer la sauvegarde et l'ancien binaire).",
+    "confirm": "Mettre à jour et redémarrer",
+    "applying": "Mise à jour…",
+    "doNotClose": "Ne fermez pas cette fenêtre.",
+    "done": "Mis à jour vers {{version}}",
+    "doneBody": "Le serveur a redémarré sur la nouvelle version. Rechargez pour continuer.",
+    "reload": "Recharger",
+    "failed": "Échec de la mise à jour",
+    "step": {
+      "downloading": "Téléchargement…",
+      "verifying": "Vérification de la signature…",
+      "backingUp": "Sauvegarde de la base…",
+      "swapping": "Installation…",
+      "restarting": "Redémarrage…"
+    }
+  }
+}

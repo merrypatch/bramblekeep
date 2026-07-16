@@ -1,0 +1,25 @@
+# Rust
+/target
+**/*.rs.bk
+
+# SQLite (local data)
+bramblekeep.db
+bramblekeep.db-shm
+bramblekeep.db-wal
+/files
+
+# Front
+web/node_modules
+web/dist/*
+!web/dist/.gitkeep
+web/*.tsbuildinfo
+
+# Generated ts-rs bindings
+/bindings
+
+# Miscellaneous
+.env
+.DS_Store
+
+# Local e2e databases
+bramblekeep_e2e.db*

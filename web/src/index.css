@@ -1,0 +1,278 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+}
+
+/* Tailwind v4 removed default pointer cursor from buttons — we restore it. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  summary,
+  select:not(:disabled),
+  [role="menuitem"],
+  [role="option"],
+  [role="tab"] {
+    cursor: pointer;
+  }
+}
+
+/* shadcn/ui — base zinc (new-york). */
+:root {
+  --radius: 0.625rem;
+  /* Visual signature grid: small "+" instead of dots.
+     SVG inline data-URI (24px tile), tint + alpha baked per theme.
+     Bg-image (and not mask/pseudo) to tile endlessly and scroll with the
+     content, including in scrollable containers (DatabaseView). */
+  --dot-color: oklch(0.141 0.005 285.823 / 11%);
+  --dot-grid-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M12 9v6M9 12h6' stroke='%23141416' stroke-opacity='0.14' stroke-width='1'/%3E%3C/svg%3E");
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --primary: oklch(0.21 0.006 285.885);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.885);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.705 0.015 286.067);
+  --sidebar: hsl(0 0% 98%);
+  --sidebar-foreground: hsl(240 5.3% 26.1%);
+  --sidebar-primary: hsl(240 5.9% 10%);
+  --sidebar-primary-foreground: hsl(0 0% 98%);
+  --sidebar-accent: hsl(240 4.8% 95.9%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-border: hsl(220 13% 91%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.dark {
+  /* On dark background: light "+" with low alpha. */
+  --dot-color: oklch(1 0 0 / 8%);
+  --dot-grid-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M12 9v6M9 12h6' stroke='%23ffffff' stroke-opacity='0.10' stroke-width='1'/%3E%3C/svg%3E");
+  --background: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.21 0.006 285.885);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.21 0.006 285.885);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.92 0.004 286.32);
+  --primary-foreground: oklch(0.21 0.006 285.885);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --accent: oklch(0.274 0.006 286.033);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.552 0.016 285.938);
+  --sidebar: hsl(240 5.9% 10%);
+  --sidebar-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-primary: hsl(224.3 76.3% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(240 3.7% 15.9%);
+  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-border: hsl(240 3.7% 15.9%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+/* Background grid — visual signature, user-configurable via
+   `data-grid` on <html> (cf. lib/appearance.ts). 24px tile, very low
+   alpha. Pure background: no pointer/scroll events captured. Default attachment
+   (scrolls with content) — `fixed` is janky on mobile, avoided.
+   Default "+": `--dot-grid-image` (SVG baked per theme) defined in :root /
+   .dark. Dots & lines reuse `--dot-color` (thus theme-aware without
+   baking); "none" removes background. `html[data-grid=…]` (0,1,1) overrides `.dark`
+   (0,1,0), so grid override applies to both themes. */
+.dot-grid {
+  background-image: var(--dot-grid-image);
+  background-size: 24px 24px;
+}
+html[data-grid="dots"] {
+  --dot-grid-image: radial-gradient(var(--dot-color) 1px, transparent 1px);
+}
+html[data-grid="lines"] {
+  --dot-grid-image: linear-gradient(var(--dot-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--dot-color) 1px, transparent 1px);
+}
+html[data-grid="none"] {
+  --dot-grid-image: none;
+}
+
+/* User-configurable accent color via `data-accent` on <html> (cf. lib/appearance.ts).
+   Each accent only redefines `--primary` + `--primary-foreground`; the
+   `html[data-accent]` selector (attr present) rewires ring/sidebar to it. "zinc" does
+   not override anything: it keeps the base shadcn token. Tints valid for both light
+   and dark themes (sufficiently vivid). */
+html[data-accent] {
+  --ring: var(--primary);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-ring: var(--primary);
+}
+html[data-accent="blue"] {
+  --primary: oklch(0.55 0.2 255);
+  --primary-foreground: oklch(0.985 0 0);
+}
+html[data-accent="violet"] {
+  --primary: oklch(0.53 0.24 293);
+  --primary-foreground: oklch(0.985 0 0);
+}
+html[data-accent="green"] {
+  --primary: oklch(0.6 0.17 150);
+  --primary-foreground: oklch(0.985 0 0);
+}
+html[data-accent="amber"] {
+  --primary: oklch(0.8 0.16 78);
+  --primary-foreground: oklch(0.24 0.03 78);
+}
+html[data-accent="rose"] {
+  --primary: oklch(0.63 0.24 12);
+  --primary-foreground: oklch(0.985 0 0);
+}
+
+/* BlockNote editor embedded in the page: no floating grey card. Transparent
+   background lets the page background show through. Min height
+   so clicking below text keeps focus, reduced padding on mobile. */
+.bk-editor {
+  --bn-colors-editor-background: transparent;
+  background: transparent;
+}
+.bk-editor .bn-editor {
+  min-height: 70vh;
+  background: transparent;
+}
+@media (max-width: 640px) {
+  .bk-editor .bn-editor {
+    padding-inline: 16px;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  /* The PAGE never scrolls along x (mobile-first): any wide element scrolls
+     within its own container (`overflow-x-auto` on table/kanban). `clip` does
+     not create a scroll container → does not affect `position: sticky`. */
+  html,
+  body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    /* Safe areas iOS (mobile-first, PWA standalone). */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+      env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* Mobile-style scrollbars on desktop: thin, rounded, translucent,
+     transparent track. Firefox + WebKit/Chromium. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--foreground) 25%, transparent) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--foreground) 22%, transparent);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--foreground) 40%, transparent);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* PDF export via print: hide chrome, unbind containers
+   (database views and editor limit their height on screen). */
+@media print {
+  body {
+    background: #fff !important;
+  }
+  header,
+  [data-slot="sidebar"],
+  [data-slot="sidebar-gap"],
+  [data-slot="sidebar-container"],
+  [data-slot="sidebar-trigger"],
+  [data-slot="sidebar-rail"] {
+    display: none !important;
+  }
+  /* Print everything: no bounded height or internal scroll. */
+  * {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  /* Icon overlaps cover on screen; in print we
+     cancel this overlap so that the icon and title remain readable below
+     the image, not on top of it. Cover is also bounded in height and followed
+     by space to separate the title. */
+  .bk-page-cover {
+    height: 12rem !important;
+    margin-bottom: 1rem !important;
+  }
+  .bk-page-icon,
+  .bk-page-icon[class] {
+    margin-top: 0 !important;
+  }
+  /* Faithful color rendering (cover, badges…). */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

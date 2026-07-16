@@ -1,0 +1,47 @@
+name: CLA
+
+# Every external contribution is accepted under the Contributor License
+# Agreement (see /CLA.md) — required by the dual-license model (/LICENSING.md).
+# This gate blocks a PR from merging until its author has signed once.
+# Signatures are stored in this repo (branch below); no third-party service.
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+# pull_request_target + write scopes are required so the bot can post the
+# signature comment and update the stored signatures file. It runs with the
+# base-repo token, never executes PR code — safe for this comment-only action.
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    # Only the two events that matter: a PR change, or someone typing the sign phrase.
+    if: >
+      (github.event.issue.pull_request && contains(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA'))
+      || github.event_name == 'pull_request_target'
+    steps:
+      - name: CLA Assistant
+        uses: contributor-assistant/github-action@v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A classic PAT (repo scope) that can write to the signatures repo/branch.
+          # Create it and add it as the repo secret CLA_SIGNATURES_TOKEN.
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_SIGNATURES_TOKEN }}
+        with:
+          path-to-document: "https://github.com/merrypatch/bramblekeep/blob/master/CLA.md"
+          path-to-signatures: "signatures/cla.json"
+          branch: "cla-signatures"
+          allowlist: "dependabot[bot],merrypatch"
+          custom-notsigned-prcomment: >
+            Thank you for your contribution. Before we can merge it, please read our
+            [Contributor License Agreement](https://github.com/merrypatch/bramblekeep/blob/master/CLA.md)
+            and sign it by posting a comment with exactly this sentence:
+          custom-pr-sign-comment: "I have read the CLA Document and I hereby sign the CLA"
+          custom-allsigned-prcomment: "✅ All contributors have signed the CLA."
