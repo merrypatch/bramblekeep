@@ -61,6 +61,44 @@ Logs: `journalctl -u bramblekeep -f`. The service file lives at
 [`deploy/bramblekeep.service`](./deploy/bramblekeep.service) if you prefer to
 install it by hand.
 
+#### macOS (launchd)
+
+The bundled installer is Linux-only. On macOS, use a launchd daemon. Put the
+binary in `/usr/local/bramblekeep/bramblekeep`, then create
+`/Library/LaunchDaemons/com.bramblekeep.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.bramblekeep</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/local/bramblekeep/bramblekeep</string>
+  </array>
+  <key>WorkingDirectory</key><string>/usr/local/bramblekeep</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict></plist>
+```
+
+`RunAtLoad` starts it on boot, `KeepAlive` restarts it on crash.
+
+```bash
+sudo launchctl load -w /Library/LaunchDaemons/com.bramblekeep.plist   # start + enable at boot
+sudo launchctl unload /Library/LaunchDaemons/com.bramblekeep.plist    # manual stop (no restart loop)
+```
+
+#### Windows (service)
+
+The Windows binary is not service-aware, so wrap it with a service manager such
+as [NSSM](https://nssm.cc/) or [WinSW](https://github.com/winsw/winsw). With NSSM:
+
+```powershell
+nssm install Bramblekeep C:\bramblekeep\bramblekeep-windows-x64.exe
+nssm set Bramblekeep AppDirectory C:\bramblekeep
+Start-Service Bramblekeep      # NSSM handles restart-on-crash + start-at-boot
+Stop-Service Bramblekeep       # manual stop
+```
+
 ## Status
 
 Walking skeleton: backend that applies migrations + `/api/health`, frontend that pings the API. **Next milestone (V1 truth):** a page edited in BlockNote, synchronized via WebSocket (yrs), persisted in `yjs_updates`, projected in `blocks`, surviving a restart of the binary.
