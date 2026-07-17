@@ -1024,6 +1024,7 @@
     "apply": "Update",
     "confirmTitle": "Update to {{version}}?",
     "disclaimer": "The server will download, verify and install the new version, then restart — briefly interrupting all connected users. Your database is backed up first. This cannot be undone (roll back by restoring the backup and the previous binary).",
+    "disclaimerContainer": "The new container image will be pulled and this container recreated on the new version — briefly interrupting all connected users. Your database is backed up first. Review the release notes above before continuing.",
     "confirm": "Update and restart",
     "applying": "Updating…",
     "doNotClose": "Do not close this window.",
@@ -1035,6 +1036,7 @@
       "downloading": "Downloading…",
       "verifying": "Verifying signature…",
       "backingUp": "Backing up the database…",
+      "pulling": "Pulling the new image…",
       "swapping": "Installing…",
       "restarting": "Restarting…"
     }

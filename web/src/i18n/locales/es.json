@@ -1024,6 +1024,7 @@
     "apply": "Actualizar",
     "confirmTitle": "¿Actualizar a {{version}}?",
     "disclaimer": "El servidor descargará, verificará e instalará la nueva versión y se reiniciará, interrumpiendo brevemente a los usuarios conectados. La base de datos se respalda antes. Es irreversible (para revertir, restaura la copia y el binario anterior).",
+    "disclaimerContainer": "Se descargará la nueva imagen del contenedor y este se recreará en la nueva versión, interrumpiendo brevemente a los usuarios conectados. La base de datos se respalda antes. Revisa las notas de la versión arriba antes de continuar.",
     "confirm": "Actualizar y reiniciar",
     "applying": "Actualizando…",
     "doNotClose": "No cierres esta ventana.",
@@ -1035,6 +1036,7 @@
       "downloading": "Descargando…",
       "verifying": "Verificando la firma…",
       "backingUp": "Respaldando la base de datos…",
+      "pulling": "Descargando la nueva imagen…",
       "swapping": "Instalando…",
       "restarting": "Reiniciando…"
     }

@@ -124,11 +124,32 @@ pub fn public_key() -> Option<String> {
         .or_else(|| (!EMBEDDED_PUBKEY.is_empty()).then(|| EMBEDDED_PUBKEY.to_string()))
 }
 
-/// "Managed" context (docker/systemd/orchestrator): we do not replace the
-/// binary under them → apply hidden, updates via the deployment tool.
+/// "Managed" context (docker/systemd/orchestrator): we never self-replace the
+/// binary under them (impossible/unsafe inside a container). Apply is either
+/// delegated to a container-update helper (see [`container_update_url`]) or
+/// hidden, updates then going through the deployment tool.
 pub fn is_managed() -> bool {
     Path::new("/.dockerenv").exists()
         || std::env::var("BRAMBLEKEEP_MANAGED").is_ok_and(|v| !v.is_empty())
+}
+
+/// Container-update endpoint (Watchtower HTTP API). When set, a one-click update
+/// in a container triggers this endpoint to pull the new image and recreate the
+/// container — the app never touches the Docker socket itself (that stays
+/// confined to the Watchtower sidecar). Example: `http://watchtower:8080/v1/update`.
+pub fn container_update_url() -> Option<String> {
+    std::env::var("WATCHTOWER_URL").ok().filter(|v| !v.is_empty())
+}
+
+/// Bearer token for the container-update endpoint. Never logged.
+fn container_update_token() -> Option<String> {
+    std::env::var("WATCHTOWER_TOKEN").ok().filter(|v| !v.is_empty())
+}
+
+/// One-click update possible in a managed container: a Watchtower endpoint is
+/// wired. Lets the binary path and the container path share the same UX.
+pub fn can_container_update() -> bool {
+    is_managed() && container_update_url().is_some()
 }
 
 /// Path of the SQLite file (for pre-migration backup). `None` if in-memory
@@ -387,6 +408,11 @@ pub fn verify(bytes: &[u8], expected_sha256: &str, sig: &str, pubkey: &str) -> s
 /// Returns the target version.
 pub async fn start_apply(manifest_url: String) -> std::result::Result<String, String> {
     if is_managed() {
+        // In a container we cannot self-replace the binary. If a Watchtower
+        // endpoint is configured, delegate: pull the new image + recreate.
+        if container_update_url().is_some() {
+            return start_container_update(manifest_url).await;
+        }
         return Err("managed".into());
     }
     let Some(pubkey) = public_key() else {
@@ -470,6 +496,92 @@ async fn run_apply(artifact: Artifact, pubkey: String) -> std::result::Result<()
         reexec();
     });
     Ok(())
+}
+
+// ---- Container update path (managed context, via Watchtower) ----
+
+/// Starts a container update: check a newer version exists, then ask Watchtower
+/// (in the background) to pull the new image and recreate this container. The DB
+/// is backed up first — same safety net as the binary path. Returns the target
+/// version. The image swap itself is done by Watchtower, not by this process.
+async fn start_container_update(manifest_url: String) -> std::result::Result<String, String> {
+    if matches!(
+        apply_progress().step.as_str(),
+        "downloading" | "verifying" | "backing_up" | "pulling" | "swapping" | "restarting"
+    ) {
+        return Err("in-progress".into());
+    }
+    let json = tokio::task::spawn_blocking(move || fetch_manifest(&manifest_url))
+        .await
+        .map_err(|e| e.to_string())??;
+    let manifest: Manifest =
+        serde_json::from_str(&json).map_err(|e| format!("unreadable manifest: {e}"))?;
+    if !is_newer(current_version(), &manifest.version) {
+        return Err("up-to-date".into());
+    }
+    let version = manifest.version.clone();
+    set_progress("backing_up", None, Some(version.clone()));
+    tokio::spawn(async move {
+        if let Err(e) = run_container_update().await {
+            tracing::error!(error = %e, "container update failed");
+            set_progress("failed", Some(e), None);
+        }
+    });
+    Ok(version)
+}
+
+/// Backs up the DB, then triggers Watchtower. On success Watchtower recreates
+/// this container, which terminates the process — the frontend detects the
+/// restart via `/version` polling.
+async fn run_container_update() -> std::result::Result<(), String> {
+    // Backup before the new image runs its migrations (recover from a bad one).
+    if let Some(db_path) = db_file_path()
+        && Path::new(&db_path).exists()
+    {
+        let bak = format!("{db_path}.bak-{}", current_version());
+        std::fs::copy(&db_path, &bak).map_err(|e| format!("backup failed: {e}"))?;
+    }
+
+    set_progress("pulling", None, None);
+    let url = container_update_url().ok_or("watchtower endpoint not configured")?;
+    let token = container_update_token();
+    tokio::task::spawn_blocking(move || trigger_watchtower(&url, token.as_deref()))
+        .await
+        .map_err(|e| e.to_string())??;
+
+    // Watchtower is now pulling + recreating this container; we will be stopped.
+    set_progress("restarting", None, None);
+    Ok(())
+}
+
+/// Calls the Watchtower HTTP update API (`POST /v1/update`, Bearer token). A
+/// connection reset once Watchtower recreates this container is the SUCCESS path
+/// (we are being replaced); only a connect-time failure or a non-2xx status is a
+/// real, actionable error.
+fn trigger_watchtower(url: &str, token: Option<&str>) -> std::result::Result<(), String> {
+    let agent = ureq::builder()
+        .timeout_connect(Duration::from_secs(10))
+        .timeout(Duration::from_secs(600)) // image pull can be slow
+        .build();
+    let mut req = agent.post(url);
+    if let Some(tok) = token {
+        req = req.set("Authorization", &format!("Bearer {tok}"));
+    }
+    match req.call() {
+        Ok(_) => Ok(()),
+        Err(ureq::Error::Status(code, _)) => Err(format!("watchtower returned HTTP {code}")),
+        Err(ureq::Error::Transport(t)) => {
+            let msg = t.to_string();
+            let unreachable = ["refused", "connect", "dns", "resolve", "no route"]
+                .iter()
+                .any(|kw| msg.to_ascii_lowercase().contains(kw));
+            if unreachable {
+                Err(format!("cannot reach watchtower: {msg}"))
+            } else {
+                Ok(()) // reset mid-request = container being recreated
+            }
+        }
+    }
 }
 
 /// Restarts the process on the new binary (same path, already replaced).

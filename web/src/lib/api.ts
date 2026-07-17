@@ -326,6 +326,7 @@ export async function getUpdateConsent(): Promise<{
   version: string;
   managed: boolean;
   can_apply: boolean;
+  container_update: boolean;
 }> {
   const res = await fetch("/api/v1/updates/consent");
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -334,6 +335,7 @@ export async function getUpdateConsent(): Promise<{
     version: string;
     managed: boolean;
     can_apply: boolean;
+    container_update: boolean;
   };
 }
 

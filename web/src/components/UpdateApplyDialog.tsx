@@ -19,6 +19,7 @@ const STEP_KEYS = {
   downloading: "updateApply.step.downloading",
   verifying: "updateApply.step.verifying",
   backing_up: "updateApply.step.backingUp",
+  pulling: "updateApply.step.pulling",
   swapping: "updateApply.step.swapping",
   restarting: "updateApply.step.restarting",
 } as const;
@@ -36,10 +37,13 @@ export function UpdateApplyDialog({
   open,
   onOpenChange,
   targetVersion,
+  container = false,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   targetVersion: string;
+  /** Managed container path (Watchtower pulls the image) vs. binary self-replace. */
+  container?: boolean;
 }) {
   const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>("confirm");
@@ -142,7 +146,9 @@ export function UpdateApplyDialog({
           <>
             <DialogHeader>
               <DialogTitle>{t("updateApply.confirmTitle", { version: targetVersion })}</DialogTitle>
-              <DialogDescription>{t("updateApply.disclaimer")}</DialogDescription>
+              <DialogDescription>
+                {t(container ? "updateApply.disclaimerContainer" : "updateApply.disclaimer")}
+              </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>

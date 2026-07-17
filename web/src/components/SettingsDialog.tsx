@@ -1380,6 +1380,7 @@ function UpdateCheckSetting() {
   const [consent, setConsent] = useState<UpdateConsent | null>(null);
   const [version, setVersion] = useState("");
   const [canApply, setCanApply] = useState(false);
+  const [container, setContainer] = useState(false);
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<UpdateCheckResult | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
@@ -1392,6 +1393,7 @@ function UpdateCheckSetting() {
         setConsent(r.consent);
         setVersion(r.version);
         setCanApply(r.can_apply);
+        setContainer(r.container_update);
       })
       .catch(() => {});
     return () => {
@@ -1480,6 +1482,7 @@ function UpdateCheckSetting() {
                   open={applyOpen}
                   onOpenChange={setApplyOpen}
                   targetVersion={result.latest}
+                  container={container}
                 />
               )}
             </div>

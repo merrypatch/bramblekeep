@@ -1279,12 +1279,20 @@ pub async fn get_update_consent(
     if role_rank(&user.role) < role_rank("admin") {
         return Err(Error::Forbidden);
     }
+    // One-click apply is available when either:
+    //  - unmanaged install with a public key → self-replace the binary, or
+    //  - managed container with a Watchtower endpoint → pull image + recreate.
+    let container_update = crate::update::can_container_update();
+    let can_apply =
+        (crate::update::public_key().is_some() && !crate::update::is_managed()) || container_update;
     Ok(Json(json!({
         "consent": crate::update::consent(&app.db).await?,
         "version": crate::update::current_version(),
-        // `can_apply`: unmanaged install + public key configured → apply button.
         "managed": crate::update::is_managed(),
-        "can_apply": crate::update::public_key().is_some() && !crate::update::is_managed(),
+        "can_apply": can_apply,
+        // Distinguishes the container path (image pull) from the binary path,
+        // so the UI can word the confirmation accordingly.
+        "container_update": container_update,
     })))
 }
 

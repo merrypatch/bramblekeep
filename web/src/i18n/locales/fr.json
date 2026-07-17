@@ -1024,6 +1024,7 @@
     "apply": "Mettre à jour",
     "confirmTitle": "Mettre à jour vers {{version}} ?",
     "disclaimer": "Le serveur va télécharger, vérifier et installer la nouvelle version, puis redémarrer — interrompant brièvement tous les utilisateurs connectés. La base est sauvegardée au préalable. Action irréversible (retour arrière : restaurer la sauvegarde et l'ancien binaire).",
+    "disclaimerContainer": "La nouvelle image du conteneur va être téléchargée et le conteneur recréé sur la nouvelle version — interrompant brièvement tous les utilisateurs connectés. La base est sauvegardée au préalable. Consultez les notes de version ci-dessus avant de continuer.",
     "confirm": "Mettre à jour et redémarrer",
     "applying": "Mise à jour…",
     "doNotClose": "Ne fermez pas cette fenêtre.",
@@ -1035,6 +1036,7 @@
       "downloading": "Téléchargement…",
       "verifying": "Vérification de la signature…",
       "backingUp": "Sauvegarde de la base…",
+      "pulling": "Téléchargement de la nouvelle image…",
       "swapping": "Installation…",
       "restarting": "Redémarrage…"
     }
