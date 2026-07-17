@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1
+#
+# Release image: wraps the prebuilt, statically-linked (musl) binary produced by
+# the release workflow — no compilation here. buildx sets TARGETARCH per platform
+# (amd64 / arm64), selecting the matching binary staged under dist/. Because the
+# binary is static, the runtime base carries no libc-version coupling.
+#
+# Built and pushed by .github/workflows/release.yml on a version tag. For a local
+# from-source build, use ./Dockerfile instead (docker-compose's `build:`).
+
+FROM debian:bookworm-slim
+
+# ca-certificates: outbound TLS (SMTP, update check). curl: HEALTHCHECK only.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl \
+  && rm -rf /var/lib/apt/lists/*
+
+# Non-root service account owning the data directory (no home skeleton).
+RUN useradd --system --uid 10001 --no-create-home --home-dir /data bramblekeep \
+  && mkdir -p /data \
+  && chown bramblekeep:bramblekeep /data
+
+# Provided by buildx: "amd64" or "arm64". The release job stages the binaries as
+# dist/bramblekeep-amd64 and dist/bramblekeep-arm64.
+ARG TARGETARCH
+COPY dist/bramblekeep-${TARGETARCH} /usr/local/bin/bramblekeep
+RUN chmod +x /usr/local/bin/bramblekeep
+
+WORKDIR /data
+ENV DATABASE_URL=sqlite:///data/bramblekeep.db \
+    FILES_DIR=/data/files \
+    BIND_ADDR=0.0.0.0:8080 \
+    RUST_LOG=info,sqlx=warn,tower_http=info
+VOLUME /data
+EXPOSE 8080
+
+USER bramblekeep
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -fsS http://localhost:8080/api/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/bramblekeep"]

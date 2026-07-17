@@ -1,0 +1,87 @@
+# Bramblekeep — self-hosted, single-binary workspace.
+#
+#   docker compose up -d          # start (builds locally, or pulls the image)
+#   docker compose logs -f        # follow logs (magic-link URLs appear here in dev)
+#   docker compose pull && docker compose up -d   # upgrade to the latest image
+#
+# Data (bramblekeep.db + uploaded files) lives in the `bramblekeep-data` volume
+# and survives restarts and image upgrades.
+
+services:
+  bramblekeep:
+    # Pulls the prebuilt multi-arch image (amd64/arm64, incl. Raspberry Pi 64-bit)
+    # from GHCR — no local build needed. Developers building from a checkout can
+    # uncomment `build: .` to build locally instead.
+    image: ghcr.io/merrypatch/bramblekeep:latest
+    # build: .
+    container_name: bramblekeep
+    restart: unless-stopped
+    # The container always listens on 8080 (declared via EXPOSE in the image),
+    # which is all a reverse proxy needs.
+    #
+    # Standalone (direct access, no proxy): publish the port. Bound to loopback
+    # by default so it is NOT open to the internet — reach it locally, or via a
+    # reverse proxy running on the same host. Use "0.0.0.0:8080:8080" only to
+    # expose it directly on the LAN/WAN (prefer a TLS proxy instead).
+    ports:
+      - "127.0.0.1:8080:8080"
+    #
+    # Behind a PaaS / containerized proxy (Dokploy, Coolify, Traefik, Caddy in
+    # Docker): DELETE the `ports:` block above. The proxy connects to the
+    # container over the Docker network and terminates TLS on 443 — set
+    # PUBLIC_BASE_URL to your https:// domain and COOKIE_SECURE=true below.
+    volumes:
+      - bramblekeep-data:/data
+    # Lets the Watchtower sidecar below manage (only) this container.
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    environment:
+      # Public URL used in magic-link / invitation emails. Set this to the URL
+      # users actually reach (behind a reverse proxy, your real domain).
+      PUBLIC_BASE_URL: http://localhost:8080
+      # Set to "true" when served over HTTPS (e.g. behind a TLS reverse proxy)
+      # so the session cookie carries the Secure flag.
+      COOKIE_SECURE: "false"
+
+      # In-app one-click updates: the "Update" button in Settings backs up the
+      # database, then asks the Watchtower sidecar to pull the new image and
+      # recreate this container. bramblekeep itself never touches the Docker
+      # socket. Remove these two lines (and the watchtower service) if you'd
+      # rather upgrade manually with `docker compose pull && docker compose up -d`.
+      WATCHTOWER_URL: http://watchtower:8080/v1/update
+      WATCHTOWER_TOKEN: ${WATCHTOWER_TOKEN:-change-me-update-token}
+
+      # --- SMTP (optional) --------------------------------------------------
+      # Without SMTP_HOST, login/invite links are printed to the logs instead of
+      # emailed (fine for a first solo run). Fill these in to send real emails.
+      # SMTP_HOST: smtp.example.com
+      # SMTP_PORT: "587"
+      # SMTP_USERNAME: apikey
+      # SMTP_PASSWORD: ${SMTP_PASSWORD}
+      # SMTP_FROM: Bramblekeep <no-reply@example.com>
+
+  # Optional: enables the in-app one-click update for the container deployment.
+  # Watchtower is the ONLY component with access to the Docker socket, and here
+  # it acts on demand only (HTTP API), not on a timer. Delete this service to
+  # opt out — bramblekeep then hides the Update button and you upgrade manually.
+  watchtower:
+    # Actively-maintained fork (the original containrrr/watchtower is
+    # unmaintained and its bundled Docker API client is too old for recent
+    # Docker daemons). This fork negotiates the API version automatically.
+    image: nickfedor/watchtower:latest
+    container_name: bramblekeep-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # Update only containers explicitly labelled above (not everything).
+      WATCHTOWER_LABEL_ENABLE: "true"
+      # On-demand only: update when the HTTP API is called, no periodic polling.
+      WATCHTOWER_HTTP_API_UPDATE: "true"
+      WATCHTOWER_HTTP_API_TOKEN: ${WATCHTOWER_TOKEN:-change-me-update-token}
+      # Remove the old image after a successful update.
+      WATCHTOWER_CLEANUP: "true"
+    # API port stays on the internal Docker network — NOT published to the host.
+
+volumes:
+  bramblekeep-data:

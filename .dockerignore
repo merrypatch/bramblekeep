@@ -1,0 +1,36 @@
+# Keep the build context small and reproducible. The image builds the frontend
+# and the binary from source inside multi-stage builds — none of the local build
+# outputs, caches, or runtime data should ever enter the context.
+
+# Rust build outputs
+/target
+
+# Frontend deps + build output (rebuilt in the `web` stage)
+web/node_modules
+web/dist
+
+# Runtime data (must never be baked into an image)
+*.db
+*.db-shm
+*.db-wal
+/files
+/data
+
+# Local config + secrets
+.env
+.env.*
+!.env.example
+minisign.key
+*.minisig
+
+# VCS + editor + docs noise
+.git
+.github
+.gitignore
+*.md
+!README.md
+
+# Node/tooling caches
+**/.pnpm-store
+**/.cache
+**/.DS_Store

@@ -8,64 +8,79 @@ Rust backend (Axum + SQLite) + embedded Vite/React/TypeScript frontend. The rele
 
 ## Getting started (self-host)
 
-### Fastest: one-command install (Linux / macOS)
+### Fastest: one command (Linux)
 
-On a systemd Linux box (Raspberry Pi, VPS, …) this downloads the signed binary
-for your platform, verifies it, and installs it as a service that restarts on
-crash and starts on boot:
+This installs Bramblekeep as a Docker container (with an optional Watchtower
+sidecar for one-click in-app updates). If Docker isn't present, it offers to
+install it. Works on any Linux box — a Raspberry Pi (64-bit), a home server, a VPS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/merrypatch/bramblekeep/master/install.sh | sudo bash
 ```
 
-Then open `http://localhost:8080` (or `http://<host-ip>:8080` on your LAN). The
-script is inspectable — read [`install.sh`](./install.sh) before piping it to a
-shell. Options: `VERSION=v0.1.3` to pin a version, `NO_SERVICE=1` to just drop
-the binary without the service. Remove with `… | sudo bash -s -- --uninstall`
-(your data in `/opt/bramblekeep` is kept).
+It prints the URL to open and where to find the sign-in link. The script is
+inspectable — read [`install.sh`](./install.sh) before piping it to a shell.
 
-### Manual (any platform)
+Useful overrides:
 
-1. Download the binary for your platform from the [latest release](https://github.com/merrypatch/bramblekeep/releases/latest).
-2. Make it executable and run it:
+- `PUBLIC_BASE_URL=https://notes.example.com` — the URL users actually reach (default: the host's IP).
+- `PORT=9000` — host port to publish (default `8080`).
+- `NO_DOCKER=1` — install the bare binary + a systemd service instead of Docker.
+- `VERSION=v0.2.0` — pin a version. `--uninstall` — remove it (your data is kept).
 
-   ```bash
-   chmod +x bramblekeep-linux-x64
-   ./bramblekeep-linux-x64
-   ```
+### Docker (manual)
 
-3. Open the URL it prints (default `http://localhost:8080`). On first launch it creates `bramblekeep.db` and a `files/` folder next to itself.
-
-That's enough for a local trial — no email needed, sign-in links are printed in the console.
-
-### Configuration (optional)
-
-For a real deployment (public domain, email sign-in, HTTPS), create a `.env` file next to the binary. Copy [`.env.example`](./.env.example) and edit:
-
-- `PUBLIC_BASE_URL` — the URL users actually reach (e.g. `https://notes.example.com`); sign-in and shared-page links are built from it. Defaults to the binary's own address.
-- `SMTP_*` — send sign-in / invitation emails. Without it, those links are logged to the console.
-- `COOKIE_SECURE=true` — set when serving over HTTPS.
-- `BIND_ADDR` — change the listen address/port (default `0.0.0.0:8080`).
-
-Run it behind a reverse proxy (Caddy, nginx, Traefik) for TLS.
-
-### Run as a service (auto-restart + start on boot)
-
-For a real deployment you want Bramblekeep to come back on its own after a crash
-or a reboot (e.g. a server that powers off overnight), while still letting you
-stop it by hand. On systemd Linux, grab the `.tar.gz` from the release (it
-bundles the installer) and run one command:
+The published image is multi-arch (`amd64` + `arm64`, incl. Raspberry Pi 64-bit).
+Your data lives in a `/data` volume, so it survives restarts and upgrades:
 
 ```bash
-tar xzf bramblekeep-linux-x64.tar.gz
-cd bramblekeep-linux-x64
+docker run -d --name bramblekeep \
+  -p 8080:8080 \
+  -v bramblekeep-data:/data \
+  ghcr.io/merrypatch/bramblekeep:latest
+```
+
+Then open `http://localhost:8080`; sign-in links are printed to the logs
+(`docker logs -f bramblekeep`) until you configure SMTP.
+
+Prefer Compose? A ready [`docker-compose.yml`](./docker-compose.yml) is in the
+repo (volume, ports, Watchtower one-click updates, commented SMTP / HTTPS):
+
+```bash
+docker compose up -d
+```
+
+**Upgrading** is `docker compose pull && docker compose up -d`; your `/data`
+volume is untouched. The compose file also ships an optional **Watchtower**
+sidecar so the in-app **Update** button works in Docker: it backs up the
+database, then Watchtower pulls the new image and recreates the container —
+bramblekeep never touches the Docker socket itself. Delete the `watchtower`
+service to upgrade manually.
+
+### On a PaaS or app store (Dokploy, Coolify, runtipi, CasaOS…)
+
+Point the platform at the image `ghcr.io/merrypatch/bramblekeep:latest` (or paste
+the [`docker-compose.yml`](./docker-compose.yml)). The platform's proxy handles
+TLS, so **delete the `ports:` block** (it reaches the container over the internal
+network), set `PUBLIC_BASE_URL=https://your-domain` and `COOKIE_SECURE=true`.
+
+### Without Docker (bare binary + systemd)
+
+For hosts where you'd rather not run Docker, install the signed static Linux
+binary as a systemd service (x64 or arm64):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/merrypatch/bramblekeep/master/install.sh | sudo NO_DOCKER=1 bash
+```
+
+Or grab the `.tar.gz` from the [latest release](https://github.com/merrypatch/bramblekeep/releases/latest) and run its bundled installer:
+
+```bash
+tar xzf bramblekeep-linux-x64.tar.gz && cd bramblekeep-linux-x64
 sudo ./deploy/install.sh
 ```
 
-(Already have just the bare binary? `sudo ./deploy/install.sh ./bramblekeep-linux-x64` works too.)
-
-This installs the binary to `/opt/bramblekeep`, runs it as a dedicated
-`bramblekeep` user, and enables a systemd service. From then on:
+Either way it runs as a dedicated `bramblekeep` user under systemd:
 
 | Event | Result |
 | --- | --- |
@@ -74,54 +89,24 @@ This installs the binary to `/opt/bramblekeep`, runs it as a dedicated
 | `sudo systemctl stop bramblekeep` | stays stopped until the next boot |
 | `sudo systemctl disable --now bramblekeep` | stays stopped across reboots too |
 
-Re-run the same command to update the binary in place. Remove everything with
-`sudo ./deploy/install.sh --uninstall` (your data in `/opt/bramblekeep` is kept).
+Logs: `journalctl -u bramblekeep -f`. Re-run the installer to update in place.
+The binary is statically linked (musl) — it also runs directly on any Linux with
+no dependencies: `./bramblekeep-linux-x64`.
 
-Logs: `journalctl -u bramblekeep -f`. The service file lives at
-[`deploy/bramblekeep.service`](./deploy/bramblekeep.service) if you prefer to
-install it by hand.
+### Configuration
 
-#### macOS (launchd)
+Docker deployments are configured via environment variables (the installer writes
+them to `/opt/bramblekeep/.env`); bare-binary installs read a `.env` next to the
+binary (copy [`.env.example`](./.env.example)):
 
-The bundled installer is Linux-only. On macOS, use a launchd daemon. Put the
-binary in `/usr/local/bramblekeep/bramblekeep`, then create
-`/Library/LaunchDaemons/com.bramblekeep.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<plist version="1.0"><dict>
-  <key>Label</key><string>com.bramblekeep</string>
-  <key>ProgramArguments</key><array>
-    <string>/usr/local/bramblekeep/bramblekeep</string>
-  </array>
-  <key>WorkingDirectory</key><string>/usr/local/bramblekeep</string>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-</dict></plist>
-```
-
-`RunAtLoad` starts it on boot, `KeepAlive` restarts it on crash.
-
-```bash
-sudo launchctl load -w /Library/LaunchDaemons/com.bramblekeep.plist   # start + enable at boot
-sudo launchctl unload /Library/LaunchDaemons/com.bramblekeep.plist    # manual stop (no restart loop)
-```
-
-#### Windows (service)
-
-The Windows binary is not service-aware, so wrap it with a service manager such
-as [NSSM](https://nssm.cc/) or [WinSW](https://github.com/winsw/winsw). With NSSM:
-
-```powershell
-nssm install Bramblekeep C:\bramblekeep\bramblekeep-windows-x64.exe
-nssm set Bramblekeep AppDirectory C:\bramblekeep
-Start-Service Bramblekeep      # NSSM handles restart-on-crash + start-at-boot
-Stop-Service Bramblekeep       # manual stop
-```
+- `PUBLIC_BASE_URL` — the URL users actually reach; sign-in and shared-page links are built from it.
+- `SMTP_*` — send sign-in / invitation emails. Without it, those links are logged.
+- `COOKIE_SECURE=true` — set when serving over HTTPS (reverse proxy / tunnel).
+- `PORT` (Docker) / `BIND_ADDR` (binary) — change the listen port.
 
 ## Status
 
-Active development. Working today: rich pages edited in BlockNote synced over WebSocket (yrs CRDT), persisted in `yjs_updates` and projected to `blocks` (survives a binary restart), full-text search, file uploads (content-addressed), account/session auth with per-item sharing, and structured databases with multiple views. Signed release binaries with an in-app update checker.
+Active development. Working today: rich pages edited in BlockNote synced over WebSocket (yrs CRDT), persisted in `yjs_updates` and projected to `blocks` (survives a binary restart), full-text search, file uploads (content-addressed), account/session auth with per-item sharing, and structured databases with multiple views. Signed static release binaries + a multi-arch Docker image, with one-click in-app updates (self-replace on bare metal, Watchtower on Docker).
 
 Not yet: public (login-free) pages, S3 file storage, email/AI integrations — reserved in the schema, built when their version arrives.
 
