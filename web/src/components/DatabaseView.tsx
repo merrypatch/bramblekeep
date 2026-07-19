@@ -182,6 +182,17 @@ const toRow = (r: RowMeta): Row => ({
 /** Key of the Name column (the page title), distinct from the schema columns. */
 const TITLE_KEY = "__title";
 
+/** Calendar year bounds for date fields. Wide enough for historical dates
+ * (year 1 AD) up to a comfortable future. Year 1 needs setFullYear: the
+ * `new Date(1, 0)` constructor maps 0–99 to 1900–1999. The paged year picker
+ * (see calendar.tsx) keeps this range navigable without a giant native list. */
+const CAL_MIN_MONTH = (() => {
+  const d = new Date(1, 0, 1);
+  d.setFullYear(1);
+  return d;
+})();
+const CAL_MAX_MONTH = new Date(2200, 11, 31);
+
 /** Column types used as a time axis in a chart (date + meta dates). */
 const CHART_TIME_TYPES = new Set(["date", "created_time", "last_edited_time"]);
 
@@ -3072,6 +3083,9 @@ function DateCell({
           <Calendar
             mode="range"
             locale={fr}
+            captionLayout="dropdown"
+            startMonth={CAL_MIN_MONTH}
+            endMonth={CAL_MAX_MONTH}
             defaultMonth={dv ? isoToDate(dv.start) : undefined}
             selected={{ from: dv ? isoToDate(dv.start) : undefined, to: dv?.end ? isoToDate(dv.end) : undefined }}
             onSelect={(r) =>
@@ -3085,6 +3099,9 @@ function DateCell({
           <Calendar
             mode="single"
             locale={fr}
+            captionLayout="dropdown"
+            startMonth={CAL_MIN_MONTH}
+            endMonth={CAL_MAX_MONTH}
             defaultMonth={dv ? isoToDate(dv.start) : undefined}
             selected={dv ? isoToDate(dv.start) : undefined}
             onSelect={(d) => commit(d ? compose(format(d, "yyyy-MM-dd"), startTime) : null, null)}

@@ -10,10 +10,98 @@ import {
   DayPicker,
   getDefaultClassNames,
   type DayButton,
+  type DropdownProps,
 } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+
+const YEARS_PER_PAGE = 12
+
+/**
+ * Year navigation as a paged grid (12 years/page, browse with ◀ ▶) instead of a
+ * native <select>. A flat select becomes unusable over a wide range (birth dates,
+ * historical dates); the pager keeps the list to 12 while still reaching any year
+ * within the calendar's startMonth/endMonth bounds. Odoo-style.
+ */
+function YearsDropdown({ options, value, onChange }: DropdownProps) {
+  const years = (options ?? []).map((o) => o.value)
+  const min = years.length ? Math.min(...years) : Number.NEGATIVE_INFINITY
+  const max = years.length ? Math.max(...years) : Number.POSITIVE_INFINITY
+  const current = typeof value === "number" ? value : (years[0] ?? new Date().getFullYear())
+  const [open, setOpen] = React.useState(false)
+  const [pageStart, setPageStart] = React.useState(
+    () => Math.floor(current / YEARS_PER_PAGE) * YEARS_PER_PAGE,
+  )
+  const cells = Array.from({ length: YEARS_PER_PAGE }, (_, i) => pageStart + i)
+
+  const pick = (year: number) => {
+    // react-day-picker's onChange expects a <select> change event; synthesize one.
+    onChange?.({
+      target: { value: String(year) },
+    } as unknown as React.ChangeEvent<HTMLSelectElement>)
+    setOpen(false)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1 px-2 text-sm font-medium"
+        >
+          {current}
+          <ChevronDownIcon className="size-3.5 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2" align="center">
+        <div className="mb-2 flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            disabled={cells[0] <= min}
+            onClick={() => setPageStart((p) => p - YEARS_PER_PAGE)}
+          >
+            <ChevronLeftIcon className="size-4" />
+          </Button>
+          <span className="text-sm font-medium tabular-nums">
+            {cells[0]}–{cells[YEARS_PER_PAGE - 1]}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            disabled={cells[YEARS_PER_PAGE - 1] >= max}
+            onClick={() => setPageStart((p) => p + YEARS_PER_PAGE)}
+          >
+            <ChevronRightIcon className="size-4" />
+          </Button>
+        </div>
+        <div className="grid grid-cols-3 gap-1">
+          {cells.map((year) => (
+            <Button
+              key={year}
+              variant={year === current ? "default" : "ghost"}
+              size="sm"
+              className="tabular-nums"
+              disabled={year < min || year > max}
+              onClick={() => pick(year)}
+            >
+              {year}
+            </Button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 function Calendar({
   className,
@@ -52,17 +140,19 @@ function Calendar({
         ),
         month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
         nav: cn(
-          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
+          // pointer-events-none so the full-width nav bar doesn't cover the
+          // centered dropdowns; the arrow buttons re-enable it for themselves.
+          "pointer-events-none absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
           defaultClassNames.nav
         ),
         button_previous: cn(
           buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
+          "pointer-events-auto size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
           defaultClassNames.button_previous
         ),
         button_next: cn(
           buttonVariants({ variant: buttonVariant }),
-          "size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
+          "pointer-events-auto size-(--cell-size) p-0 select-none aria-disabled:opacity-50",
           defaultClassNames.button_next
         ),
         month_caption: cn(
@@ -70,7 +160,8 @@ function Calendar({
           defaultClassNames.month_caption
         ),
         dropdowns: cn(
-          "flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
+          // relative z-10 keeps the month/year controls above the absolute nav bar
+          "relative z-10 flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
@@ -163,6 +254,7 @@ function Calendar({
           )
         },
         DayButton: CalendarDayButton,
+        YearsDropdown,
         WeekNumber: ({ children, ...props }) => {
           return (
             <td {...props}>
