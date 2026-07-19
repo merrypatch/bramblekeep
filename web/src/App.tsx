@@ -73,7 +73,7 @@ function Login() {
     <div className="dot-grid flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-4">
         <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">{APP_NAME}</h1>
+          <h1 className="font-brand text-4xl font-bold tracking-tight">{APP_NAME}</h1>
           <p className="text-sm text-muted-foreground">{t("auth.brandSubtitle")}</p>
         </div>
         {sent ? (

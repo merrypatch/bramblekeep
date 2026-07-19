@@ -302,7 +302,7 @@ export function AppSidebar({
   return (
     <Sidebar variant="inset" collapsible="icon">
       <SidebarHeader>
-        <div className="px-2 py-1 text-base font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+        <div className="px-2 py-1 font-brand text-2xl font-bold leading-none tracking-tight group-data-[collapsible=icon]:hidden">
           {APP_NAME}
         </div>
         <div className="group-data-[collapsible=icon]:hidden">

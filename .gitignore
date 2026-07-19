@@ -6,6 +6,7 @@
 bramblekeep.db
 bramblekeep.db-shm
 bramblekeep.db-wal
+bramblekeep.db.bak*
 /files
 
 # Front

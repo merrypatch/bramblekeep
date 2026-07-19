@@ -2,6 +2,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
+import "@fontsource/dancing-script/600.css"; // brand wordmark font (self-hosted, no CDN)
+import "@fontsource/dancing-script/700.css";
+
 import { Toaster } from "@/components/ui/sonner";
 import { applyAccent, applyGrid, getAccent, getGrid } from "@/lib/appearance";
 import { applyTheme, getTheme, watchSystem } from "@/lib/theme";
