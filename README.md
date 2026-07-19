@@ -141,7 +141,7 @@ Produces the distributable executable — embedded frontend, no Node required at
 ./scripts/build.sh
 ```
 
-Result: `./target/release/hub`. Distributing this file alone is sufficient; it serves the API and the frontend on :8080 and creates `bramblekeep.db` + `./files` at first launch.
+Result: `./target/release/bramblekeep`. Distributing this file alone is sufficient; it serves the API and the frontend on :8080 and creates `bramblekeep.db` + `./files` at first launch.
 
 <details><summary>Manual equivalent</summary>
 
