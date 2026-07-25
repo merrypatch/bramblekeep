@@ -285,6 +285,7 @@
       "name": "Nom",
       "open": "Ouvrir",
       "rowFallback": "Ligne",
+      "openFullPage": "Ouvrir en pleine page",
       "remove": "Retirer"
     },
     "empty": {
@@ -354,7 +355,14 @@
     "hint": {
       "kanbanNeedsSelect": "Cette vue kanban a besoin d'une colonne de type Sélection.",
       "calendarNeedsDate": "Cette vue calendrier a besoin d'une colonne de type Date.",
-      "chartNeedsAxis": "Choisis une colonne d'axe (« Grouper par ») dans « Paramètres »."
+      "chartNeedsAxis": "Choisis une colonne d'axe (« Grouper par ») dans « Paramètres ».",
+      "graphNeedsRelations": "Cette vue graphe nécessite une colonne relation avec des liens."
+    },
+    "graph": {
+      "zoomIn": "Zoom avant",
+      "zoomOut": "Zoom arrière",
+      "reset": "Ajuster à la vue",
+      "spacing": "Espacement"
     },
     "dialog": {
       "deleteColTitle": "Supprimer cette colonne ?",
@@ -386,7 +394,8 @@
         "board": "Tableau (kanban)",
         "calendar": "Calendrier",
         "grid": "Grille (galerie)",
-        "chart": "Graphique"
+        "chart": "Graphique",
+        "graph": "Graphe (relations)"
       }
     },
     "viewName": {
@@ -394,7 +403,8 @@
       "board": "Tableau",
       "calendar": "Calendrier",
       "grid": "Grille",
-      "chart": "Graphique"
+      "chart": "Graphique",
+      "graph": "Graphe"
     },
     "act": {
       "rowActions": "Actions de la ligne",

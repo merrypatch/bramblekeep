@@ -50,6 +50,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { BoardView } from "@/components/db/BoardView";
 import { CalendarView } from "@/components/db/CalendarView";
 import { ChartView } from "@/components/db/ChartView";
+import { GraphView } from "@/components/db/GraphView";
+import { buildGraphModel } from "@/lib/graph";
 import { FilterBuilder, type FilterColumn } from "@/components/db/FilterBuilder";
 import { FormulaEditor } from "@/components/db/FormulaEditor";
 import { GridView, imageColumns } from "@/components/db/GridView";
@@ -749,6 +751,17 @@ export function DatabaseView({
     () => applySort(filteredRows, sort, schema.columns),
     [filteredRows, sort, schema.columns],
   );
+
+  // Relation graph model: rows of this database + their linked rows as nodes,
+  // relation cells as edges. Labels reuse `relTitles` (linked rows) and row
+  // titles. Built only for the graph view.
+  const graphModel = useMemo(() => {
+    if (activeView?.type !== "graph") return null;
+    const untitled = t("common.untitled");
+    const rowTitle = new Map(rows.map((r) => [r.id, r.title || untitled]));
+    const labelOf = (id: string): string => rowTitle.get(id) ?? (relTitles.get(id) || untitled);
+    return buildGraphModel(filteredRows, schema.columns, labelOf);
+  }, [activeView, filteredRows, rows, relTitles, schema.columns, t]);
 
   const chartData = useMemo(() => {
     if (activeView?.type !== "chart" || !activeView.groupBy) return null;
@@ -2146,6 +2159,18 @@ export function DatabaseView({
           <ViewHint>{t("dbview.hint.chartNeedsAxis")}</ViewHint>
         ))}
 
+      {/* Relation graph view */}
+      {activeView?.type === "graph" &&
+        (graphModel && graphModel.edges.length > 0 ? (
+          <GraphView
+            model={graphModel}
+            height={viewMaxH ?? 560}
+            onOpen={(id) => setPeekRow(id)}
+          />
+        ) : (
+          <ViewHint>{t("dbview.hint.graphNeedsRelations")}</ViewHint>
+        ))}
+
       {addViewOpen && (
         <AddViewDialog
           columns={schema.columns}
@@ -2492,7 +2517,38 @@ export function DatabaseView({
         >
           {(() => {
             const r = rows.find((x) => x.id === peekRow);
-            if (!r) return null;
+            // Node from the relation graph that lives in ANOTHER database: it is
+            // not in this db's `rows` and we don't have its schema, so show a
+            // minimal peek (header + page body) instead of the property grid.
+            if (!r) {
+              if (!peekMeta) return null;
+              return (
+                <>
+                  <SheetHeader className="border-b p-0">
+                    <SheetTitle className="sr-only">
+                      {peekMeta.title || t("dbview.view.rowFallback")}
+                    </SheetTitle>
+                    <div className="flex items-center gap-2 px-4 py-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 text-xs"
+                        onClick={() => {
+                          navigate(`/p/${peekMeta.id}`);
+                          setPeekRow(null);
+                        }}
+                      >
+                        <Maximize2 className="size-3.5" /> {t("dbview.view.openFullPage")}
+                      </Button>
+                    </div>
+                    <PageHeader meta={peekMeta} onChange={patchPeek} readOnly />
+                  </SheetHeader>
+                  <div className="border-t py-2">
+                    <PeekEditor itemId={peekMeta.id} userName={userName} avatar={avatar} />
+                  </div>
+                </>
+              );
+            }
             return (
               <>
                 <SheetHeader className="border-b p-0">
@@ -2507,7 +2563,7 @@ export function DatabaseView({
                         setPeekRow(null);
                       }}
                     >
-                      <Maximize2 className="size-3.5" /> Ouvrir en pleine page
+                      <Maximize2 className="size-3.5" /> {t("dbview.view.openFullPage")}
                     </Button>
                   </div>
                   {peekMeta ? (
@@ -4318,6 +4374,7 @@ function AddViewDialog({
             <option value="calendar">{t("dbview.addView.type.calendar")}</option>
             <option value="grid">{t("dbview.addView.type.grid")}</option>
             <option value="chart">{t("dbview.addView.type.chart")}</option>
+            <option value="graph">{t("dbview.addView.type.graph")}</option>
           </select>
           {needsCol &&
             (candidates.length ? (

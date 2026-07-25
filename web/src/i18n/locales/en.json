@@ -285,6 +285,7 @@
       "name": "Name",
       "open": "Open",
       "rowFallback": "Row",
+      "openFullPage": "Open as full page",
       "remove": "Remove"
     },
     "empty": {
@@ -354,7 +355,14 @@
     "hint": {
       "kanbanNeedsSelect": "This kanban view needs a Select column.",
       "calendarNeedsDate": "This calendar view needs a Date column.",
-      "chartNeedsAxis": "Pick an axis column (“Group by”) in “Settings”."
+      "chartNeedsAxis": "Pick an axis column (“Group by”) in “Settings”.",
+      "graphNeedsRelations": "This graph view needs a relation column with links."
+    },
+    "graph": {
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "reset": "Fit to view",
+      "spacing": "Spacing"
     },
     "dialog": {
       "deleteColTitle": "Delete this column?",
@@ -386,7 +394,8 @@
         "board": "Board (kanban)",
         "calendar": "Calendar",
         "grid": "Gallery",
-        "chart": "Chart"
+        "chart": "Chart",
+        "graph": "Graph (relations)"
       }
     },
     "viewName": {
@@ -394,7 +403,8 @@
       "board": "Board",
       "calendar": "Calendar",
       "grid": "Gallery",
-      "chart": "Chart"
+      "chart": "Chart",
+      "graph": "Graph"
     },
     "act": {
       "rowActions": "Row actions",

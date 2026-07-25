@@ -285,6 +285,7 @@
       "name": "Nombre",
       "open": "Abrir",
       "rowFallback": "Fila",
+      "openFullPage": "Abrir como página completa",
       "remove": "Quitar"
     },
     "empty": {
@@ -354,7 +355,14 @@
     "hint": {
       "kanbanNeedsSelect": "Esta vista kanban necesita una columna de tipo Selección.",
       "calendarNeedsDate": "Esta vista de calendario necesita una columna de tipo Fecha.",
-      "chartNeedsAxis": "Elige una columna de eje (“Agrupar por”) en “Ajustes”."
+      "chartNeedsAxis": "Elige una columna de eje (“Agrupar por”) en “Ajustes”.",
+      "graphNeedsRelations": "Esta vista de grafo necesita una columna de relación con enlaces."
+    },
+    "graph": {
+      "zoomIn": "Acercar",
+      "zoomOut": "Alejar",
+      "reset": "Ajustar a la vista",
+      "spacing": "Espaciado"
     },
     "dialog": {
       "deleteColTitle": "¿Eliminar esta columna?",
@@ -386,7 +394,8 @@
         "board": "Tablero (kanban)",
         "calendar": "Calendario",
         "grid": "Galería",
-        "chart": "Gráfico"
+        "chart": "Gráfico",
+        "graph": "Grafo (relaciones)"
       }
     },
     "viewName": {
@@ -394,7 +403,8 @@
       "board": "Tablero",
       "calendar": "Calendario",
       "grid": "Galería",
-      "chart": "Gráfico"
+      "chart": "Gráfico",
+      "graph": "Grafo"
     },
     "act": {
       "rowActions": "Acciones de la fila",

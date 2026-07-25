@@ -118,7 +118,7 @@ export function statusGroupLabel(id: string): string {
   return i18n.t(`db.statusGroup.${id}` as "db.statusGroup.todo");
 }
 
-export type ViewType = "table" | "board" | "calendar" | "grid" | "chart";
+export type ViewType = "table" | "board" | "calendar" | "grid" | "chart" | "graph";
 /** Display mode of a calendar view. */
 export type CalMode = "month" | "week" | "day";
 /** Card size of a grid view. */
