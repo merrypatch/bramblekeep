@@ -1,21 +1,23 @@
-## Bramblekeep v0.4.1
+## Bramblekeep v0.5.0
 
-"All pages" grows up: a sortable table you can act on in bulk.
+See your data as a graph: a new relation view for databases.
 
 ### Added
 
-- **All-pages table + bulk actions.** The "All pages" view is now a
-  database-like table — sort by name, type, parent or last opened — with
-  multi-row selection. Select any set of pages and, in one click:
-  - **Favorite** them,
-  - **Duplicate** them (editable pages),
-  - **Delete** them (pages you own; confirmation first, moved to trash).
-  Per-row and select-all checkboxes; the selection survives filtering.
+- **Relation graph view.** Databases get a new view type — **Graph** — that
+  draws your rows as nodes and their relation columns as links, laid out with a
+  live force-directed simulation. It's a fast, dependency-free canvas (nothing
+  leaves your server).
+  - **Click a node** to open it in the side drawer (rows of the database show
+    their full properties; linked rows from a related database open a compact
+    preview).
+  - **Drag** a node to rearrange it, **drag the background** to pan.
+  - **Zoom** with the wheel or the +/− buttons, and reset with fit-to-view.
+  - A **spacing** slider spreads the nodes apart or packs them together, with
+    an instant re-layout.
 
-### Changed
-
-- The "All pages" listing replaces the previous card grid with the table above,
-  showing each page's last-opened time.
+  Add it from a database's view bar (“+ → Graph”). The view needs at least one
+  relation column with links.
 
 ### Upgrading
 
