@@ -193,6 +193,13 @@ html[data-accent="rose"] {
   }
 }
 
+/* Cap the slash / @-mention suggestion menu height so a long list scrolls
+   instead of overflowing the viewport. */
+.bn-suggestion-menu {
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
 @layer base {
   * {
     border-color: var(--border);

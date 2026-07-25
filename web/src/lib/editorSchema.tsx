@@ -1,5 +1,5 @@
-import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
-import { createReactBlockSpec } from "@blocknote/react";
+import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from "@blocknote/core";
+import { createReactBlockSpec, createReactInlineContentSpec } from "@blocknote/react";
 import { FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -141,6 +141,75 @@ function parseViewState(json: string): ViewState {
 /** Editor schema = default blocks + the `page` and `dbview` blocks.
  * `createReactBlockSpec` returns a factory (0.51): call it to get
  * the BlockSpec. */
+/** Inline `@` mention of another item (page OR database row): a clickable chip
+ * with the target's live title. Content lives in the CRDT like any inline run;
+ * the projection captures it as a `links` edge (backlinks / graph). */
+function PageMention({ itemId, label }: { itemId: string; label: string }) {
+  const navigate = useNavigate();
+  const [live, setLive] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setLive(null);
+    setMissing(false);
+    if (itemId) {
+      getItem(itemId)
+        .then((m) => alive && setLive(m.title ?? ""))
+        .catch((e) => {
+          if (alive && e instanceof ApiError) setMissing(true);
+        });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [itemId]);
+
+  const text = (live ?? label) || "…";
+  if (missing) {
+    return (
+      <span
+        contentEditable={false}
+        className="rounded px-0.5 text-muted-foreground/60 line-through"
+      >
+        @{label || "?"}
+      </span>
+    );
+  }
+  return (
+    <span
+      contentEditable={false}
+      role="button"
+      tabIndex={0}
+      onClick={() => itemId && navigate(`/p/${itemId}`)}
+      onKeyDown={(e) => {
+        if (itemId && (e.key === "Enter" || e.key === " ")) navigate(`/p/${itemId}`);
+      }}
+      className="cursor-pointer rounded bg-accent px-1 py-0.5 font-medium text-foreground underline-offset-2 hover:underline"
+    >
+      @{text}
+    </span>
+  );
+}
+
+/** `pageLink` inline content: an `@` mention referencing another item. */
+export const PageMentionSpec = createReactInlineContentSpec(
+  {
+    type: "pageLink",
+    propSchema: { itemId: { default: "" }, label: { default: "" } },
+    content: "none",
+  },
+  {
+    render: (props) => (
+      <PageMention
+        itemId={props.inlineContent.props.itemId}
+        label={props.inlineContent.props.label}
+      />
+    ),
+  },
+);
+
 export const editorSchema = BlockNoteSchema.create({
   blockSpecs: { ...defaultBlockSpecs, page: PageBlockSpec(), dbview: DbViewBlockSpec() },
+  inlineContentSpecs: { ...defaultInlineContentSpecs, pageLink: PageMentionSpec },
 });

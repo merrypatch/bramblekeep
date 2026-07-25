@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Maximize, Minus, Plus } from "lucide-react";
+import { Loader2, Maximize, Minus, Plus } from "lucide-react";
 
 import type { GraphModel } from "@/lib/graph";
 
@@ -49,6 +49,10 @@ export function GraphView({ model, onOpen, height }: Props) {
   const [spacing, setSpacing] = useState(1);
   const spacingRef = useRef(1);
 
+  // Hide the graph behind a loader until the force layout has settled, so the
+  // initial "flash & bump" of the simulation isn't visible. Reset on new data.
+  const [ready, setReady] = useState(false);
+
   /** Multiplies the zoom by `factor`, keeping the screen point (ax,ay) fixed. */
   const zoomAround = useCallback((factor: number, ax: number, ay: number) => {
     const z = zoomRef.current;
@@ -75,6 +79,7 @@ export function GraphView({ model, onOpen, height }: Props) {
     if (!canvas || !wrap) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    setReady(false); // new model → re-hide until it settles again
 
     const colors = {
       row: resolveColor(wrap, "--primary"),
@@ -294,6 +299,8 @@ export function GraphView({ model, onOpen, height }: Props) {
 
     let raf = 0;
     let lastSpacing = spacingRef.current;
+    let revealed = false;
+    let warmFrames = 0;
     const loop = () => {
       // Spacing changed via the slider → re-heat the layout.
       if (spacingRef.current !== lastSpacing) {
@@ -301,7 +308,15 @@ export function GraphView({ model, onOpen, height }: Props) {
         running = true;
         alpha = Math.max(alpha, 0.6);
       }
-      if (running) step();
+      // Before the first reveal, run several physics steps per frame so the
+      // layout converges quickly WITHOUT drawing the intermediate jitter.
+      const steps = revealed ? 1 : 6;
+      for (let i = 0; i < steps && running; i++) step();
+      warmFrames++;
+      if (!revealed && (!running || warmFrames > 240)) {
+        revealed = true;
+        setReady(true);
+      }
       draw();
       raf = requestAnimationFrame(loop);
     };
@@ -427,7 +442,16 @@ export function GraphView({ model, onOpen, height }: Props) {
       className="relative w-full overflow-hidden rounded-md border bg-card"
       style={{ height }}
     >
-      <canvas ref={canvasRef} className="block touch-none" />
+      <canvas
+        ref={canvasRef}
+        className={`block touch-none transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"}`}
+      />
+      {/* Loader while the force layout settles (hides the initial flash/bump). */}
+      {!ready && (
+        <div className="absolute inset-0 flex items-center justify-center gap-2 bg-card text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" /> {t("dbview.graph.loading")}
+        </div>
+      )}
       {/* Node spacing. */}
       <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-md border bg-background/90 px-2 py-1 shadow-sm">
         <span className="text-xs text-muted-foreground">{t("dbview.graph.spacing")}</span>

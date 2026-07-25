@@ -9,13 +9,61 @@
 //! prerequisite.
 
 use yrs::any::Any;
-use yrs::{Doc, Out, ReadTxn, Text, Transact, XmlFragment, XmlOut};
+use yrs::{Doc, Out, ReadTxn, Text, Transact, Xml, XmlFragment, XmlOut};
 
 use crate::store::BlockRow;
 
 /// Name of the root shared fragment matching the client BlockNote/Yjs. Both
 /// sides MUST use the same name, otherwise the content is invisible.
 pub const FRAGMENT: &str = "document-store";
+
+/// A reference edge extracted from the content: `src` (the projected item) links
+/// to `dst_item`. `kind` is the reference block type. Projected like `blocks` —
+/// a pure function of the CRDT — into the `links` table (backlinks + graph).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkEdge {
+    pub dst_item: String,
+    pub kind: String,
+}
+
+/// BlockNote node tags that reference another item via an `itemId` attribute:
+/// the `page` card + `dbview` embed (block-level), and the `pageLink` `@` mention
+/// (inline, nested in a paragraph — reached by the recursive walk). All three
+/// carry `itemId` as an XML attribute, so the same extraction applies.
+const REF_BLOCKS: [&str; 3] = ["page", "dbview", "pageLink"];
+
+/// Extracts the reference edges of a document (page/dbview blocks → their target
+/// `itemId`). Deduplicated by (dst, kind): two cards to the same page = one edge.
+/// One-way, like `project`.
+pub fn project_links(doc: &Doc) -> Vec<LinkEdge> {
+    let frag = doc.get_or_insert_xml_fragment(FRAGMENT);
+    let txn = doc.transact();
+    let mut edges: Vec<LinkEdge> = Vec::new();
+    collect_links(&txn, frag.children(&txn), &mut edges);
+    edges
+}
+
+fn collect_links<T: ReadTxn>(
+    txn: &T,
+    nodes: yrs::types::xml::XmlNodes<'_, T>,
+    out: &mut Vec<LinkEdge>,
+) {
+    for node in nodes {
+        if let XmlOut::Element(el) = node {
+            let tag = el.tag().as_ref();
+            if REF_BLOCKS.contains(&tag)
+                && let Some(dst) = el.get_attribute(txn, "itemId")
+                && !dst.is_empty()
+            {
+                let edge = LinkEdge { dst_item: dst, kind: tag.to_string() };
+                if !out.contains(&edge) {
+                    out.push(edge);
+                }
+            }
+            collect_links(txn, el.children(txn), out);
+        }
+    }
+}
 
 /// Projects authored content (Yjs doc) into `blocks` rows for the given item.
 pub fn project(doc: &Doc, item_id: &str) -> Vec<BlockRow> {

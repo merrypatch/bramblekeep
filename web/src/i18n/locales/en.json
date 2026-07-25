@@ -362,7 +362,8 @@
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
       "reset": "Fit to view",
-      "spacing": "Spacing"
+      "spacing": "Spacing",
+      "loading": "Building the graph…"
     },
     "dialog": {
       "deleteColTitle": "Delete this column?",
@@ -1047,7 +1048,10 @@
     "clearSelection": "Clear selection",
     "deleteTitle": "Delete the selected pages?",
     "deleteBody": "{{count}} page(s) and all their sub-pages will be moved to the trash.",
-    "deleteConfirm": "Delete"
+    "deleteConfirm": "Delete",
+    "viewTable": "Table",
+    "viewGraph": "Graph",
+    "graphLoading": "Loading the graph…"
   },
   "updateConsent": {
     "title": "Check for updates?",
@@ -1147,5 +1151,8 @@
       "swapping": "Installing…",
       "restarting": "Restarting…"
     }
+  },
+  "backlinks": {
+    "title": "Linked references ({{count}})"
   }
 }

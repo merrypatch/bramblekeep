@@ -129,9 +129,11 @@ import {
   duplicateItem,
   deleteItem,
   fileUrl,
+  getDbGraphLinks,
   getItem,
   getItemCached,
   type ItemMeta,
+  type PageGraph,
   type MetaPatch,
   listItems,
   listRows,
@@ -752,16 +754,48 @@ export function DatabaseView({
     [filteredRows, sort, schema.columns],
   );
 
+  // Page references touching this database's rows (loaded for the graph view):
+  // edges from the `links` projection + the external endpoints as nodes.
+  const [graphRefs, setGraphRefs] = useState<PageGraph | null>(null);
+  useEffect(() => {
+    if (activeView?.type !== "graph") return;
+    let alive = true;
+    getDbGraphLinks(dbId)
+      .then((g) => alive && setGraphRefs(g))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [activeView?.type, dbId]);
+
   // Relation graph model: rows of this database + their linked rows as nodes,
-  // relation cells as edges. Labels reuse `relTitles` (linked rows) and row
-  // titles. Built only for the graph view.
+  // relation cells as edges; MERGED with page references (@-mentions / cards)
+  // touching those rows. Labels reuse `relTitles` (linked rows) and row titles.
   const graphModel = useMemo(() => {
     if (activeView?.type !== "graph") return null;
     const untitled = t("common.untitled");
     const rowTitle = new Map(rows.map((r) => [r.id, r.title || untitled]));
     const labelOf = (id: string): string => rowTitle.get(id) ?? (relTitles.get(id) || untitled);
-    return buildGraphModel(filteredRows, schema.columns, labelOf);
-  }, [activeView, filteredRows, rows, relTitles, schema.columns, t]);
+    const model = buildGraphModel(filteredRows, schema.columns, labelOf);
+    // Merge in page-reference nodes/edges (external items + links).
+    const nodeById = new Map(model.nodes.map((n) => [n.id, n]));
+    for (const n of graphRefs?.nodes ?? []) {
+      if (!nodeById.has(n.id)) {
+        const node = { id: n.id, label: n.title || untitled, group: "linked" as const };
+        nodeById.set(n.id, node);
+        model.nodes.push(node);
+      }
+    }
+    const edgeSeen = new Set(model.edges.map((e) => [e.source, e.target].sort().join(" ")));
+    for (const e of graphRefs?.edges ?? []) {
+      const key = [e.src, e.dst].sort().join(" ");
+      if (nodeById.has(e.src) && nodeById.has(e.dst) && !edgeSeen.has(key)) {
+        edgeSeen.add(key);
+        model.edges.push({ source: e.src, target: e.dst });
+      }
+    }
+    return model;
+  }, [activeView, filteredRows, rows, relTitles, schema.columns, t, graphRefs]);
 
   const chartData = useMemo(() => {
     if (activeView?.type !== "chart" || !activeView.groupBy) return null;

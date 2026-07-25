@@ -132,6 +132,8 @@ pub fn build_app(state: AppState) -> Router {
             "/api/v1/items",
             post(routes::create_item).get(routes::list_items),
         )
+        .route("/api/v1/graph", get(routes::page_graph))
+        .route("/api/v1/mentions", get(routes::search_mentions))
         .route(
             "/api/v1/items/{id}",
             get(routes::get_item)
@@ -144,6 +146,8 @@ pub fn build_app(state: AppState) -> Router {
         .route("/api/v1/trash/{id}", axum::routing::delete(routes::purge_item))
         .route("/api/v1/items/{id}/blocks", get(routes::get_blocks))
         .route("/api/v1/items/{id}/ancestors", get(routes::ancestors))
+        .route("/api/v1/items/{id}/backlinks", get(routes::backlinks))
+        .route("/api/v1/items/{id}/graph-links", get(routes::db_graph_refs))
         .route("/api/v1/items/{id}/rows", get(routes::list_rows))
         .route("/api/v1/items/{id}/activity", get(routes::list_activity))
         .route("/api/v1/items/{id}/events", get(routes::list_events))

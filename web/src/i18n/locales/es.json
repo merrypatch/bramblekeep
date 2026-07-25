@@ -362,7 +362,8 @@
       "zoomIn": "Acercar",
       "zoomOut": "Alejar",
       "reset": "Ajustar a la vista",
-      "spacing": "Espaciado"
+      "spacing": "Espaciado",
+      "loading": "Construyendo el grafo…"
     },
     "dialog": {
       "deleteColTitle": "¿Eliminar esta columna?",
@@ -1047,7 +1048,10 @@
     "clearSelection": "Borrar selección",
     "deleteTitle": "¿Eliminar las páginas seleccionadas?",
     "deleteBody": "{{count}} página(s) y todas sus subpáginas se moverán a la papelera.",
-    "deleteConfirm": "Eliminar"
+    "deleteConfirm": "Eliminar",
+    "viewTable": "Tabla",
+    "viewGraph": "Grafo",
+    "graphLoading": "Cargando el grafo…"
   },
   "updateConsent": {
     "title": "¿Buscar actualizaciones?",
@@ -1147,5 +1151,8 @@
       "swapping": "Instalando…",
       "restarting": "Reiniciando…"
     }
+  },
+  "backlinks": {
+    "title": "Referencias vinculadas ({{count}})"
   }
 }

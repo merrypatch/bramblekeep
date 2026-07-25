@@ -140,7 +140,8 @@ impl SyncHub {
         store::append_update(db, &item_id, seq, &payload).await?;
 
         let blocks = projection::project(&guard.doc, &item_id.to_string());
-        store::save_projection(db, &item_id, &blocks).await?;
+        let links = projection::project_links(&guard.doc);
+        store::save_projection(db, &item_id, &blocks, &links).await?;
 
         let _ = guard.tx.send(framed(TAG_DOC, &payload));
         Ok(())

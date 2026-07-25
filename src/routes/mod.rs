@@ -1668,6 +1668,54 @@ pub async fn ancestors(
     Ok(Json(json!({ "ancestors": crumbs })))
 }
 
+/// Item search for the `@` mention picker: accessible items (pages AND database
+/// rows) by title. Access enforced inside the query.
+pub async fn search_mentions(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Query(params): Query<SearchQuery>,
+) -> Result<Json<Value>> {
+    let q = params.q.as_deref().unwrap_or("").trim();
+    let hits = crate::store::search_mentions(&app.db, &user.id, q).await?;
+    Ok(Json(json!({ "hits": hits })))
+}
+
+/// The whole page graph the user can see: accessible pages/databases as nodes,
+/// reference + hierarchy edges. Access is enforced inside the query.
+pub async fn page_graph(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+) -> Result<Json<Value>> {
+    let (nodes, edges) = crate::store::page_graph(&app.db, &user.id).await?;
+    Ok(Json(json!({ "nodes": nodes, "edges": edges })))
+}
+
+/// Reference edges touching the rows of a database (for its graph view): links
+/// between the db's rows and other items, + those external items as nodes.
+pub async fn db_graph_refs(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>> {
+    let item_id = parse_item_id(&id)?;
+    require_access(&app, &item_id, &user, "read").await?;
+    let (edges, nodes) = crate::store::db_graph_refs(&app.db, &user.id, &item_id).await?;
+    Ok(Json(json!({ "edges": edges, "nodes": nodes })))
+}
+
+/// Incoming references ("linked references") of an item: the accessible pages
+/// whose content links to it (via a `page`/`dbview` block).
+pub async fn backlinks(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>> {
+    let item_id = parse_item_id(&id)?;
+    require_access(&app, &item_id, &user, "read").await?;
+    let backlinks = crate::store::backlinks(&app.db, &user.id, &item_id).await?;
+    Ok(Json(json!({ "backlinks": backlinks })))
+}
+
 /// Reads the `blocks` projection of an item (reading from projection, cf. §5.3).
 pub async fn get_blocks(
     State(app): State<AppState>,

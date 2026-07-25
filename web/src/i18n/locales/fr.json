@@ -362,7 +362,8 @@
       "zoomIn": "Zoom avant",
       "zoomOut": "Zoom arrière",
       "reset": "Ajuster à la vue",
-      "spacing": "Espacement"
+      "spacing": "Espacement",
+      "loading": "Construction du graphe…"
     },
     "dialog": {
       "deleteColTitle": "Supprimer cette colonne ?",
@@ -1047,7 +1048,10 @@
     "clearSelection": "Effacer la sélection",
     "deleteTitle": "Supprimer les pages sélectionnées ?",
     "deleteBody": "{{count}} page(s) et toutes leurs sous-pages seront mises à la corbeille.",
-    "deleteConfirm": "Supprimer"
+    "deleteConfirm": "Supprimer",
+    "viewTable": "Table",
+    "viewGraph": "Graphe",
+    "graphLoading": "Chargement du graphe…"
   },
   "updateConsent": {
     "title": "Vérifier les mises à jour ?",
@@ -1147,5 +1151,8 @@
       "swapping": "Installation…",
       "restarting": "Redémarrage…"
     }
+  },
+  "backlinks": {
+    "title": "Références liées ({{count}})"
   }
 }

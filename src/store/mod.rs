@@ -1575,9 +1575,16 @@ pub async fn append_update(db: &Db, item_id: &ItemId, seq: i64, update: &[u8]) -
     Ok(())
 }
 
-/// Rewrites the `blocks` projection of an item (complete replacement). Called
-/// only by the `sync` engine after reconstruction from the CRDT.
-pub async fn save_projection(db: &Db, item_id: &ItemId, blocks: &[BlockRow]) -> Result<()> {
+/// Rewrites the `blocks` projection of an item (complete replacement), together
+/// with its `links` edges and FTS index — all in one transaction so the three
+/// derived views stay consistent. Called only by the `sync` engine after
+/// reconstruction from the CRDT.
+pub async fn save_projection(
+    db: &Db,
+    item_id: &ItemId,
+    blocks: &[BlockRow],
+    links: &[crate::sync::projection::LinkEdge],
+) -> Result<()> {
     let id = item_id.to_string();
     let mut tx = db.begin().await?;
     // Projection + FTS index rebuilt together (same transaction) to stay
@@ -1601,9 +1608,309 @@ pub async fn save_projection(db: &Db, item_id: &ItemId, blocks: &[BlockRow]) -> 
         .execute(&mut *tx)
         .await?;
     }
+    // Reference edges (page/dbview → target): full replacement for this source.
+    sqlx::query("DELETE FROM links WHERE src_item = ?")
+        .bind(&id)
+        .execute(&mut *tx)
+        .await?;
+    for e in links {
+        sqlx::query("INSERT INTO links (src_item, dst_item, kind) VALUES (?, ?, ?)")
+            .bind(&id)
+            .bind(&e.dst_item)
+            .bind(&e.kind)
+            .execute(&mut *tx)
+            .await?;
+    }
     crate::search::index_item(&mut tx, &id, blocks).await?;
     tx.commit().await?;
     Ok(())
+}
+
+/// A candidate for an `@` mention: any accessible item (page OR database row) by
+/// title, with its parent title for disambiguation ("biel — Personnes").
+#[derive(Debug, Clone, sqlx::FromRow, serde::Serialize)]
+pub struct MentionHit {
+    pub id: String,
+    pub title: Option<String>,
+    pub icon: Option<String>,
+    pub parent_title: Option<String>,
+}
+
+/// Searches accessible items by title for the `@` mention picker. Unlike the
+/// sidebar, this INCLUDES database rows (they are page-items too), so an entity
+/// like a "Personnes" row can be mentioned in prose. Access-scoped, capped.
+pub async fn search_mentions(db: &Db, user_id: &str, q: &str) -> Result<Vec<MentionHit>> {
+    // Neutralize LIKE wildcards in the user query (substring match only).
+    let needle = format!("%{}%", q.replace(['%', '_'], ""));
+    let rows = sqlx::query_as::<_, MentionHit>(
+        "WITH RECURSIVE granted(id) AS ( \
+             SELECT id FROM items \
+             WHERE workspace_id = ? \
+               AND (owner_id = ? OR id IN (SELECT item_id FROM item_shares WHERE user_id = ?)) \
+             UNION SELECT i.id FROM items i JOIN granted g ON i.parent_item_id = g.id \
+         ) \
+         SELECT i.id, i.title, i.icon, \
+                (SELECT p.title FROM items p WHERE p.id = i.parent_item_id) AS parent_title \
+         FROM items i \
+         WHERE i.id IN (SELECT id FROM granted) AND i.source_channel = 'page' \
+           AND i.workspace_id = ? AND i.deleted_ts IS NULL \
+           AND i.title IS NOT NULL AND i.title <> '' \
+           AND i.title LIKE ? COLLATE NOCASE \
+         ORDER BY length(i.title), i.title \
+         LIMIT 20",
+    )
+    .bind(DEFAULT_WORKSPACE)
+    .bind(user_id)
+    .bind(user_id)
+    .bind(DEFAULT_WORKSPACE)
+    .bind(needle)
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
+}
+
+/// A page that references the given item — an incoming link ("linked reference").
+#[derive(Debug, Clone, sqlx::FromRow, serde::Serialize)]
+pub struct Backlink {
+    pub id: String,
+    pub title: Option<String>,
+    pub icon: Option<String>,
+}
+
+/// Pages linking TO `item_id` (incoming references), restricted to items the
+/// user can access (owned/shared + descendants). Deleted sources excluded;
+/// deduplicated per source page.
+pub async fn backlinks(db: &Db, user_id: &str, item_id: &ItemId) -> Result<Vec<Backlink>> {
+    let rows = sqlx::query_as::<_, Backlink>(
+        "WITH RECURSIVE granted(id) AS ( \
+             SELECT id FROM items \
+             WHERE workspace_id = ? \
+               AND (owner_id = ? OR id IN (SELECT item_id FROM item_shares WHERE user_id = ?)) \
+             UNION SELECT i.id FROM items i JOIN granted g ON i.parent_item_id = g.id \
+         ) \
+         SELECT DISTINCT i.id, i.title, i.icon \
+         FROM links l JOIN items i ON i.id = l.src_item \
+         WHERE l.dst_item = ? \
+           AND i.workspace_id = ? \
+           AND i.deleted_ts IS NULL \
+           AND l.src_item IN (SELECT id FROM granted) \
+         ORDER BY i.title",
+    )
+    .bind(DEFAULT_WORKSPACE)
+    .bind(user_id)
+    .bind(user_id)
+    .bind(item_id.to_string())
+    .bind(DEFAULT_WORKSPACE)
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
+}
+
+/// A node of the page graph (an accessible page or database).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct GraphNode {
+    pub id: String,
+    pub title: Option<String>,
+    pub icon: Option<String>,
+    pub is_db: bool,
+}
+
+/// An undirected-ish edge of the page graph (reference or hierarchy).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct GraphEdge {
+    pub src: String,
+    pub dst: String,
+}
+
+/// The page graph the user can see. Nodes = accessible pages/databases PLUS any
+/// accessible item (including a database row) that is referenced by a link — so
+/// an `@`-mention of a row (e.g. a "Personnes" entry) shows up as a node. Edges
+/// = reference links (`links`) ∪ hierarchy (`parent_id`), both endpoints in the
+/// node set. Access-scoped: an edge to an item the user can't see is dropped.
+pub async fn page_graph(db: &Db, user_id: &str) -> Result<(Vec<GraphNode>, Vec<GraphEdge>)> {
+    const GRANTED: &str = "WITH RECURSIVE granted(id) AS ( \
+         SELECT id FROM items \
+         WHERE workspace_id = ? \
+           AND (owner_id = ? OR id IN (SELECT item_id FROM item_shares WHERE user_id = ?)) \
+         UNION SELECT i.id FROM items i JOIN granted g ON i.parent_item_id = g.id \
+     ) ";
+
+    // Base nodes: pages + databases (rows excluded, like the sidebar), + parent.
+    let base = sqlx::query_as::<_, (String, Option<String>, Option<String>, bool, Option<String>)>(
+        &format!(
+            "{GRANTED} SELECT id, title, icon, (db_schema IS NOT NULL) AS is_db, parent_item_id \
+             FROM items \
+             WHERE id IN (SELECT id FROM granted) AND source_channel = 'page' AND workspace_id = ? \
+               AND deleted_ts IS NULL \
+               AND (parent_item_id IS NULL \
+                    OR parent_item_id NOT IN (SELECT id FROM items WHERE db_schema IS NOT NULL))"
+        ),
+    )
+    .bind(DEFAULT_WORKSPACE)
+    .bind(user_id)
+    .bind(user_id)
+    .bind(DEFAULT_WORKSPACE)
+    .fetch_all(db)
+    .await?;
+
+    // Extra nodes: accessible items (INCLUDING rows) that are a link endpoint —
+    // these are entities mentioned in prose (e.g. an @-mentioned database row).
+    let endpoints = sqlx::query_as::<_, (String, Option<String>, Option<String>, bool)>(&format!(
+        "{GRANTED} SELECT id, title, icon, (db_schema IS NOT NULL) AS is_db \
+         FROM items \
+         WHERE id IN (SELECT id FROM granted) AND source_channel = 'page' AND workspace_id = ? \
+           AND deleted_ts IS NULL \
+           AND id IN (SELECT dst_item FROM links UNION SELECT src_item FROM links)"
+    ))
+    .bind(DEFAULT_WORKSPACE)
+    .bind(user_id)
+    .bind(user_id)
+    .bind(DEFAULT_WORKSPACE)
+    .fetch_all(db)
+    .await?;
+
+    // Merge into a node map (base wins; dedup by id).
+    let mut node_map: std::collections::HashMap<String, GraphNode> = std::collections::HashMap::new();
+    for (id, title, icon, is_db) in endpoints {
+        node_map.insert(id.clone(), GraphNode { id, title, icon, is_db });
+    }
+    for (id, title, icon, is_db, _) in &base {
+        node_map.insert(
+            id.clone(),
+            GraphNode { id: id.clone(), title: title.clone(), icon: icon.clone(), is_db: *is_db },
+        );
+    }
+    let ids: std::collections::HashSet<String> = node_map.keys().cloned().collect();
+
+    let mut edges: Vec<GraphEdge> = Vec::new();
+    let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+    let mut push = |src: String, dst: String, edges: &mut Vec<GraphEdge>| {
+        if src != dst && seen.insert((src.clone(), dst.clone())) {
+            edges.push(GraphEdge { src, dst });
+        }
+    };
+
+    // Hierarchy edges (child → parent), both endpoints in the node set.
+    for (id, _, _, _, parent) in &base {
+        if let Some(parent) = parent
+            && ids.contains(parent)
+        {
+            push(id.clone(), parent.clone(), &mut edges);
+        }
+    }
+
+    // Reference edges (links), both endpoints in the node set.
+    let links = sqlx::query_as::<_, (String, String)>("SELECT src_item, dst_item FROM links")
+        .fetch_all(db)
+        .await?;
+    for (src, dst) in links {
+        if ids.contains(&src) && ids.contains(&dst) {
+            push(src, dst, &mut edges);
+        }
+    }
+
+    Ok((node_map.into_values().collect(), edges))
+}
+
+/// Reference edges (from `links`) touching the rows of database `db_id`, plus
+/// the metadata of the EXTERNAL endpoints (the referencing/referenced items that
+/// are not rows of this database) so the database's graph view can add them as
+/// nodes. Access-scoped: endpoints the user can't see are dropped.
+pub async fn db_graph_refs(
+    db: &Db,
+    user_id: &str,
+    db_id: &ItemId,
+) -> Result<(Vec<GraphEdge>, Vec<GraphNode>)> {
+    let db_id = db_id.to_string();
+    // Rows of this database.
+    let rows: Vec<String> =
+        sqlx::query_scalar("SELECT id FROM items WHERE parent_item_id = ? AND deleted_ts IS NULL")
+            .bind(&db_id)
+            .fetch_all(db)
+            .await?;
+    if rows.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    let rowset: std::collections::HashSet<String> = rows.into_iter().collect();
+
+    // Accessible ids (for scoping external endpoints).
+    let granted: std::collections::HashSet<String> = sqlx::query_scalar(
+        "WITH RECURSIVE granted(id) AS ( \
+             SELECT id FROM items \
+             WHERE workspace_id = ? \
+               AND (owner_id = ? OR id IN (SELECT item_id FROM item_shares WHERE user_id = ?)) \
+             UNION SELECT i.id FROM items i JOIN granted g ON i.parent_item_id = g.id \
+         ) SELECT id FROM granted",
+    )
+    .bind(DEFAULT_WORKSPACE)
+    .bind(user_id)
+    .bind(user_id)
+    .fetch_all(db)
+    .await?
+    .into_iter()
+    .collect();
+
+    // Metadata of accessible link-endpoint items (to label external nodes).
+    let meta = sqlx::query_as::<_, (String, Option<String>, Option<String>, bool)>(
+        "WITH RECURSIVE granted(id) AS ( \
+             SELECT id FROM items \
+             WHERE workspace_id = ? \
+               AND (owner_id = ? OR id IN (SELECT item_id FROM item_shares WHERE user_id = ?)) \
+             UNION SELECT i.id FROM items i JOIN granted g ON i.parent_item_id = g.id \
+         ) \
+         SELECT id, title, icon, (db_schema IS NOT NULL) AS is_db FROM items \
+         WHERE id IN (SELECT id FROM granted) AND deleted_ts IS NULL \
+           AND id IN (SELECT dst_item FROM links UNION SELECT src_item FROM links)",
+    )
+    .bind(DEFAULT_WORKSPACE)
+    .bind(user_id)
+    .bind(user_id)
+    .fetch_all(db)
+    .await?;
+    let meta_by_id: std::collections::HashMap<String, GraphNode> = meta
+        .into_iter()
+        .map(|(id, title, icon, is_db)| (id.clone(), GraphNode { id, title, icon, is_db }))
+        .collect();
+
+    let all_links = sqlx::query_as::<_, (String, String)>("SELECT src_item, dst_item FROM links")
+        .fetch_all(db)
+        .await?;
+
+    let mut edges: Vec<GraphEdge> = Vec::new();
+    let mut ext: std::collections::HashMap<String, GraphNode> = std::collections::HashMap::new();
+    let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+    for (src, dst) in all_links {
+        let touches = rowset.contains(&src) || rowset.contains(&dst);
+        if !touches || !granted.contains(&src) || !granted.contains(&dst) {
+            continue;
+        }
+        // Add the external endpoint(s) — those not already rows of this db — as nodes.
+        for end in [&src, &dst] {
+            if !rowset.contains(end)
+                && let Some(node) = meta_by_id.get(end)
+            {
+                ext.insert(end.clone(), node.clone());
+            }
+        }
+        if src != dst && seen.insert((src.clone(), dst.clone())) {
+            edges.push(GraphEdge { src, dst });
+        }
+    }
+    Ok((edges, ext.into_values().collect()))
+}
+
+/// Reads the reference edges originating from an item (its outgoing links).
+pub async fn load_links(db: &Db, item_id: &ItemId) -> Result<Vec<crate::sync::projection::LinkEdge>> {
+    let rows = sqlx::query_as::<_, (String, String)>(
+        "SELECT dst_item, kind FROM links WHERE src_item = ? ORDER BY dst_item, kind",
+    )
+    .bind(item_id.to_string())
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(dst_item, kind)| crate::sync::projection::LinkEdge { dst_item, kind })
+        .collect())
 }
 
 /// Reads the `blocks` projection of an item (for the read API).

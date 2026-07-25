@@ -1,11 +1,14 @@
-import { ChevronDown, ChevronUp, Copy, Search, Star, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, Copy, Search, Share2, Star, Table2, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { GraphView } from "@/components/db/GraphView";
 import { ItemIcon } from "@/components/ItemIcon";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { getPageGraph, type PageGraph } from "@/lib/api";
+import type { GraphModel } from "@/lib/graph";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +51,33 @@ export function AllPages({
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "name", dir: 1 });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [mode, setMode] = useState<"table" | "graph">("table");
+  const [graph, setGraph] = useState<PageGraph | null>(null);
+
+  // Fetch the page graph lazily, the first time the graph view is opened.
+  useEffect(() => {
+    if (mode !== "graph" || graph) return;
+    let alive = true;
+    getPageGraph()
+      .then((g) => alive && setGraph(g))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [mode, graph]);
+
+  const graphModel = useMemo<GraphModel | null>(() => {
+    if (!graph) return null;
+    const untitled = t("common.untitled");
+    return {
+      nodes: graph.nodes.map((n) => ({
+        id: n.id,
+        label: n.title || untitled,
+        group: n.is_db ? "linked" : "row",
+      })),
+      edges: graph.edges.map((e) => ({ source: e.src, target: e.dst })),
+    };
+  }, [graph, t]);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const parentTitle = (it: ItemMeta): string =>
@@ -148,13 +178,48 @@ export function AllPages({
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("allPages.title")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("allPages.count", { count: items.length })}
-        </p>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("allPages.title")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("allPages.count", { count: items.length })}
+          </p>
+        </div>
+        {/* Table ⇄ graph view toggle. */}
+        <div className="flex shrink-0 items-center gap-0.5 rounded-md border p-0.5">
+          <button
+            type="button"
+            onClick={() => setMode("table")}
+            aria-label={t("allPages.viewTable")}
+            className={cn(
+              "flex size-7 items-center justify-center rounded text-muted-foreground hover:text-foreground",
+              mode === "table" && "bg-accent text-foreground",
+            )}
+          >
+            <Table2 className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("graph")}
+            aria-label={t("allPages.viewGraph")}
+            className={cn(
+              "flex size-7 items-center justify-center rounded text-muted-foreground hover:text-foreground",
+              mode === "graph" && "bg-accent text-foreground",
+            )}
+          >
+            <Share2 className="size-4" />
+          </button>
+        </div>
       </div>
 
+      {mode === "graph" ? (
+        graphModel ? (
+          <GraphView model={graphModel} height={600} onOpen={(id) => onSelect(id)} />
+        ) : (
+          <p className="py-12 text-center text-sm text-muted-foreground">{t("allPages.graphLoading")}</p>
+        )
+      ) : (
+        <>
       <div className="relative mb-4">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -263,6 +328,8 @@ export function AllPages({
             </tbody>
           </table>
         </div>
+      )}
+        </>
       )}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>

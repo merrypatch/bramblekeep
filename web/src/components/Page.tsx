@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
+import { BacklinksPanel } from "@/components/BacklinksPanel";
 import { DatabaseView } from "@/components/DatabaseView";
 import { Editor } from "@/components/Editor";
 import { PageHeader } from "@/components/PageHeader";
@@ -209,6 +210,7 @@ export function Page({
           />
         )
       )}
+      {meta && <BacklinksPanel itemId={itemId} onOpen={(id) => navigate(`/p/${id}`)} />}
     </div>
   );
 }

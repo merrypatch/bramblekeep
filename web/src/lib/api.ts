@@ -397,6 +397,53 @@ export async function listItems(): Promise<ItemMeta[]> {
   return data.items;
 }
 
+/** A page linking TO an item (incoming reference / linked reference). */
+export type Backlink = { id: string; title: string | null; icon: string | null };
+
+/** Accessible pages whose content references `id` (via a page/dbview block). */
+export async function getBacklinks(id: string): Promise<Backlink[]> {
+  const res = await fetch(`/api/v1/items/${id}/backlinks`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = (await res.json()) as { backlinks: Backlink[] };
+  return data.backlinks;
+}
+
+/** The page graph: accessible pages/databases + reference/hierarchy edges. */
+export type PageGraph = {
+  nodes: { id: string; title: string | null; icon: string | null; is_db: boolean }[];
+  edges: { src: string; dst: string }[];
+};
+
+export async function getPageGraph(): Promise<PageGraph> {
+  const res = await fetch("/api/v1/graph");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()) as PageGraph;
+}
+
+/** Reference edges touching a database's rows + the external endpoints as nodes,
+ * to enrich the database graph view with page references (not just relations). */
+export async function getDbGraphLinks(id: string): Promise<PageGraph> {
+  const res = await fetch(`/api/v1/items/${id}/graph-links`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()) as PageGraph;
+}
+
+/** A candidate for an `@` mention (page or database row) with its parent title. */
+export type MentionHit = {
+  id: string;
+  title: string | null;
+  icon: string | null;
+  parent_title: string | null;
+};
+
+/** Searches accessible items (pages AND rows) by title for the `@` picker. */
+export async function searchMentions(q: string): Promise<MentionHit[]> {
+  const res = await fetch(`/api/v1/mentions?q=${encodeURIComponent(q)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = (await res.json()) as { hits: MentionHit[] };
+  return data.hits;
+}
+
 export type SearchHit = { item_id: string; title: string | null; snippet: string };
 
 /** Full-text search across accessible pages. Empty `q` → no results. */

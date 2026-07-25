@@ -9,7 +9,7 @@ import {
   SuggestionMenuController,
   useCreateBlockNote,
 } from "@blocknote/react";
-import { FileText, Link2, Table2 } from "lucide-react";
+import { AtSign, FileText, Link2, Table2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Awareness } from "y-protocols/awareness";
@@ -19,7 +19,7 @@ import { InlineDbHostContext } from "@/components/db/hostContext";
 import { PageLinkDialog } from "@/components/PageLinkDialog";
 import { PresenceCursors } from "@/components/PresenceCursors";
 import { PageSkeleton } from "@/components/ui/skeletons";
-import { createDatabase, createItem } from "@/lib/api";
+import { createDatabase, createItem, searchMentions } from "@/lib/api";
 import { editorSchema } from "@/lib/editorSchema";
 import type { HostContext } from "@/lib/filter";
 import { colorFromName, useBroadcastPointer } from "@/lib/presence";
@@ -236,6 +236,24 @@ export function Editor({
               query,
             )
           }
+        />
+        {/* `@` mentions: reference another item (page OR database row) inline. */}
+        <SuggestionMenuController
+          triggerCharacter="@"
+          getItems={async (query) => {
+            const hits = await searchMentions(query);
+            return hits.map((h) => ({
+              title: h.title || t("common.untitled"),
+              subtext: h.parent_title ?? undefined,
+              icon: <AtSign className="size-4" />,
+              onItemClick: () => {
+                editor.insertInlineContent([
+                  { type: "pageLink", props: { itemId: h.id, label: h.title ?? "" } },
+                  " ",
+                ]);
+              },
+            }));
+          }}
         />
       </BlockNoteView>
       <PresenceCursors awareness={awareness} />
