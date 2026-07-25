@@ -1,23 +1,14 @@
-## Bramblekeep v0.5.0
+## Bramblekeep v0.5.1
 
-See your data as a graph: a new relation view for databases.
+Sharper interaction in the relation graph view.
 
-### Added
+### Changed
 
-- **Relation graph view.** Databases get a new view type — **Graph** — that
-  draws your rows as nodes and their relation columns as links, laid out with a
-  live force-directed simulation. It's a fast, dependency-free canvas (nothing
-  leaves your server).
-  - **Click a node** to open it in the side drawer (rows of the database show
-    their full properties; linked rows from a related database open a compact
-    preview).
-  - **Drag** a node to rearrange it, **drag the background** to pan.
-  - **Zoom** with the wheel or the +/− buttons, and reset with fit-to-view.
-  - A **spacing** slider spreads the nodes apart or packs them together, with
-    an instant re-layout.
-
-  Add it from a database's view bar (“+ → Graph”). The view needs at least one
-  relation column with links.
+- **Graph view: click to focus, double-click to open.** Single-clicking a node
+  now highlights its immediate neighborhood — the node, its links and its direct
+  neighbors stay lit while the rest of the graph dims — so you can trace a row's
+  connections at a glance. Click empty space to clear. Opening a node in the
+  side drawer is now a double-click.
 
 ### Upgrading
 
@@ -25,4 +16,4 @@ See your data as a graph: a new relation view for databases.
   Update button.
 - **Bare metal:** re-run the installer, or use the in-app Update button.
 
-No migration required — all changes are additive.
+No migration required.
