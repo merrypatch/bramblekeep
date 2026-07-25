@@ -9,14 +9,22 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    // PWA disabled during active dev: the Workbox service worker caches JS
-    // aggressively (freeze + inefficient reload, only a rebuild with changed
-    // hashes "repaired"). `selfDestroying` issues a SW that unregisters
-    // itself and clears caches → uninstalls any already placed SW.
-    // Reactivate (remove selfDestroying) when approaching a mobile release.
+    // PWA (mobile-first, cf. D3). During active dev the Workbox SW can cache JS
+    // aggressively; set VITE_PWA=0 to fall back to a self-destroying SW (it
+    // unregisters itself + clears caches). Default = full PWA (mobile release).
     VitePWA({
-      selfDestroying: true,
+      selfDestroying: process.env.VITE_PWA === "0",
       registerType: "autoUpdate",
+      // CSP is `script-src 'self'` (no inline) → register via an EXTERNAL script
+      // file (registerSW.js), never an inline snippet, so it isn't blocked.
+      injectRegister: "script",
+      workbox: {
+        cleanupOutdatedCaches: true,
+        // Precache the app shell; never intercept the API / sync WebSocket.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api\//],
+      },
       manifest: {
         name: "Bramblekeep",
         short_name: "Bramblekeep",
@@ -24,9 +32,12 @@ export default defineConfig({
         theme_color: "#09090b",
         background_color: "#09090b",
         display: "standalone",
+        start_url: "/",
+        scope: "/",
         icons: [
-          { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-          { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
     }),

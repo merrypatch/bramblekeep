@@ -18,8 +18,14 @@ pub async fn static_handler(uri: Uri) -> Response {
 
     match Assets::get(path) {
         Some(content) => {
-            let mime = mime_guess::from_path(path).first_or_octet_stream();
-            ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
+            // `.webmanifest` isn't reliably mapped by mime_guess; the PWA install
+            // prompt needs the correct type, so set it explicitly.
+            let mime = if path.ends_with(".webmanifest") {
+                "application/manifest+json".to_string()
+            } else {
+                mime_guess::from_path(path).first_or_octet_stream().as_ref().to_string()
+            };
+            ([(header::CONTENT_TYPE, mime)], content.data).into_response()
         }
         None => match Assets::get("index.html") {
             Some(content) => {
