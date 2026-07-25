@@ -253,6 +253,37 @@ export function Shell({
     }
   }
 
+  // Bulk actions from the "All pages" table. Each loops over the selection and
+  // refreshes once; no per-item navigation.
+  async function onBulkDuplicate(ids: string[]) {
+    try {
+      for (const id of ids) await duplicateItem(id);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("common.unknownError"));
+    }
+  }
+
+  async function onBulkDelete(ids: string[]) {
+    try {
+      for (const id of ids) await deleteItem(id);
+      await refresh();
+      // If the open page was deleted, leave it.
+      if (activeId && ids.includes(activeId)) navigate("/");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("common.unknownError"));
+    }
+  }
+
+  async function onBulkFavorite(ids: string[], favorite: boolean) {
+    try {
+      for (const id of ids) await setFavorite(id, favorite);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("common.unknownError"));
+    }
+  }
+
   const activeLabel = activeMeta
     ? `${activeMeta.icon ? activeMeta.icon + " " : ""}${activeMeta.title || t("common.untitled")}`
     : isAllPagesActive
@@ -434,7 +465,16 @@ export function Shell({
             />
             <Route
               path="/pages"
-              element={<AllPages items={items} onSelect={(id) => navigate(`/p/${id}`)} />}
+              element={
+                <AllPages
+                  items={items}
+                  currentUserId={user.id}
+                  onSelect={(id) => navigate(`/p/${id}`)}
+                  onBulkDuplicate={(ids) => void onBulkDuplicate(ids)}
+                  onBulkDelete={(ids) => void onBulkDelete(ids)}
+                  onBulkFavorite={(ids, fav) => void onBulkFavorite(ids, fav)}
+                />
+              }
             />
             <Route
               path="/p/:id"
