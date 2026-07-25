@@ -12,6 +12,12 @@ ignore = [
     # enters the binary. No patch exists upstream. Re-evaluate if MySQL is ever
     # enabled. Matched by cargo-audit via the same --ignore in CI.
     "RUSTSEC-2023-0071",
+    # smallstr unmaintained (informational, NOT a vulnerability). Transitive dep
+    # of `yrs` (yrs → smallstr), the CRDT library the project is built on and
+    # does not replace (cf. CLAUDE.md). No safe upgrade is available upstream.
+    # Re-evaluate when yrs drops smallstr or migrates to compact_str/smol_str.
+    # Matched by cargo-audit via the same --ignore in CI.
+    "RUSTSEC-2026-0215",
 ]
 
 [licenses]

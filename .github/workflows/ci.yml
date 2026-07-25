@@ -64,8 +64,11 @@ jobs:
       - name: cargo audit (advisories RustSec)
         # RUSTSEC-2023-0071 (rsa Marvin timing sidechannel): pulled only by
         # sqlx-mysql, which is NOT compiled (sqlx is built sqlite-only), so rsa
-        # never enters the binary. No upstream patch. Also ignored in deny.toml.
-        run: cargo audit --ignore RUSTSEC-2023-0071
+        # never enters the binary. No upstream patch.
+        # RUSTSEC-2026-0215 (smallstr unmaintained, informational): transitive
+        # dep of yrs (the CRDT lib), no safe upgrade available.
+        # Both also ignored in deny.toml — keep the two lists in sync.
+        run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0215
       - name: cargo deny (advisories, licenses, sources)
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
