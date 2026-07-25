@@ -210,6 +210,9 @@ export type ItemMeta = {
   is_public?: boolean;
   /** Favorite of the current user. Set by both listItems AND getItem. */
   is_favorite: boolean;
+  /** Last time the current user viewed this page (epoch ms), null if never.
+   * Set by listItems only — drives the sidebar "Recents" section. */
+  last_viewed_ts?: number | null;
 };
 
 export type Share = { user_id: string; email: string; display_name: string; level: string };

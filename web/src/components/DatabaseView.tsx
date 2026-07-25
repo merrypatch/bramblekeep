@@ -20,7 +20,6 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
-  Filter,
   GripVertical,
   Hash,
   Info,
@@ -45,12 +44,13 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { BoardView } from "@/components/db/BoardView";
 import { CalendarView } from "@/components/db/CalendarView";
 import { ChartView } from "@/components/db/ChartView";
+import { FilterBuilder, type FilterColumn } from "@/components/db/FilterBuilder";
 import { FormulaEditor } from "@/components/db/FormulaEditor";
 import { GridView, imageColumns } from "@/components/db/GridView";
 import { format } from "date-fns";
@@ -148,6 +148,7 @@ import {
   type DbColumn,
   type DbSchema,
   type DbView,
+  type FilterGroup,
   fileImageHash,
   type FileRef,
   type GridSize,
@@ -164,6 +165,7 @@ import {
   statusGroupLabel,
   type ViewType,
 } from "@/lib/db";
+import { compileFilters, type GetValue, type HostContext, resolveFilters } from "@/lib/filter";
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 
@@ -197,7 +199,6 @@ const CAL_MAX_MONTH = new Date(2200, 11, 31);
 const CHART_TIME_TYPES = new Set(["date", "created_time", "last_edited_time"]);
 
 type SortState = { key: string; dir: "asc" | "desc" };
-type FilterState = { id: string; key: string; query: string };
 
 /** Cleans an input to keep only a valid number: digits, a single decimal
  * point (comma converted), minus sign at the start only.
@@ -284,11 +285,9 @@ function computeAgg(rows: Row[], key: string, agg: string): string {
   }
 }
 
-/** Applies filters (AND, case-insensitive substring) then sorting. */
-function applyView(rows: Row[], filters: FilterState[], sort: SortState | null, columns: DbColumn[]): Row[] {
-  let out = rows.filter((r) =>
-    filters.every((f) => !f.query || cellText(r, f.key).toLowerCase().includes(f.query.toLowerCase())),
-  );
+/** Sorts rows (single key). Filtering is done upstream in `filteredRows`. */
+function applySort(rows: Row[], sort: SortState | null, columns: DbColumn[]): Row[] {
+  let out = rows;
   if (sort) {
     const col = columns.find((c) => c.id === sort.key);
     const numeric = col?.type === "number";
@@ -410,6 +409,7 @@ export function DatabaseView({
   onSetHiddenViews,
   viewState,
   onSetViewState,
+  hostContext,
 }: {
   dbId: string;
   schemaJson: string | null;
@@ -430,8 +430,10 @@ export function DatabaseView({
   /** Linked mode: hide/re-show a view locally (instead of deleting it). */
   onSetHiddenViews?: (ids: string[]) => void;
   /** Linked mode: sort/filters SPECIFIC to this block, per view (don't affect the schema). */
-  viewState?: Record<string, { sort?: SortState | null; filters?: FilterState[] }>;
-  onSetViewState?: (next: Record<string, { sort?: SortState | null; filters?: FilterState[] }>) => void;
+  viewState?: Record<string, { sort?: SortState | null; filters?: FilterGroup }>;
+  onSetViewState?: (next: Record<string, { sort?: SortState | null; filters?: FilterGroup }>) => void;
+  /** Host page context (embedded db in a page): resolves dynamic filter values. */
+  hostContext?: HostContext;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -444,7 +446,9 @@ export function DatabaseView({
   // Insertion index of a new column (null = append at the end).
   const [newColAt, setNewColAt] = useState<number | null>(null);
   const [sort, setSort] = useState<SortState | null>(null);
-  const [filters, setFilters] = useState<FilterState[]>([]);
+  /** View-level filter tree (persisted per view). Combined AND with the
+   * database-level `schema.filters` at evaluation. */
+  const [viewFilter, setViewFilter] = useState<FilterGroup | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   // Active view restored from the URL (?view=) on refresh; falls back to the
@@ -501,7 +505,7 @@ export function DatabaseView({
       ? viewStateRef.current?.[activeViewId]
       : schemaRef.current.views.find((x) => x.id === activeViewId);
     setSort(stored?.sort ?? null);
-    setFilters(stored?.filters ?? []);
+    setViewFilter(stored?.filters ?? undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeViewId]);
   const fsTimer = useRef<number | undefined>(undefined);
@@ -511,11 +515,11 @@ export function DatabaseView({
       : schemaRef.current.views.find((x) => x.id === activeViewId);
     const same =
       JSON.stringify(stored?.sort ?? null) === JSON.stringify(sort) &&
-      JSON.stringify(stored?.filters ?? []) === JSON.stringify(filters);
+      JSON.stringify(stored?.filters ?? null) === JSON.stringify(viewFilter ?? null);
     if (same) return;
     clearTimeout(fsTimer.current);
     fsTimer.current = window.setTimeout(() => {
-      const entry = { sort: sort ?? undefined, filters: filters.length ? filters : undefined };
+      const entry = { sort: sort ?? undefined, filters: viewFilter };
       if (onSetViewState) {
         onSetViewState({ ...(viewStateRef.current ?? {}), [activeViewId]: entry });
       } else {
@@ -527,7 +531,7 @@ export function DatabaseView({
     }, 400);
     return () => clearTimeout(fsTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, sort, activeViewId]);
+  }, [viewFilter, sort, activeViewId]);
 
   // Available height measured for the table view → the table scrolls internally
   // (sticky header), the page doesn't overflow when there are many rows.
@@ -579,6 +583,18 @@ export function DatabaseView({
     [schema.columns],
   );
   const keyName = (key: string) => keys.find((k) => k.key === key)?.name ?? key;
+  // Columns offered in the filter builder: the title (as text) + every column,
+  // carrying options so the value editor can offer them.
+  const filterColumns = useMemo<FilterColumn[]>(
+    () => [
+      { id: TITLE_KEY, name: t("dbview.view.name"), type: "text" },
+      ...schema.columns.map((c) => ({ id: c.id, name: c.name, type: c.type, options: c.options })),
+    ],
+    [schema.columns, t],
+  );
+  /** Persists the database-level filter (applies to all views). */
+  const setDbFilter = (next: FilterGroup | undefined) =>
+    void persistSchema({ ...schemaRef.current, filters: next });
   // Template rows (hidden child items) are excluded from all views.
   const templateIds = useMemo(() => new Set(schema.templates ?? []), [schema.templates]);
   // Templates' metadata (title/icon), read live (getItem, not cached)
@@ -616,11 +632,6 @@ export function DatabaseView({
     if (!q) return orderedRows;
     return orderedRows.filter((r) => searchKeys.some((k) => cellText(r, k).toLowerCase().includes(q)));
   }, [orderedRows, search, searchKeys]);
-  const view = useMemo(
-    () => applyView(searchedRows, filters, sort, schema.columns),
-    [searchedRows, filters, sort, schema.columns],
-  );
-
   // Chart data: generic pivot engine (X axis, series, aggregate,
   // transformation, sort) driven by the view's parameters.
   // Computed columns' values (formula / rollup) per row: precomputed
@@ -675,15 +686,79 @@ export function DatabaseView({
     };
   }, [rows, schema.columns]);
 
+  // Titles of linked pages (relation columns store ids, not titles) so filters
+  // can match on the displayed name. Prefetched for every relation id in view.
+  const relColIds = useMemo(
+    () => new Set(schema.columns.filter((c) => c.type === "relation").map((c) => c.id)),
+    [schema.columns],
+  );
+  const [relTitles, setRelTitles] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (relColIds.size === 0) return;
+    const ids = new Set<string>();
+    for (const r of rows)
+      for (const cid of relColIds) {
+        const v = r.props[cid];
+        if (Array.isArray(v)) v.forEach((x) => ids.add(String(x)));
+      }
+    if (ids.size === 0) return;
+    let alive = true;
+    void Promise.all(
+      [...ids].map((id) =>
+        getItemCached(id)
+          .then((it) => [id, it.title ?? ""] as const)
+          .catch(() => null),
+      ),
+    ).then((pairs) => {
+      if (alive) setRelTitles(new Map(pairs.filter((p): p is readonly [string, string] => p != null)));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [rows, relColIds]);
+
+  const columnById = useMemo(() => new Map(schema.columns.map((c) => [c.id, c])), [schema.columns]);
+  // Cell accessor for filtering: title for __title, computed value for
+  // formula/rollup columns (from `derived`), linked-page titles for relations,
+  // else the raw prop.
+  const getValue: GetValue = useCallback(
+    (row, columnId) => {
+      if (columnId === TITLE_KEY) return row.title;
+      const d = derived.get(row.id);
+      if (d && columnId in d) return d[columnId];
+      const v = row.props[columnId];
+      if (columnById.get(columnId)?.type === "relation" && Array.isArray(v)) {
+        return v.map((id) => relTitles.get(String(id)) ?? "").filter(Boolean);
+      }
+      return v;
+    },
+    [derived, columnById, relTitles],
+  );
+
+  // Rows after search + filters (db-level AND view-level), applied to EVERY
+  // view type. Dynamic values are resolved against the host page first; sorting
+  // (table only) is layered on top in `view`.
+  const filteredRows = useMemo(() => {
+    const pred = compileFilters(
+      resolveFilters(schema.filters, hostContext),
+      resolveFilters(viewFilter, hostContext),
+    );
+    return searchedRows.filter((r) => pred(r, getValue));
+  }, [searchedRows, schema.filters, viewFilter, getValue, hostContext]);
+  const view = useMemo(
+    () => applySort(filteredRows, sort, schema.columns),
+    [filteredRows, sort, schema.columns],
+  );
+
   const chartData = useMemo(() => {
     if (activeView?.type !== "chart" || !activeView.groupBy) return null;
     // Inject the computed values into the props so the chart reads them.
-    const chartRows = searchedRows.map((r) => {
+    const chartRows = filteredRows.map((r) => {
       const d = derived.get(r.id);
       return d ? { ...r, props: { ...r.props, ...d } } : r;
     });
     return buildChart(chartRows, activeView, schema.columns, cellText);
-  }, [activeView, searchedRows, schema.columns, derived]);
+  }, [activeView, filteredRows, schema.columns, derived]);
 
   useEffect(() => setSchema(parseSchema(schemaJson)), [schemaJson]);
 
@@ -1274,9 +1349,17 @@ export function DatabaseView({
   // Grouping of the TABLE view: rows grouped by the value of `groupCol`.
   const tableGroups = useMemo(() => {
     if (activeView?.type !== "table" || !groupCol) return null;
+    // Relation columns store ids; group by the resolved page titles instead.
+    const groupText = (r: Row) => {
+      if (groupCol.type === "relation") {
+        const v = getValue(r, groupCol.id);
+        return Array.isArray(v) ? v.join(", ") : "";
+      }
+      return cellText(r, groupCol.id);
+    };
     const map = new Map<string, Row[]>();
     for (const r of view) {
-      const key = cellText(r, groupCol.id);
+      const key = groupText(r);
       const arr = map.get(key);
       if (arr) arr.push(r);
       else map.set(key, [r]);
@@ -1296,7 +1379,7 @@ export function DatabaseView({
     }
     if (map.has("")) ordered.push({ key: "", label: "No value", rows: map.get("")! });
     return ordered;
-  }, [activeView?.type, groupCol, view]);
+  }, [activeView?.type, groupCol, view, getValue]);
 
   const colCount = visibleColumns.length + 1 + (canDelete ? 1 : 0) + (canCreate || canDelete ? 1 : 0);
 
@@ -1922,11 +2005,53 @@ export function DatabaseView({
         </div>
       </div>
 
+      {/* Filters bar — available on EVERY view (top-left). Sort/group table-only. */}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <FilterBuilder
+          columns={filterColumns}
+          dbFilter={schema.filters}
+          viewFilter={viewFilter}
+          onChangeView={setViewFilter}
+          onChangeDb={canCreate ? setDbFilter : undefined}
+          hostColumns={hostContext?.columns}
+        />
+        {activeView?.type === "table" && canCreate && schema.columns.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs">
+                <Rows3 className="size-3.5" /> {groupCol ? t("dbview.view.grouped", { name: groupCol.name }) : t("dbview.view.group")}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => setGroupBy(undefined)}>
+                <span className="flex size-4 items-center justify-center">
+                  {!groupCol && <Check className="size-3.5" />}
+                </span>
+                {t("dbview.view.none")}
+              </DropdownMenuItem>
+              {schema.columns.map((c) => (
+                <DropdownMenuItem key={c.id} onSelect={() => setGroupBy(c.id)}>
+                  <span className="flex size-4 items-center justify-center">
+                    {groupCol?.id === c.id && <Check className="size-3.5" />}
+                  </span>
+                  {c.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {activeView?.type === "table" && sort && (
+          <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setSort(null)}>
+            {t("dbview.view.sortLabel")} {keyName(sort.key)} {sort.dir === "asc" ? "↑" : "↓"} <X className="size-3" />
+          </Button>
+        )}
+      </div>
+
       {/* Board (kanban) view */}
       {activeView?.type === "board" &&
         (groupCol?.type === "select" || groupCol?.type === "status" ? (
           <BoardView
-            rows={searchedRows}
+            rows={filteredRows}
             column={groupCol}
             cardColumns={visibleColumns.filter((c) => c.id !== groupCol.id && !META_TYPES.has(c.type))}
             columns={schema.columns}
@@ -1976,7 +2101,7 @@ export function DatabaseView({
       {activeView?.type === "calendar" &&
         (groupCol?.type === "date" ? (
           <CalendarView
-            rows={searchedRows}
+            rows={filteredRows}
             column={groupCol}
             cardColumns={visibleColumns.filter((c) => c.id !== groupCol.id && !META_TYPES.has(c.type))}
             columns={schema.columns}
@@ -1994,7 +2119,7 @@ export function DatabaseView({
       {activeView?.type === "grid" && (
         <div ref={viewScrollRef} style={{ maxHeight: viewMaxH }} className="overflow-auto">
           <GridView
-            rows={searchedRows}
+            rows={filteredRows}
             cardColumns={visibleColumns.filter((c) => !META_TYPES.has(c.type))}
             columns={schema.columns}
             size={activeView.gridSize ?? "m"}
@@ -2034,79 +2159,6 @@ export function DatabaseView({
 
       {activeView?.type !== "table" ? null : (
         <>
-      {/* Sort + filters bar (client-side). */}
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        {filters.map((f) => (
-          <div key={f.id} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
-            <span className="text-muted-foreground">{keyName(f.key)}</span>
-            <input
-              className="w-24 bg-transparent outline-none"
-              placeholder={t("dbview.filter.contains")}
-              value={f.query}
-              onChange={(e) =>
-                setFilters((fs) => fs.map((x) => (x.id === f.id ? { ...x, query: e.target.value } : x)))
-              }
-            />
-            <button
-              aria-label={t("dbview.filter.remove")}
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => setFilters((fs) => fs.filter((x) => x.id !== f.id))}
-            >
-              <X className="size-3" />
-            </button>
-          </div>
-        ))}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-7 gap-1 text-xs">
-              <Filter className="size-3.5" /> <span className="max-sm:hidden">{t("dbview.view.filter")}</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {keys.map((k) => (
-              <DropdownMenuItem
-                key={k.key}
-                onSelect={() =>
-                  setFilters((fs) => [...fs, { id: `f${Date.now()}${fs.length}`, key: k.key, query: "" }])
-                }
-              >
-                {k.name}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {canCreate && schema.columns.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs">
-                <Rows3 className="size-3.5" /> {groupCol ? t("dbview.view.grouped", { name: groupCol.name }) : t("dbview.view.group")}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onSelect={() => setGroupBy(undefined)}>
-                <span className="flex size-4 items-center justify-center">
-                  {!groupCol && <Check className="size-3.5" />}
-                </span>
-                {t("dbview.view.none")}
-              </DropdownMenuItem>
-              {schema.columns.map((c) => (
-                <DropdownMenuItem key={c.id} onSelect={() => setGroupBy(c.id)}>
-                  <span className="flex size-4 items-center justify-center">
-                    {groupCol?.id === c.id && <Check className="size-3.5" />}
-                  </span>
-                  {c.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        {sort && (
-          <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setSort(null)}>
-            {t("dbview.view.sortLabel")} {keyName(sort.key)} {sort.dir === "asc" ? "↑" : "↓"} <X className="size-3" />
-          </Button>
-        )}
-      </div>
-
       {(canDelete || canCreate) && selected.size > 0 && (
         <div className="mb-2 flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5 text-sm">
           <span className="font-medium">

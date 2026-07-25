@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Route, Routes, useMatch, useNavigate, useParams } from "react-router-dom";
 
-import { ChevronDown, Download, History, Star, Trash2, Users } from "lucide-react";
+import { ChevronDown, Download, History, Star, Trash2, Upload, Users } from "lucide-react";
 
 import { HistoryDrawer } from "@/components/HistoryDrawer";
+import { ImportCsvDialog } from "@/components/ImportCsvDialog";
 import { APP_NAME } from "@/lib/brand";
 import { AllPages } from "@/components/AllPages";
 import { CreditsPage } from "@/components/CreditsPage";
@@ -37,6 +38,8 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { useConfirmPublicChild } from "@/lib/publishConsent";
 import { acquireRoom, releaseRoom } from "@/lib/room";
 import { exportCsv, exportMarkdown } from "@/lib/export";
+import { exportDbBundle } from "@/lib/bundle";
+import { ImportBundleDialog } from "@/components/ImportBundleDialog";
 import { usePresence } from "@/lib/presence";
 import type { Awareness } from "y-protocols/awareness";
 import {
@@ -55,15 +58,18 @@ import {
 function PageView({
   user,
   onMetaChange,
+  refreshKey,
 }: {
   user: User;
   onMetaChange: () => void;
+  /** Bumped by the parent to force a remount (e.g. after a CSV import). */
+  refreshKey: number;
 }) {
   const { id } = useParams();
   if (!id) return null;
   return (
     <Page
-      key={id}
+      key={`${id}:${refreshKey}`}
       itemId={id}
       currentUserName={user.display_name}
       currentUserAvatar={user.avatar}
@@ -169,6 +175,10 @@ export function Shell({
   const [shareOpen, setShareOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [bundleImportOpen, setBundleImportOpen] = useState(false);
+  // Bumped after a CSV import to remount the active page (reloads its rows).
+  const [refreshKey, setRefreshKey] = useState(0);
   const confirmPublicChild = useConfirmPublicChild();
   // Managing shares = administration power over the item, not just direct
   // ownership: the server also grants it through supervision (owner over
@@ -257,6 +267,7 @@ export function Shell({
         isAllPagesActive={isAllPagesActive}
         currentUserId={user.id}
         onSelect={(id) => navigate(`/p/${id}`)}
+        onHome={() => navigate("/")}
         onShowAll={() => navigate("/pages")}
         onShowCredits={() => navigate("/credits")}
         onToggleFavorite={(id, fav) => void onToggleFavorite(id, fav)}
@@ -327,9 +338,20 @@ export function Shell({
                     <Download className="size-3.5" /> {t("pageMenu.exportPdf")}
                   </DropdownMenuItem>
                   {activeMeta?.db_schema != null && (
-                    <DropdownMenuItem onSelect={() => void exportCsv(activeId)}>
-                      <Download className="size-3.5" /> {t("pageMenu.exportCsv")}
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem onSelect={() => void exportCsv(activeId)}>
+                        <Download className="size-3.5" /> {t("pageMenu.exportCsv")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                        <Upload className="size-3.5" /> {t("pageMenu.importCsv")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => void exportDbBundle(activeId)}>
+                        <Download className="size-3.5" /> {t("pageMenu.exportBundle")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setBundleImportOpen(true)}>
+                        <Upload className="size-3.5" /> {t("pageMenu.importBundle")}
+                      </DropdownMenuItem>
+                    </>
                   )}
                   {canManageShares && (
                     <>
@@ -376,6 +398,25 @@ export function Shell({
           </AlertDialog>
         )}
         {activeId && <ShareDialog itemId={activeId} open={shareOpen} onOpenChange={setShareOpen} />}
+        {activeId && activeMeta?.db_schema != null && (
+          <>
+            <ImportCsvDialog
+              itemId={activeId}
+              open={importOpen}
+              onOpenChange={setImportOpen}
+              onImported={() => setRefreshKey((k) => k + 1)}
+            />
+            <ImportBundleDialog
+              itemId={activeId}
+              open={bundleImportOpen}
+              onOpenChange={setBundleImportOpen}
+              onImported={() => {
+                setRefreshKey((k) => k + 1);
+                void refresh();
+              }}
+            />
+          </>
+        )}
         {activeId && (
           <HistoryDrawer
             itemId={activeId}
@@ -397,7 +438,13 @@ export function Shell({
             />
             <Route
               path="/p/:id"
-              element={<PageView user={user} onMetaChange={() => void refresh()} />}
+              element={
+                <PageView
+                  user={user}
+                  refreshKey={refreshKey}
+                  onMetaChange={() => void refresh()}
+                />
+              }
             />
             <Route path="/credits" element={<CreditsPage />} />
           </Routes>

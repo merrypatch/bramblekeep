@@ -1,4 +1,4 @@
-import { ChevronRight, Copy, FileStack, FileText, Files, Heart, LogOut, MoreHorizontal, Pencil, Plus, Settings, Star, Table2, Trash2 } from "lucide-react";
+import { ChevronRight, Clock, Copy, FileStack, FileText, Files, Heart, LogOut, MoreHorizontal, Pencil, Plus, Settings, Star, Table2, Trash2 } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -66,6 +66,10 @@ const labelOf = (it: ItemMeta) => it.title || "Sans titre";
  * inflates the list. */
 const ROOT_LIMIT = 10;
 
+/** Number of most-recently-viewed pages listed in the "Recents" section. Beyond
+ * this, "see more" leads to the "All pages" listing. */
+const RECENT_LIMIT = 8;
+
 /** Builds the tree: children by parent + roots (orphans included). */
 function buildTree(items: ItemMeta[]): { childrenOf: Map<string, ItemMeta[]>; roots: ItemMeta[] } {
   const ids = new Set(items.map((i) => i.id));
@@ -95,6 +99,7 @@ export function AppSidebar({
   isAllPagesActive,
   currentUserId,
   onSelect,
+  onHome,
   onShowAll,
   onShowCredits,
   onToggleFavorite,
@@ -113,6 +118,8 @@ export function AppSidebar({
   isAllPagesActive: boolean;
   currentUserId: string;
   onSelect: (id: string) => void;
+  /** Navigates to the home route (brand click). */
+  onHome: () => void;
   /** Opens the dedicated page listing everything accessible. */
   onShowAll: () => void;
   /** Opens the "Credits" page (what makes the project possible + contributing). */
@@ -139,6 +146,10 @@ export function AppSidebar({
     onShowCredits();
     if (isMobile) setOpenMobile(false);
   };
+  const home = () => {
+    onHome();
+    if (isMobile) setOpenMobile(false);
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [renaming, setRenaming] = useState<ItemMeta | null>(null);
   const [deleting, setDeleting] = useState<ItemMeta | null>(null);
@@ -151,6 +162,15 @@ export function AppSidebar({
 
   const { childrenOf, roots } = buildTree(items);
   const favorites = items.filter((it) => it.is_favorite);
+
+  // Recents: viewed pages, most-recent first, capped. A stable list (its own
+  // section) so the main "Pages" tree keeps a fixed order instead of reshuffling
+  // on every visit. `recentTotal > RECENT_LIMIT` ⇒ "see more" → All pages.
+  const viewed = items.filter((it) => it.last_viewed_ts != null);
+  const recentTotal = viewed.length;
+  const recents = [...viewed]
+    .sort((a, b) => (b.last_viewed_ts ?? 0) - (a.last_viewed_ts ?? 0))
+    .slice(0, RECENT_LIMIT);
 
   // Root cap: beyond ROOT_LIMIT, the overflow is collapsed behind a
   // "show more". Exception: if the active page descends from a collapsed root,
@@ -302,9 +322,16 @@ export function AppSidebar({
   return (
     <Sidebar variant="inset" collapsible="icon">
       <SidebarHeader>
-        <div className="px-2 py-1 font-brand text-2xl font-bold leading-none tracking-tight group-data-[collapsible=icon]:hidden">
-          {APP_NAME}
-        </div>
+        <button
+          type="button"
+          onClick={home}
+          aria-label={APP_NAME}
+          className="flex items-center rounded px-2 py-1 font-brand text-2xl font-bold leading-none tracking-tight group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+        >
+          {/* Full wordmark when expanded, compact "Bk" mark on the collapsed rail. */}
+          <span className="group-data-[collapsible=icon]:hidden">{APP_NAME}</span>
+          <span className="hidden group-data-[collapsible=icon]:inline">Bk</span>
+        </button>
         <div className="group-data-[collapsible=icon]:hidden">
           <SearchBox onSelect={select} />
         </div>
@@ -364,6 +391,69 @@ export function AppSidebar({
                     </ContextMenuContent>
                   </ContextMenu>
                 ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {recents.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>
+              <Clock className="mr-1.5 size-3.5" />
+              {t("sidebar.recents")}
+            </SidebarGroupLabel>
+            {/* Collapsed rail: the section clock (non-clickable) marks the group. */}
+            <div
+              aria-hidden
+              className="hidden justify-center py-1 text-muted-foreground group-data-[collapsible=icon]:flex"
+            >
+              <Clock className="size-4" />
+            </div>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {recents.map((it) => (
+                  <ContextMenu key={it.id}>
+                    <ContextMenuTrigger asChild>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          isActive={it.id === activeId}
+                          onClick={() => select(it.id)}
+                          tooltip={labelOf(it)}
+                        >
+                          <ItemIcon
+                            icon={it.icon}
+                            kind={it.db_schema ? "database" : "page"}
+                            size={16}
+                            className="shrink-0"
+                          />
+                          <span className="truncate">{labelOf(it)}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-48">
+                      {renderPageActions(
+                        it,
+                        it.owner_id === currentUserId,
+                        ContextMenuItem,
+                        ContextMenuSeparator,
+                      )}
+                    </ContextMenuContent>
+                  </ContextMenu>
+                ))}
+                {recentTotal > RECENT_LIMIT && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={() => {
+                        onShowAll();
+                        if (isMobile) setOpenMobile(false);
+                      }}
+                      tooltip={t("sidebar.recentsMore")}
+                      className="text-muted-foreground group-data-[collapsible=icon]:hidden"
+                    >
+                      <Files className="size-4 shrink-0" />
+                      <span className="truncate">{t("sidebar.recentsMore")}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

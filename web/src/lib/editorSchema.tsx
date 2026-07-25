@@ -6,7 +6,9 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { InlineDatabase, type ViewState } from "@/components/db/InlineDatabase";
+import { InlineDbHostContext } from "@/components/db/hostContext";
 import { ApiError, getItem } from "@/lib/api";
+import { migrateFilters } from "@/lib/db";
 
 /** Card of a referenced page (sub-page or link). Refreshes the title from
  * the real page. If the target is deleted or inaccessible (getItem → 403/404),
@@ -94,31 +96,43 @@ export const DbViewBlockSpec = createReactBlockSpec(
   },
   {
     render: (props) => (
-      <InlineDatabase
-        itemId={props.block.props.itemId}
-        locked={props.block.props.locked}
-        onToggleLock={() =>
-          props.editor.updateBlock(props.block, { props: { locked: !props.block.props.locked } })
-        }
-        hiddenViews={props.block.props.hiddenViews.split(",").filter(Boolean)}
-        onSetHiddenViews={(ids) =>
-          props.editor.updateBlock(props.block, { props: { hiddenViews: ids.join(",") } })
-        }
-        viewState={parseViewState(props.block.props.viewState)}
-        onSetViewState={(next) =>
-          props.editor.updateBlock(props.block, { props: { viewState: JSON.stringify(next) } })
-        }
-      />
+      // Consumer (not a hook) → host page context reaches this non-component render.
+      <InlineDbHostContext.Consumer>
+        {(host) => (
+          <InlineDatabase
+            itemId={props.block.props.itemId}
+            locked={props.block.props.locked}
+            onToggleLock={() =>
+              props.editor.updateBlock(props.block, { props: { locked: !props.block.props.locked } })
+            }
+            hiddenViews={props.block.props.hiddenViews.split(",").filter(Boolean)}
+            onSetHiddenViews={(ids) =>
+              props.editor.updateBlock(props.block, { props: { hiddenViews: ids.join(",") } })
+            }
+            viewState={parseViewState(props.block.props.viewState)}
+            onSetViewState={(next) =>
+              props.editor.updateBlock(props.block, { props: { viewState: JSON.stringify(next) } })
+            }
+            host={host}
+          />
+        )}
+      </InlineDbHostContext.Consumer>
     ),
   },
 );
 
-/** Tolerant parse of the per-view sort/filter JSON stored in the dbview block. */
+/** Tolerant parse of the per-view sort/filter JSON stored in the dbview block.
+ * Migrates each view's legacy flat `filters` array to the current tree shape. */
 function parseViewState(json: string): ViewState {
   if (!json) return {};
   try {
     const v = JSON.parse(json);
-    return v && typeof v === "object" ? (v as ViewState) : {};
+    if (!v || typeof v !== "object") return {};
+    const out: ViewState = {};
+    for (const [viewId, entry] of Object.entries(v as Record<string, { sort?: ViewState[string]["sort"]; filters?: unknown }>)) {
+      out[viewId] = { sort: entry?.sort, filters: migrateFilters(entry?.filters) };
+    }
+    return out;
   } catch {
     return {};
   }

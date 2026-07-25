@@ -122,6 +122,11 @@ pub struct ItemMeta {
     /// (handler); `false` by default elsewhere.
     #[sqlx(default)]
     pub is_favorite: bool,
+    /// Last time the current user viewed this page (epoch ms), or `None` if never.
+    /// Selected by `list_pages` to drive the sidebar "Recents" section; `None`
+    /// elsewhere (column absent → `#[sqlx(default)]`).
+    #[sqlx(default)]
+    pub last_viewed_ts: Option<i64>,
 }
 
 /// A sharing entry (for the share UI).
@@ -157,13 +162,14 @@ pub async fn list_pages(db: &Db, user_id: &str) -> Result<Vec<ItemMeta>> {
          ) \
          SELECT id, title, icon, cover, owner_id, parent_item_id, db_schema, \
                 (id IN (SELECT id FROM granted_edit)) AS can_edit, \
-                (id IN (SELECT item_id FROM item_favorites WHERE user_id = ?)) AS is_favorite \
+                (id IN (SELECT item_id FROM item_favorites WHERE user_id = ?)) AS is_favorite, \
+                (SELECT last_ts FROM page_views WHERE item_id = items.id AND user_id = ?) AS last_viewed_ts \
          FROM items \
          WHERE id IN (SELECT id FROM granted) AND source_channel = 'page' AND workspace_id = ? \
            AND deleted_ts IS NULL \
            AND (parent_item_id IS NULL \
                 OR parent_item_id NOT IN (SELECT id FROM items WHERE db_schema IS NOT NULL)) \
-         ORDER BY (SELECT last_ts FROM page_views WHERE item_id = items.id AND user_id = ?) DESC, id",
+         ORDER BY id",
     )
     .bind(DEFAULT_WORKSPACE)
     .bind(user_id)
@@ -172,8 +178,8 @@ pub async fn list_pages(db: &Db, user_id: &str) -> Result<Vec<ItemMeta>> {
     .bind(user_id)
     .bind(user_id)
     .bind(user_id)
-    .bind(DEFAULT_WORKSPACE)
     .bind(user_id)
+    .bind(DEFAULT_WORKSPACE)
     .fetch_all(db)
     .await?;
     Ok(items)

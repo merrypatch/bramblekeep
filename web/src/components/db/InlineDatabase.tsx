@@ -5,12 +5,14 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { TableSkeleton } from "@/components/ui/skeletons";
 import { getItem, type ItemMeta } from "@/lib/api";
+import type { FilterGroup } from "@/lib/db";
+import type { HostContext } from "@/lib/filter";
 import { acquireRoom, releaseRoom, type Room } from "@/lib/room";
 
 /** Sort/filters per view, specific to a linked database block. */
 export type ViewState = Record<
   string,
-  { sort?: { key: string; dir: "asc" | "desc" } | null; filters?: { id: string; key: string; query: string }[] }
+  { sort?: { key: string; dir: "asc" | "desc" } | null; filters?: FilterGroup }
 >;
 
 // Lazy loaded to break the import cycle: editorSchema -> DatabaseView ->
@@ -30,6 +32,7 @@ export function InlineDatabase({
   onSetHiddenViews,
   viewState,
   onSetViewState,
+  host,
 }: {
   itemId: string;
   /** Lock specific to this block: read-only view without locking the source db. */
@@ -41,6 +44,8 @@ export function InlineDatabase({
   /** Sort/filters specific to this block (per view), serialized in the block. */
   viewState?: ViewState;
   onSetViewState?: (next: ViewState) => void;
+  /** Host page context, for dynamic filters referencing the current page. */
+  host?: HostContext | null;
 }) {
   const { t } = useTranslation();
   const [meta, setMeta] = useState<ItemMeta | null>(null);
@@ -106,6 +111,7 @@ export function InlineDatabase({
           onSetHiddenViews={onSetHiddenViews}
           viewState={viewState}
           onSetViewState={onSetViewState}
+          hostContext={host ?? undefined}
         />
       </Suspense>
     </div>

@@ -16,8 +16,18 @@ export function download(filename: string, content: string, mime: string): void 
   URL.revokeObjectURL(url);
 }
 
+/** Triggers the download of a Blob (e.g. a zip archive). */
+export function downloadBlob(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /** Safe filename derived from a title. */
-function safeName(title: string | null | undefined): string {
+export function safeName(title: string | null | undefined): string {
   return (title || "export").replace(/[^\p{L}\p{N}\-_ ]/gu, "").trim().slice(0, 60) || "export";
 }
 
@@ -80,8 +90,9 @@ export async function exportMarkdown(itemId: string): Promise<void> {
   download(`${safeName(meta.title)}.md`, md, "text/markdown");
 }
 
-/** Text value of a cell for export (sync; formula/rollup ignored). */
-function cellExport(col: DbColumn, raw: unknown): string {
+/** Text value of a cell for export (sync; formula/rollup ignored).
+ * `linkTitles` resolves a linked-row id → its title (for `relation` columns). */
+function cellExport(col: DbColumn, raw: unknown, linkTitles: Map<string, string>): string {
   if (raw == null) return "";
   switch (col.type) {
     case "checkbox":
@@ -97,7 +108,14 @@ function cellExport(col: DbColumn, raw: unknown): string {
     case "files":
       return Array.isArray(raw) ? (raw as { name?: string }[]).map((f) => f?.name ?? "").filter(Boolean).join(", ") : "";
     case "relation":
-      return Array.isArray(raw) ? (raw as string[]).length + " lien(s)" : "";
+      // Linked-row titles (comma-joined) so the export is meaningful and can be
+      // re-imported. Missing titles (deleted rows) are dropped.
+      return Array.isArray(raw)
+        ? (raw as unknown[])
+            .map((x) => linkTitles.get(typeof x === "string" ? x : ((x as { id?: string })?.id ?? "")) ?? "")
+            .filter(Boolean)
+            .join(", ")
+        : "";
     case "formula":
     case "rollup":
       return ""; // computed — not exported in v1
@@ -108,18 +126,44 @@ function cellExport(col: DbColumn, raw: unknown): string {
 
 const csvCell = (s: string) => `"${s.replace(/"/g, '""')}"`;
 
+/** Serializes rows to CSV given the columns to emit: a "Nom" title column then
+ * one column per `cols`. `linkTitles` resolves relation ids → titles. Shared by
+ * the single-database export and the multi-database bundle. */
+export function dbRowsToCsv(
+  cols: DbColumn[],
+  rows: { title: string | null; properties: string | null }[],
+  linkTitles: Map<string, string>,
+): string {
+  const header = ["Nom", ...cols.map((c) => c.name)];
+  const lines = [header.map(csvCell).join(",")];
+  for (const r of rows) {
+    const props: PropValues = parseProps(r.properties);
+    const cells = [r.title ?? "", ...cols.map((c) => cellExport(c, props[c.id], linkTitles))];
+    lines.push(cells.map(csvCell).join(","));
+  }
+  return lines.join("\n");
+}
+
 /** Exports a database's rows as CSV (Name + columns, excluding meta/computed). */
 export async function exportCsv(itemId: string): Promise<void> {
   const meta = await getItem(itemId);
   const schema = parseSchema(meta.db_schema);
   const cols = schema.columns.filter((c) => !META_TYPES.has(c.type) && c.type !== "formula" && c.type !== "rollup");
-  const rows = await listRows(itemId);
-  const header = ["Nom", ...cols.map((c) => c.name)];
-  const lines = [header.map(csvCell).join(",")];
-  for (const r of rows) {
-    const props: PropValues = parseProps(r.properties);
-    const cells = [r.title ?? "", ...cols.map((c) => cellExport(c, props[c.id]))];
-    lines.push(cells.map(csvCell).join(","));
-  }
-  download(`${safeName(meta.title)}.csv`, lines.join("\n"), "text/csv");
+  // Exclude row templates (hidden child items, excluded from views too) — otherwise
+  // they export as ordinary rows and re-import as duplicated data rows.
+  const templates = new Set(schema.templates ?? []);
+  const rows = (await listRows(itemId)).filter((r) => !templates.has(r.id));
+
+  // Resolve linked-row titles for relation columns (id → title across target dbs).
+  const linkTitles = new Map<string, string>();
+  const relDbs = new Set(
+    cols.filter((c) => c.type === "relation" && c.relationDb).map((c) => c.relationDb as string),
+  );
+  await Promise.all(
+    [...relDbs].map(async (dbId) => {
+      for (const row of await listRows(dbId)) if (row.title) linkTitles.set(row.id, row.title);
+    }),
+  );
+
+  download(`${safeName(meta.title)}.csv`, dbRowsToCsv(cols, rows, linkTitles), "text/csv");
 }

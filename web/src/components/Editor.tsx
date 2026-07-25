@@ -15,11 +15,13 @@ import { useNavigate } from "react-router-dom";
 import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
 
+import { InlineDbHostContext } from "@/components/db/hostContext";
 import { PageLinkDialog } from "@/components/PageLinkDialog";
 import { PresenceCursors } from "@/components/PresenceCursors";
 import { PageSkeleton } from "@/components/ui/skeletons";
 import { createDatabase, createItem } from "@/lib/api";
 import { editorSchema } from "@/lib/editorSchema";
+import type { HostContext } from "@/lib/filter";
 import { colorFromName, useBroadcastPointer } from "@/lib/presence";
 import { useConfirmPublicChild } from "@/lib/publishConsent";
 import { useIsDark } from "@/lib/theme";
@@ -39,6 +41,7 @@ export function Editor({
   doc,
   awareness,
   onTreeChange,
+  host = null,
 }: {
   itemId: string;
   userName: string;
@@ -48,6 +51,9 @@ export function Editor({
   awareness: Awareness;
   /** Called after creating a sub-page (refreshes the sidebar). */
   onTreeChange: () => void;
+  /** Host page context (this page's own values), for dynamic filters in
+   * embedded `dbview` blocks. Null on pages that aren't database rows. */
+  host?: HostContext | null;
 }) {
   const { t, i18n } = useTranslation();
   // BlockNote dictionary (placeholders + default items of the "/" menu) aligned
@@ -157,6 +163,7 @@ export function Editor({
   }
 
   return (
+    <InlineDbHostContext.Provider value={host}>
     <div
       ref={columnRef}
       className="relative mx-auto w-full max-w-4xl cursor-text"
@@ -263,5 +270,6 @@ export function Editor({
         }}
       />
     </div>
+    </InlineDbHostContext.Provider>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -9,7 +9,8 @@ import { RowProperties } from "@/components/RowProperties";
 import { Button } from "@/components/ui/button";
 import { ApiError, getItem, patchItem, type ItemMeta, type MetaPatch } from "@/lib/api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { parseSchema } from "@/lib/db";
+import { parseProps, parseSchema } from "@/lib/db";
+import type { HostContext } from "@/lib/filter";
 import { useLivePresence, usePresence } from "@/lib/presence";
 import { TEMPLATE_TOKENS } from "@/lib/templateTokens";
 import { Copy } from "lucide-react";
@@ -68,6 +69,17 @@ export function Page({
     };
   }, [meta?.parent_item_id]);
   useLivePresence(parentDbId, currentUserName, currentUserAvatar, itemId);
+
+  // Host context for embedded `dbview` blocks: this page's own property values
+  // + the parent DB's columns, so their filters can reference the current page.
+  const host = useMemo<HostContext | null>(() => {
+    if (!parentDbSchema) return null;
+    return {
+      props: parseProps(meta?.properties),
+      columns: parseSchema(parentDbSchema).columns,
+      title: meta?.title ?? null,
+    };
+  }, [parentDbSchema, meta?.properties, meta?.title]);
 
   useEffect(() => {
     let alive = true;
@@ -193,6 +205,7 @@ export function Page({
             doc={rt.doc}
             awareness={rt.awareness}
             onTreeChange={onMetaChange}
+            host={host}
           />
         )
       )}

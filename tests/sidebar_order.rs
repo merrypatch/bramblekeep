@@ -1,6 +1,7 @@
-//! The sidebar (list_pages) orders pages by the user's last VIEW
-//! (page_views.last_ts) descending; the never-viewed ones last, tie-broken
-//! by id (creation). The order is PER user.
+//! The sidebar (list_pages) returns pages in a STABLE creation order (id), so
+//! the main tree does not reshuffle on every visit. Recency is carried per page
+//! as `last_viewed_ts` (page_views.last_ts, PER user), which the frontend uses
+//! to build the dedicated "Recents" section.
 
 mod common;
 
@@ -23,11 +24,11 @@ async fn set_view(db: &sqlx::SqlitePool, item: &str, user: &str, last_ts: i64) {
 }
 
 #[tokio::test]
-async fn pages_ordered_by_last_consultation() {
+async fn pages_stable_order_with_view_ts() {
     let (db, path) = test_db().await;
     insert_user(&db, OWNER, "owner@x.com").await;
 
-    // 4 pages created; a/b/c viewed at distinct dates, d never.
+    // 4 pages created; a/b/c viewed at distinct dates (out of creation order), d never.
     let a = make_page(&db, OWNER, None).await.to_string();
     let b = make_page(&db, OWNER, None).await.to_string();
     let c = make_page(&db, OWNER, None).await.to_string();
@@ -37,15 +38,18 @@ async fn pages_ordered_by_last_consultation() {
     set_view(&db, &c, OWNER, 300).await;
     set_view(&db, &b, OWNER, 200).await;
 
-    let order: Vec<String> = store::list_pages(&db, OWNER)
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|p| p.id)
-        .collect();
+    let pages = store::list_pages(&db, OWNER).await.unwrap();
 
-    // Most recently viewed first; never-viewed (d) last.
-    assert_eq!(order, vec![c, b, a, d], "order by recent view then never-seen");
+    // Stable: creation order (id ascending), regardless of view recency.
+    let order: Vec<String> = pages.iter().map(|p| p.id.clone()).collect();
+    assert_eq!(order, vec![a.clone(), b.clone(), c.clone(), d.clone()], "stable creation order");
+
+    // Each page carries the user's last-view timestamp (None if never viewed).
+    let ts = |id: &str| pages.iter().find(|p| p.id == id).unwrap().last_viewed_ts;
+    assert_eq!(ts(&a), Some(100));
+    assert_eq!(ts(&b), Some(200));
+    assert_eq!(ts(&c), Some(300));
+    assert_eq!(ts(&d), None, "never-viewed page has no view timestamp");
 
     let _ = std::fs::remove_file(&path);
 }
