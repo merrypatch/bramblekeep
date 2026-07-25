@@ -59,5 +59,13 @@
     "vite": "^6.0.0",
     "vite-plugin-pwa": "^0.21.1",
     "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "//": "Security overrides: force patched versions of transitive deps flagged by the OSV audit (all build/tooling-only, no API change). Re-check on dep bumps.",
+    "overrides": {
+      "brace-expansion": "5.0.8",
+      "fast-uri": "3.1.4",
+      "postcss": "8.5.18"
+    }
   }
 }

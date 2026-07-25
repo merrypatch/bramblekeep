@@ -1,0 +1,20 @@
+# OSV scanner policy for the frontend lockfile (blocking supply-chain gate).
+# Only NON-APPLICABLE or dev-only advisories are ignored here, each justified —
+# never a blanket suppression. Re-evaluate on every dependency bump.
+
+[[IgnoredVulns]]
+id = "GHSA-qwww-vcr4-c8h2"
+# react-router "RSC Mode CSRF Bypass": per the advisory, this "only affects your
+# application if you are using the unstable RSC APIs". Bramblekeep is a classic
+# client-side SPA (react-router-dom: BrowserRouter/Routes/useNavigate) and does
+# NOT use React Server Components / the unstable RSC APIs, so the vector does not
+# apply. The only fix is react-router 8.x (major migration); revisit then.
+reason = "Not applicable: SPA does not use the unstable RSC APIs the CSRF bypass requires."
+
+[[IgnoredVulns]]
+id = "GHSA-frvp-7c67-39w9"
+# @hono/node-server is a DEV-ONLY transitive dependency of the `shadcn` CLI
+# (shadcn → @modelcontextprotocol/sdk → @hono/node-server), used locally to add
+# UI components. It is never imported by the app and never ships in the built
+# bundle or the release binary. Fix requires a major bump of a dev CLI tool.
+reason = "Dev-only: transitive dep of the shadcn CLI, never imported or shipped in the app."

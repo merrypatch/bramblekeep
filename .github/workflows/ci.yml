@@ -77,7 +77,9 @@ jobs:
         # npm retired the audit endpoint `pnpm audit` calls (HTTP 410). OSV
         # scanning the lockfile is the maintained replacement — the OSV DB
         # aggregates GHSA/npm advisories. Non-zero exit if any advisory is found.
+        # `--config` applies the documented, justified ignores in
+        # web/osv-scanner.toml (non-applicable / dev-only only).
         run: |
           curl -sSL https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_amd64 -o "$RUNNER_TEMP/osv-scanner"
           chmod +x "$RUNNER_TEMP/osv-scanner"
-          "$RUNNER_TEMP/osv-scanner" --lockfile=web/pnpm-lock.yaml
+          "$RUNNER_TEMP/osv-scanner" --config=web/osv-scanner.toml --lockfile=web/pnpm-lock.yaml
