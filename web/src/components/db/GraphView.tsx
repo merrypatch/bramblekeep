@@ -100,6 +100,21 @@ export function GraphView({ model, onOpen, height }: Props) {
     }
     const radiusOf = (id: string): number => 5 + Math.min(6, (degree.get(id) ?? 0));
 
+    // Adjacency (n+1 neighbors) for click-to-highlight.
+    const adjacency = new Map<string, Set<string>>();
+    const link = (a: string, b: string) => {
+      let set = adjacency.get(a);
+      if (!set) adjacency.set(a, (set = new Set()));
+      set.add(b);
+    };
+    for (const e of model.edges) {
+      link(e.source, e.target);
+      link(e.target, e.source);
+    }
+    // Currently selected node (single click) → its n+1 links are highlighted,
+    // the rest dimmed. Null = nothing selected (everything lit).
+    let selected: string | null = null;
+
     let width = wrap.clientWidth;
     let dpr = Math.min(2, window.devicePixelRatio || 1);
     const resize = () => {
@@ -218,16 +233,24 @@ export function GraphView({ model, onOpen, height }: Props) {
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, width, height);
 
+      // Selection highlight: the selected node + its direct neighbors are lit,
+      // the rest dimmed. When nothing is selected everything is lit.
+      const neighbors = selected ? adjacency.get(selected) : null;
+      const nodeLit = (id: string): boolean =>
+        !selected || id === selected || (neighbors?.has(id) ?? false);
+      const edgeLit = (e: { source: string; target: string }): boolean =>
+        !selected || e.source === selected || e.target === selected;
+
       // Edges.
       ctx.strokeStyle = colors.edge;
       ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.7;
       for (const e of model.edges) {
         const a = byId.get(e.source);
         const b = byId.get(e.target);
         if (!a || !b) continue;
         const pa = toScreen(a);
         const pb = toScreen(b);
+        ctx.globalAlpha = edgeLit(e) ? 0.8 : 0.08;
         ctx.beginPath();
         ctx.moveTo(pa.x, pa.y);
         ctx.lineTo(pb.x, pb.y);
@@ -244,19 +267,28 @@ export function GraphView({ model, onOpen, height }: Props) {
         if (!nd) continue;
         const p = toScreen(s);
         const rad = radiusOf(s.id);
+        const lit = nodeLit(s.id);
+        ctx.globalAlpha = lit ? 1 : 0.2;
         ctx.beginPath();
         ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
         ctx.fillStyle = nd.group === "row" ? colors.row : colors.linked;
         ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = colors.bg;
+        // Selected node gets an accent ring; others a thin background outline.
+        if (s.id === selected) {
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = colors.label;
+        } else {
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = colors.bg;
+        }
         ctx.stroke();
-        if (scale > 0.5 && nd.label) {
+        if (lit && scale > 0.5 && nd.label) {
           ctx.fillStyle = colors.label;
           const label = nd.label.length > 24 ? nd.label.slice(0, 23) + "…" : nd.label;
           ctx.fillText(label, p.x, p.y + rad + 2);
         }
       }
+      ctx.globalAlpha = 1;
       ctx.restore();
     };
 
@@ -275,7 +307,8 @@ export function GraphView({ model, onOpen, height }: Props) {
     };
     loop();
 
-    // Pointer interaction: hit-test in graph space, drag to pin, click to open.
+    // Pointer interaction: hit-test in graph space. Drag a node to move it,
+    // single click to highlight its neighborhood, double click to open it.
     const pickAt = (clientX: number, clientY: number): Sim | null => {
       const rect = canvas.getBoundingClientRect();
       const px = clientX - rect.left;
@@ -339,17 +372,25 @@ export function GraphView({ model, onOpen, height }: Props) {
     const onUp = (ev: PointerEvent) => {
       if (dragging) {
         dragging.pinned = false;
-        if (!moved) {
-          const nd = nodeById.get(dragging.id);
-          if (nd) onOpenRef.current(nd.id, nd.group);
-        }
+        // Single click on a node → highlight its n+1 neighborhood.
+        if (!moved) selected = dragging.id;
         dragging = null;
         running = true;
         alpha = Math.max(alpha, 0.2);
+      } else if (panning && !moved) {
+        // Click on empty space → clear the selection.
+        selected = null;
       }
       panning = false;
       canvas.style.cursor = "grab";
       if (canvas.hasPointerCapture(ev.pointerId)) canvas.releasePointerCapture(ev.pointerId);
+    };
+    // Double click on a node → open the drawer.
+    const onDblClick = (ev: MouseEvent) => {
+      const hit = pickAt(ev.clientX, ev.clientY);
+      if (!hit) return;
+      const nd = nodeById.get(hit.id);
+      if (nd) onOpenRef.current(nd.id, nd.group);
     };
     const onWheel = (ev: WheelEvent) => {
       ev.preventDefault();
@@ -359,6 +400,7 @@ export function GraphView({ model, onOpen, height }: Props) {
     canvas.addEventListener("pointerdown", onDown);
     canvas.addEventListener("pointermove", onMove);
     canvas.addEventListener("pointerup", onUp);
+    canvas.addEventListener("dblclick", onDblClick);
     canvas.addEventListener("wheel", onWheel, { passive: false });
 
     const ro = new ResizeObserver(() => {
@@ -374,6 +416,7 @@ export function GraphView({ model, onOpen, height }: Props) {
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerup", onUp);
+      canvas.removeEventListener("dblclick", onDblClick);
       canvas.removeEventListener("wheel", onWheel);
     };
   }, [model, height, zoomAround]);
