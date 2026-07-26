@@ -33,6 +33,14 @@ async fn detects_and_notifies_once_with_consent() {
     assert!(!update::is_newer("1.2.3", "1.2.3"));
     assert!(update::is_newer("1.2.3", "1.3.0"));
     assert!(!update::is_newer("1.2.3", "oops"));
+    // Two-digit components: the comparison is numeric, not lexicographic. A
+    // string compare would read "0.10.0" < "0.9.0" and silently stop offering
+    // updates right after 0.9.x — the boundary is worth pinning.
+    assert!(update::is_newer("0.9.0", "0.10.0"));
+    assert!(!update::is_newer("0.10.0", "0.9.0"));
+    assert!(update::is_newer("0.9.12", "0.10.0"));
+    assert!(update::is_newer("1.9.0", "1.10.0"));
+    assert!(update::is_newer("9.0.0", "10.0.0"));
 
     // Consent not given (unset) → no emission, no call.
     assert_eq!(update::detect_and_notify(&db, &newer, cur).await.unwrap(), None);
