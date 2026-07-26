@@ -60,9 +60,11 @@ import {
   type User,
   type UpdateCheckResult,
   type UpdateConsent,
+  type UnsplashStatus,
   type Workspace,
   getMemberPages,
   getTrash,
+  getUnsplashStatus,
   getUpdateConsent,
   getWorkspace,
   inviteMember,
@@ -72,6 +74,7 @@ import {
   revokeInvite,
   checkForUpdates,
   setMemberRole,
+  setUnsplashKey,
   setUpdateConsent,
   transferOwnership,
   updateMe,
@@ -88,6 +91,7 @@ import {
   setGrid,
 } from "@/lib/appearance";
 import { type Theme, getTheme, setTheme } from "@/lib/theme";
+import { refreshUnsplashStatus } from "@/lib/unsplashStatus";
 import { formatDate } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 
@@ -1368,7 +1372,84 @@ function WorkspaceSection({ ws, onChanged }: { ws: Workspace | null; onChanged: 
         ))}
       </div>
 
+      <UnsplashSetting />
       <UpdateCheckSetting />
+    </div>
+  );
+}
+
+/** Setting (admin): Unsplash access key, used by every image picker.
+ *
+ * Write-only: the stored value is never returned by the API, so the field starts
+ * empty and only shows whether a key is configured. `UNSPLASH_ACCESS_KEY` in the
+ * environment wins over it — in that case the field is read-only. */
+function UnsplashSetting() {
+  const { t } = useTranslation();
+  const [status, setStatus] = useState<UnsplashStatus | null>(null);
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getUnsplashStatus()
+      .then((s) => alive && setStatus(s))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const fromEnv = status?.source === "env";
+
+  const save = async (value: string) => {
+    setBusy(true);
+    try {
+      setStatus(await setUnsplashKey(value));
+      setKey("");
+      // Every picker caches the availability answer: drop it so the Unsplash
+      // source appears (or disappears) without a reload.
+      refreshUnsplashStatus();
+      toast.success(value ? t("settings.unsplash.saved") : t("settings.unsplash.cleared"));
+    } catch {
+      toast.error(t("settings.unsplash.failed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-6">
+      <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+        {t("settings.unsplash.title")}
+      </h3>
+      <p className="mb-2 text-xs text-muted-foreground">{t("settings.unsplash.desc")}</p>
+      <div className="flex items-center gap-2">
+        <Input
+          type="password"
+          value={key}
+          disabled={fromEnv || busy}
+          autoComplete="off"
+          placeholder={t("settings.unsplash.placeholder")}
+          aria-label={t("settings.unsplash.placeholder")}
+          onChange={(e) => setKey(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && key.trim() && void save(key.trim())}
+        />
+        <Button disabled={fromEnv || busy || !key.trim()} onClick={() => void save(key.trim())}>
+          {t("settings.unsplash.save")}
+        </Button>
+        {status?.configured && !fromEnv && (
+          <Button variant="ghost" disabled={busy} onClick={() => void save("")}>
+            {t("settings.unsplash.clear")}
+          </Button>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {fromEnv
+          ? t("settings.unsplash.fromEnv")
+          : status?.configured
+            ? t("settings.unsplash.configured")
+            : t("settings.unsplash.notConfigured")}
+      </p>
     </div>
   );
 }

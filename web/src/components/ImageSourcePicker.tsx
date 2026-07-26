@@ -1,10 +1,12 @@
-import { Upload } from "lucide-react";
+import { ArrowLeft, ImageIcon, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { UnsplashPicker } from "@/components/UnsplashPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { mirrorFileFromUrl, type StoredFile, uploadFile } from "@/lib/api";
+import { useUnsplashAvailable } from "@/lib/unsplashStatus";
 
 /**
  * "Where from?" panel for an image: computer or URL. Single entry point shared by
@@ -17,21 +19,30 @@ import { mirrorFileFromUrl, type StoredFile, uploadFile } from "@/lib/api";
  *
  * Only an image is accepted, and the check is on the MIME sniffed from the
  * CONTENT by the server — a file extension proves nothing.
+ *
+ * `allowUnsplash` adds a third source. It is opt-in per call site rather than
+ * always on: an Unsplash photo must be credited where it is displayed, and some
+ * slots (a 60px icon) have nowhere to put that credit.
  */
 export function ImageSourcePicker({
   onPicked,
   autoFocusUrl = false,
+  allowUnsplash = false,
 }: {
   /** Called with the stored file once it is confirmed to be an image. */
   onPicked: (stored: StoredFile) => void | Promise<void>;
   /** Focus the URL field on mount (panel opened by an explicit click). */
   autoFocusUrl?: boolean;
+  /** Offer Unsplash, if the installation has a key configured. */
+  allowUnsplash?: boolean;
 }) {
   const { t } = useTranslation();
   const fileInput = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unsplash, setUnsplash] = useState(false);
+  const unsplashAvailable = useUnsplashAvailable();
 
   async function run(action: () => Promise<StoredFile>) {
     setBusy(true);
@@ -48,6 +59,24 @@ export function ImageSourcePicker({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Unsplash mode takes over the panel: a search grid needs the room, and a
+  // "back" link keeps the two other sources one click away.
+  if (unsplash) {
+    return (
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          className="flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setUnsplash(false)}
+        >
+          <ArrowLeft className="size-3.5" />
+          {t("imageSource.back")}
+        </button>
+        <UnsplashPicker onPicked={(picked) => void onPicked(picked)} />
+      </div>
+    );
   }
 
   return (
@@ -95,6 +124,13 @@ export function ImageSourcePicker({
           {busy ? t("imageSource.importing") : t("imageSource.use")}
         </Button>
       </div>
+
+      {allowUnsplash && unsplashAvailable && (
+        <Button variant="ghost" size="sm" onClick={() => setUnsplash(true)}>
+          <ImageIcon className="mr-2 size-4" />
+          {t("imageSource.unsplash")}
+        </Button>
+      )}
 
       <p className="text-xs text-muted-foreground">{error ?? t("imageSource.hint")}</p>
     </div>

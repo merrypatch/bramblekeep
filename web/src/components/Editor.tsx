@@ -5,6 +5,7 @@ import { filterSuggestionItems } from "@blocknote/core";
 import { en as bnEn, es as bnEs, fr as bnFr } from "@blocknote/core/locales";
 import { BlockNoteView } from "@blocknote/mantine";
 import {
+  FilePanelController,
   getDefaultReactSlashMenuItems,
   SuggestionMenuController,
   useCreateBlockNote,
@@ -17,6 +18,7 @@ import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
 
 import { InlineDbHostContext } from "@/components/db/hostContext";
+import { EditorFilePanel } from "@/components/EditorFilePanel";
 import { PageLinkDialog } from "@/components/PageLinkDialog";
 import { PresenceCursors } from "@/components/PresenceCursors";
 import { PageSkeleton } from "@/components/ui/skeletons";
@@ -232,7 +234,10 @@ export function Editor({
         theme={dark ? "dark" : "light"}
         className="bk-editor"
         slashMenu={false}
+        // Replaced by our own panel: same Upload / Embed tabs + Unsplash.
+        filePanel={false}
       >
+        <FilePanelController filePanel={EditorFilePanel} />
         <SuggestionMenuController
           triggerCharacter="/"
           getItems={async (query) =>

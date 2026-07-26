@@ -728,7 +728,20 @@
       "checking": "Comprobando…",
       "viewRelease": "Ver la versión"
     },
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "unsplash": {
+      "title": "Fotos de Unsplash",
+      "desc": "Permite a todos elegir fotos para portadas e imágenes. Crea una aplicación gratuita en unsplash.com/developers y pega su Access Key (no la Secret Key).",
+      "placeholder": "Access Key",
+      "save": "Guardar",
+      "clear": "Quitar",
+      "configured": "Configurada",
+      "notConfigured": "Sin configurar",
+      "fromEnv": "Definida por la variable de entorno UNSPLASH_ACCESS_KEY — no editable aquí.",
+      "saved": "Clave de Unsplash guardada.",
+      "cleared": "Clave de Unsplash eliminada.",
+      "failed": "No se pudo guardar la clave."
+    }
   },
   "formula": {
     "group": {
@@ -956,6 +969,11 @@
       "hint": "Solo YouTube y Vimeo. El vídeo permanece en la plataforma: los lectores cargan su reproductor.",
       "invalid": "Enlace no reconocido. Se espera un vídeo de YouTube o Vimeo. Para un ARCHIVO de vídeo (.mp4, .webm), usa el bloque de vídeo.",
       "frameTitle": "Reproductor de vídeo insertado"
+    },
+    "filePanel": {
+      "upload": "Subir",
+      "embed": "Insertar",
+      "unsplash": "Unsplash"
     }
   },
   "history": {
@@ -1194,6 +1212,22 @@
     "importing": "Importando…",
     "notImage": "Este archivo no es una imagen.",
     "failed": "No se pudo importar. Comprueba el archivo o la URL.",
-    "hint": "La imagen se guarda en tu servidor (importada una vez), nunca se carga desde el sitio de origen."
+    "hint": "La imagen se guarda en tu servidor (importada una vez), nunca se carga desde el sitio de origen.",
+    "unsplash": "Buscar en Unsplash",
+    "back": "Volver"
+  },
+  "unsplash": {
+    "placeholder": "Buscar fotos en Unsplash",
+    "search": "Buscar",
+    "searching": "Buscando…",
+    "importing": "Importando…",
+    "noResults": "Ninguna foto para esta búsqueda.",
+    "searchFailed": "Búsqueda fallida. Comprueba la clave de Unsplash en los Ajustes.",
+    "pickFailed": "No se pudo importar esta foto.",
+    "hint": "Fotos cortesía de"
+  },
+  "credit": {
+    "photoBy": "Foto de",
+    "on": "en"
   }
 }

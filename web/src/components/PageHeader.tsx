@@ -6,6 +6,7 @@ import { ItemIcon } from "@/components/ItemIcon";
 import { Button } from "@/components/ui/button";
 import { PickerSkeleton } from "@/components/ui/skeletons";
 import { fileUrl, type ItemMeta, type MetaPatch, type StoredFile } from "@/lib/api";
+import { parseCredit, providerLabel } from "@/lib/credit";
 import {
   type CoverPos,
   coverObjectPosition,
@@ -94,6 +95,8 @@ export function PageHeader({
   }, [coverActions]);
 
   if (!meta) return null;
+
+  const credit = parseCredit(meta.cover_credit);
 
   /** Applies a stored file as the cover. `ImageSourcePicker` has already checked
    * that it is an image. A new image RESETS the framing: the old focal point
@@ -244,7 +247,25 @@ export function PageHeader({
               data-cover-source=""
               className="absolute inset-x-2 top-12 mx-auto max-w-md rounded-md border bg-background/95 p-3 shadow-lg backdrop-blur"
             >
-              <ImageSourcePicker onPicked={applyCover} />
+              <ImageSourcePicker onPicked={applyCover} allowUnsplash />
+            </div>
+          )}
+          {/* Attribution of the cover photo (Unsplash terms): discreet, but
+              present wherever the photo is displayed. Hidden while repositioning
+              so it does not sit under the drag hint. */}
+          {credit && !repositioning && (
+            <div className="absolute right-2 bottom-2 rounded bg-background/80 px-2 py-0.5 text-[11px] text-muted-foreground backdrop-blur">
+              <a href={credit.author_url || undefined} target="_blank" rel="noreferrer noopener" className="hover:underline">
+                {credit.author}
+              </a>
+              {providerLabel(credit) && (
+                <>
+                  {" / "}
+                  <a href={credit.source_url || undefined} target="_blank" rel="noreferrer noopener" className="hover:underline">
+                    {providerLabel(credit)}
+                  </a>
+                </>
+              )}
             </div>
           )}
           {repositioning && (
@@ -326,7 +347,7 @@ export function PageHeader({
             no image to overlay). */}
         {!readOnly && !meta.cover && coverSourceOpen && (
           <div data-cover-source="" className="max-w-md rounded-md border p-3">
-            <ImageSourcePicker onPicked={applyCover} autoFocusUrl />
+            <ImageSourcePicker onPicked={applyCover} autoFocusUrl allowUnsplash />
           </div>
         )}
 

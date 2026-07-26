@@ -728,7 +728,20 @@
       "checking": "Vérification…",
       "viewRelease": "Voir la release"
     },
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "unsplash": {
+      "title": "Photos Unsplash",
+      "desc": "Permet à tout le monde de choisir des photos pour les couvertures et les images. Créez une application gratuite sur unsplash.com/developers et collez son Access Key (pas la Secret Key).",
+      "placeholder": "Access Key",
+      "save": "Enregistrer",
+      "clear": "Retirer",
+      "configured": "Configurée",
+      "notConfigured": "Non configurée",
+      "fromEnv": "Définie par la variable d'environnement UNSPLASH_ACCESS_KEY — non modifiable ici.",
+      "saved": "Clé Unsplash enregistrée.",
+      "cleared": "Clé Unsplash retirée.",
+      "failed": "Impossible d'enregistrer la clé."
+    }
   },
   "formula": {
     "group": {
@@ -956,6 +969,11 @@
       "hint": "YouTube et Vimeo uniquement. La vidéo reste chez la plateforme : les lecteurs chargent son player.",
       "invalid": "Lien non reconnu. Attendu : une vidéo YouTube ou Vimeo. Pour un FICHIER vidéo (.mp4, .webm), utilisez plutôt le bloc vidéo.",
       "frameTitle": "Lecteur vidéo intégré"
+    },
+    "filePanel": {
+      "upload": "Envoyer",
+      "embed": "Intégrer",
+      "unsplash": "Unsplash"
     }
   },
   "history": {
@@ -1194,6 +1212,22 @@
     "importing": "Import en cours…",
     "notImage": "Ce fichier n'est pas une image.",
     "failed": "Import impossible. Vérifiez le fichier ou l'URL.",
-    "hint": "L'image est stockée sur votre serveur (importée une fois), jamais chargée depuis le site source."
+    "hint": "L'image est stockée sur votre serveur (importée une fois), jamais chargée depuis le site source.",
+    "unsplash": "Chercher sur Unsplash",
+    "back": "Retour"
+  },
+  "unsplash": {
+    "placeholder": "Rechercher des photos Unsplash",
+    "search": "Rechercher",
+    "searching": "Recherche…",
+    "importing": "Import…",
+    "noResults": "Aucune photo pour cette recherche.",
+    "searchFailed": "Recherche impossible. Vérifiez la clé Unsplash dans les Réglages.",
+    "pickFailed": "Impossible d'importer cette photo.",
+    "hint": "Photos fournies par"
+  },
+  "credit": {
+    "photoBy": "Photo de",
+    "on": "sur"
   }
 }

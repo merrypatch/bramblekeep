@@ -728,7 +728,20 @@
       "checking": "Checking…",
       "viewRelease": "View release"
     },
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "unsplash": {
+      "title": "Unsplash photos",
+      "desc": "Lets everyone pick photos for covers and images. Create a free app on unsplash.com/developers and paste its Access Key (not the Secret Key).",
+      "placeholder": "Access Key",
+      "save": "Save",
+      "clear": "Remove",
+      "configured": "Configured",
+      "notConfigured": "Not configured",
+      "fromEnv": "Set by the UNSPLASH_ACCESS_KEY environment variable — not editable here.",
+      "saved": "Unsplash key saved.",
+      "cleared": "Unsplash key removed.",
+      "failed": "Could not save the key."
+    }
   },
   "formula": {
     "group": {
@@ -956,6 +969,11 @@
       "hint": "YouTube and Vimeo only. The video stays on the platform: readers load its player.",
       "invalid": "Unrecognized link. Expected a YouTube or Vimeo video. For a video FILE (.mp4, .webm), use the video block instead.",
       "frameTitle": "Embedded video player"
+    },
+    "filePanel": {
+      "upload": "Upload",
+      "embed": "Embed",
+      "unsplash": "Unsplash"
     }
   },
   "history": {
@@ -1194,6 +1212,22 @@
     "importing": "Importing…",
     "notImage": "This file is not an image.",
     "failed": "Import failed. Check the file or the URL.",
-    "hint": "The image is stored on your server (imported once), never loaded from the source site."
+    "hint": "The image is stored on your server (imported once), never loaded from the source site.",
+    "unsplash": "Search Unsplash",
+    "back": "Back"
+  },
+  "unsplash": {
+    "placeholder": "Search Unsplash photos",
+    "search": "Search",
+    "searching": "Searching…",
+    "importing": "Importing…",
+    "noResults": "No photo for this search.",
+    "searchFailed": "Search failed. Check the Unsplash key in Settings.",
+    "pickFailed": "Could not import this photo.",
+    "hint": "Photos courtesy of"
+  },
+  "credit": {
+    "photoBy": "Photo by",
+    "on": "on"
   }
 }

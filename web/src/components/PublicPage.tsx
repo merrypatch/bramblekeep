@@ -19,6 +19,7 @@ import {
 } from "@/lib/api";
 import { ItemIcon } from "@/components/ItemIcon";
 import { coverObjectPosition, parseCoverPos } from "@/lib/coverPosition";
+import { parseCredit, providerLabel } from "@/lib/credit";
 import { publicSchema } from "@/lib/publicSchema";
 import { localFileHash } from "@/lib/remoteMedia";
 import { PageSkeleton } from "@/components/ui/skeletons";
@@ -146,17 +147,38 @@ function PublicRender({
     [doc, token],
   );
 
+  const coverCredit = parseCredit(meta.cover_credit);
+
   return (
     <div className="mx-auto min-h-dvh w-full max-w-4xl px-4 py-10 sm:px-8">
       <Breadcrumb token={token} trail={buildTrail(pages, meta.id)} />
       {meta.cover && (
-        <img
-          src={publicFileUrl(token, meta.cover)}
-          alt=""
-          className="mb-6 h-48 w-full rounded-lg object-cover"
-          // Same framing as in the app (items.cover_pos).
-          style={{ objectPosition: coverObjectPosition(parseCoverPos(meta.cover_pos)) }}
-        />
+        <figure className="m-0 mb-6">
+          <img
+            src={publicFileUrl(token, meta.cover)}
+            alt=""
+            className="h-48 w-full rounded-lg object-cover"
+            // Same framing as in the app (items.cover_pos).
+            style={{ objectPosition: coverObjectPosition(parseCoverPos(meta.cover_pos)) }}
+          />
+          {/* Photo credit: required wherever the photo is displayed, public
+              pages included. */}
+          {coverCredit && (
+            <figcaption className="mt-1 text-right text-[11px] text-muted-foreground">
+              <a href={coverCredit.author_url || undefined} target="_blank" rel="noreferrer noopener" className="hover:underline">
+                {coverCredit.author}
+              </a>
+              {providerLabel(coverCredit) && (
+                <>
+                  {" / "}
+                  <a href={coverCredit.source_url || undefined} target="_blank" rel="noreferrer noopener" className="hover:underline">
+                    {providerLabel(coverCredit)}
+                  </a>
+                </>
+              )}
+            </figcaption>
+          )}
+        </figure>
       )}
       <h1 className="mb-6 flex items-center gap-2 text-3xl font-bold tracking-tight">
         {meta.icon && (

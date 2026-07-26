@@ -18,8 +18,9 @@ pub mod ratelimit;
 pub mod routes;
 pub mod search;
 pub mod store;
-pub mod update;
 pub mod sync;
+pub mod unsplash;
+pub mod update;
 
 use std::sync::Arc;
 
@@ -257,6 +258,15 @@ pub fn build_app(state: AppState) -> Router {
         // Mirror of a remote image: the server downloads it, the content then
         // references the local hash (CSP stays closed to third-party hosts).
         .route("/api/v1/files/from-url", post(routes::file_from_url))
+        // Unsplash: search + thumbnails proxied (key server-side, CSP closed),
+        // and import of the chosen photo into the store.
+        .route(
+            "/api/v1/integrations/unsplash",
+            get(routes::unsplash_status).put(routes::set_unsplash_key),
+        )
+        .route("/api/v1/unsplash/search", get(routes::unsplash_search))
+        .route("/api/v1/unsplash/thumb", get(routes::unsplash_thumb))
+        .route("/api/v1/unsplash/pick", post(routes::unsplash_pick))
         .route("/api/files/{hash}", get(routes::serve_file))
         .layer(middleware::from_fn_with_state(
             state.clone(),

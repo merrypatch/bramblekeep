@@ -196,6 +196,8 @@ export type ItemMeta = {
   cover: string | null;
   /** Cover framing "<x>,<y>" in percent (null = centered). */
   cover_pos: string | null;
+  /** Attribution JSON of the cover image (null = none). */
+  cover_credit: string | null;
   owner_id: string | null;
   parent_item_id: string | null;
   /** Schema JSON if the item is a database, otherwise null. */
@@ -701,6 +703,79 @@ export async function mirrorFileFromUrl(url: string): Promise<StoredFile> {
   return (await res.json()) as StoredFile;
 }
 
+// ── Unsplash (search + thumbnails proxied by the server) ──────────────
+
+/** Attribution of an image, required wherever an Unsplash photo is displayed. */
+export type ImageCredit = {
+  provider: string;
+  author: string;
+  author_url: string;
+  source_url: string;
+};
+
+export type UnsplashPhoto = {
+  id: string;
+  alt: string;
+  /** Unsplash URL, to be passed to `unsplashThumbUrl` (never loaded directly:
+   * the CSP allows our origin only). */
+  thumb_url: string;
+  author: string;
+  author_url: string;
+  source_url: string;
+  /** Dominant color, placeholder while the thumbnail loads. */
+  color: string;
+};
+
+export type UnsplashStatus = {
+  configured: boolean;
+  /** "env" | "settings" | "none" for an admin, null otherwise. */
+  source: string | null;
+};
+
+export async function getUnsplashStatus(): Promise<UnsplashStatus> {
+  const res = await fetch("/api/v1/integrations/unsplash");
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as UnsplashStatus;
+}
+
+/** Stores the access key (admin). `""` clears it. Write-only: the value is never
+ * read back by any route. */
+export async function setUnsplashKey(key: string): Promise<UnsplashStatus> {
+  const res = await fetch("/api/v1/integrations/unsplash", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ key }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as UnsplashStatus;
+}
+
+export async function searchUnsplash(q: string, page = 1): Promise<UnsplashPhoto[]> {
+  const params = new URLSearchParams({ q, page: String(page) });
+  const res = await fetch(`/api/v1/unsplash/search?${params}`);
+  if (!res.ok) throw await toApiError(res);
+  return ((await res.json()) as { photos: UnsplashPhoto[] }).photos;
+}
+
+/** Proxy URL of a thumbnail: the browser never contacts Unsplash. */
+export function unsplashThumbUrl(url: string): string {
+  return `/api/v1/unsplash/thumb?url=${encodeURIComponent(url)}`;
+}
+
+/** Imports the chosen photo: the server mirrors it, records the attribution and
+ * sends the download ping the Unsplash terms require. */
+export async function pickUnsplash(
+  id: string,
+): Promise<StoredFile & { credit: ImageCredit | null }> {
+  const res = await fetch("/api/v1/unsplash/pick", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as StoredFile & { credit: ImageCredit | null };
+}
+
 /** Serving URL of a content-addressed file. */
 export function fileUrl(hash: string): string {
   return `/api/files/${hash}`;
@@ -715,6 +790,8 @@ export type PublicItemMeta = {
   cover: string | null;
   /** Cover framing "<x>,<y>" in percent (null = centered). */
   cover_pos: string | null;
+  /** Attribution JSON of the cover image (null = none). */
+  cover_credit: string | null;
 };
 export type PublicNavItem = {
   id: string;

@@ -84,6 +84,11 @@ pub struct ItemMeta {
     /// `#[sqlx(default)]`: not selected by the queries that don't display a cover.
     #[sqlx(default)]
     pub cover_pos: Option<String>,
+    /// Attribution JSON of the cover image (`files.credit`, migration 0026).
+    /// Derived, not a column of `items`: filled by the handlers that display a
+    /// cover, so the photographer's credit can be shown next to it.
+    #[sqlx(default)]
+    pub cover_credit: Option<String>,
     pub owner_id: Option<String>,
     pub parent_item_id: Option<String>,
     /// Schema JSON if the item is a database (typed columns), otherwise NULL.
@@ -1547,6 +1552,29 @@ pub async fn file_mime(db: &Db, hash: &str) -> Result<Option<String>> {
         .await?
         .flatten();
     Ok(mime)
+}
+
+/// Attribution JSON of a file (migration 0026), `None` if it has none.
+/// Required to display the photographer's credit wherever the image appears.
+pub async fn file_credit(db: &Db, hash: &str) -> Result<Option<String>> {
+    let credit = sqlx::query_scalar::<_, Option<String>>("SELECT credit FROM files WHERE hash = ?")
+        .bind(hash)
+        .fetch_optional(db)
+        .await?
+        .flatten()
+        .filter(|c: &String| !c.is_empty());
+    Ok(credit)
+}
+
+/// Attaches an attribution to a stored file. Idempotent: importing the same
+/// photo twice (same hash) rewrites the same credit.
+pub async fn set_file_credit(db: &Db, hash: &str, credit: &str) -> Result<()> {
+    sqlx::query("UPDATE files SET credit = ? WHERE hash = ?")
+        .bind(credit)
+        .bind(hash)
+        .execute(db)
+        .await?;
+    Ok(())
 }
 
 /// Loads all CRDT updates of an item, in journal order.

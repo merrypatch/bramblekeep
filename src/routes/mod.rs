@@ -325,6 +325,11 @@ pub async fn get_item(
                 .await?
                 .is_some();
             meta.is_favorite = crate::store::is_favorite(&app.db, &item_id, &user.id).await?;
+            // Credit of the cover image (Unsplash): displayed next to the cover,
+            // which has no caption of its own to carry it.
+            if let Some(cover) = meta.cover.clone() {
+                meta.cover_credit = crate::store::file_credit(&app.db, &cover).await?;
+            }
             Ok(Json(json!(meta)))
         }
         None => Err(Error::BadId("unknown page".into())),
@@ -481,12 +486,19 @@ pub async fn patch_item(
     }
     // Return capabilities (like get_item): otherwise client would lose
     // can_edit/can_create after a PATCH (editing blocked until reload).
-    let meta = crate::store::get_item_meta(&app.db, &item_id).await?.map(|mut m| {
+    let mut meta = crate::store::get_item_meta(&app.db, &item_id).await?.map(|mut m| {
         m.can_edit = level_rank(&level) >= level_rank("edit");
         m.can_create = level_rank(&level) >= level_rank("creator");
         m.can_delete = level_rank(&level) >= level_rank("admin");
         m
     });
+    // Cover credit, like get_item: a PATCH that sets a cover must return the
+    // attribution to display with it, without a second round trip.
+    if let Some(m) = meta.as_mut()
+        && let Some(cover) = m.cover.clone()
+    {
+        m.cover_credit = crate::store::file_credit(&app.db, &cover).await?;
+    }
     Ok(Json(json!(meta)))
 }
 
@@ -1419,6 +1431,156 @@ pub async fn file_from_url(
     Ok(Json(json!({ "hash": hash, "mime": mime })))
 }
 
+// ── Unsplash integration ────────────────────────────────────────────────────
+
+/// Status of the integration: is a key configured, and where from. The key
+/// itself is NEVER returned (write-only, cf. `unsplash` module).
+pub async fn unsplash_status(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+) -> Result<Json<Value>> {
+    let source = crate::unsplash::key_source(&app.db).await?;
+    Ok(Json(json!({
+        "configured": source != crate::unsplash::KeySource::None,
+        // Only an admin needs to know whether the value is editable here or
+        // pinned by the environment.
+        "source": if role_rank(&user.role) >= role_rank("admin") {
+            json!(source.as_str())
+        } else {
+            Value::Null
+        },
+    })))
+}
+
+#[derive(Deserialize)]
+pub struct UnsplashKeyInput {
+    /// Access key; `""` clears the stored value.
+    key: String,
+}
+
+/// Stores the Unsplash access key (admin/owner). Write-only: no route reads it
+/// back. An `UNSPLASH_ACCESS_KEY` in the environment keeps precedence.
+pub async fn set_unsplash_key(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Json(body): Json<UnsplashKeyInput>,
+) -> Result<Json<Value>> {
+    if role_rank(&user.role) < role_rank("admin") {
+        return Err(Error::Forbidden);
+    }
+    let key = body.key.trim();
+    crate::store::set_setting(&app.db, crate::unsplash::KEY_SETTING, key).await?;
+    let source = crate::unsplash::key_source(&app.db).await?;
+    Ok(Json(json!({
+        "configured": source != crate::unsplash::KeySource::None,
+        "source": source.as_str(),
+    })))
+}
+
+/// The effective key, or a "not configured" error the UI can act on.
+async fn require_unsplash_key(app: &AppState) -> Result<String> {
+    crate::unsplash::access_key(&app.db)
+        .await?
+        .ok_or_else(|| Error::Upload("Unsplash is not configured".into()))
+}
+
+#[derive(Deserialize)]
+pub struct UnsplashSearch {
+    q: Option<String>,
+    page: Option<u32>,
+}
+
+/// Photo search, proxied: the key stays server-side. Rate-limited per user,
+/// like every route that makes the server call out.
+pub async fn unsplash_search(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Query(params): Query<UnsplashSearch>,
+) -> Result<Json<Value>> {
+    if !app.fetch_rl.check(&user.id, now_ms()) {
+        return Err(Error::TooManyRequests);
+    }
+    let key = require_unsplash_key(&app).await?;
+    let query = params.q.unwrap_or_default().trim().to_string();
+    if query.is_empty() {
+        return Ok(Json(json!({ "photos": [] })));
+    }
+    let page = params.page.unwrap_or(1);
+    let photos = tokio::task::spawn_blocking(move || crate::unsplash::search(&key, &query, page))
+        .await
+        .map_err(|e| Error::Upload(e.to_string()))?
+        .map_err(Error::Upload)?;
+    Ok(Json(json!({ "photos": photos })))
+}
+
+#[derive(Deserialize)]
+pub struct UnsplashThumb {
+    url: String,
+}
+
+/// Proxies a picker thumbnail so the CSP stays closed (`img-src 'self'`) and no
+/// browser contacts Unsplash. Only Unsplash photo hosts are accepted — otherwise
+/// this route would be an open proxy.
+pub async fn unsplash_thumb(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Query(params): Query<UnsplashThumb>,
+) -> Result<Response> {
+    if !app.fetch_rl.check(&user.id, now_ms()) {
+        return Err(Error::TooManyRequests);
+    }
+    if !crate::unsplash::is_photo_url(&params.url) {
+        return Err(Error::Upload("not an Unsplash photo URL".into()));
+    }
+    let url = params.url.clone();
+    let (bytes, mime) = tokio::task::spawn_blocking(move || crate::unsplash::fetch_thumb(&url))
+        .await
+        .map_err(|e| Error::Upload(e.to_string()))?
+        .map_err(Error::Upload)?;
+    let mut resp = bytes.into_response();
+    let h = resp.headers_mut();
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(&mime).unwrap_or(HeaderValue::from_static("image/jpeg")),
+    );
+    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    // Thumbnails are not stored: a short private cache is enough for scrolling
+    // the picker without re-fetching every image.
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=600"));
+    Ok(resp)
+}
+
+#[derive(Deserialize)]
+pub struct UnsplashPick {
+    /// Photo id. Not a URL: the server re-reads the canonical metadata, so the
+    /// stored attribution cannot be forged by the client.
+    id: String,
+}
+
+/// Imports a chosen photo: mirrors it into the store, records its attribution,
+/// and sends the download ping the Unsplash terms require.
+pub async fn unsplash_pick(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Json(body): Json<UnsplashPick>,
+) -> Result<Json<Value>> {
+    if !app.fetch_rl.check(&user.id, now_ms()) {
+        return Err(Error::TooManyRequests);
+    }
+    let key = require_unsplash_key(&app).await?;
+    let id = body.id.clone();
+    let picked = tokio::task::spawn_blocking(move || crate::unsplash::import(&key, &id))
+        .await
+        .map_err(|e| Error::Upload(e.to_string()))?
+        .map_err(Error::Upload)?;
+    let hash = app.files.put(&picked.bytes).await?;
+    crate::store::record_file(&app.db, &hash, picked.bytes.len() as i64, Some(&picked.mime))
+        .await?;
+    crate::store::set_file_credit(&app.db, &hash, &picked.credit).await?;
+    let credit: Value = serde_json::from_str(&picked.credit).unwrap_or(Value::Null);
+    Ok(Json(json!({ "hash": hash, "mime": picked.mime, "credit": credit })))
+}
+
 /// Serves a file by its hash.
 ///
 /// Access model (cf. spec §5.4): files are content-addressed and
@@ -1586,12 +1748,19 @@ async fn public_item_meta(app: &AppState, item_id: &ItemId) -> Result<Value> {
         .await?
         .filter(|m| m.deleted_ts.is_none())
         .ok_or(Error::NotFound)?;
+    // Cover credit resolved server-side: a public visitor has no session to read
+    // file metadata with, and the attribution must be displayed all the same.
+    let cover_credit = match &meta.cover {
+        Some(hash) => crate::store::file_credit(&app.db, hash).await?,
+        None => None,
+    };
     Ok(json!({
         "id": item_id.to_string(),
         "title": meta.title,
         "icon": meta.icon,
         "cover": meta.cover,
         "cover_pos": meta.cover_pos,
+        "cover_credit": cover_credit,
     }))
 }
 
