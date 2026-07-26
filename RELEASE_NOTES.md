@@ -1,48 +1,46 @@
-## Bramblekeep v0.9.1
+## Bramblekeep v0.9.2
 
-A caching bug could delete blocks from your pages. This patch closes it.
+The settings dialog now scrolls. Its lower half was unreachable.
 
 ### Fixed
 
-- **An old interface kept running after an update.** `index.html`, the service
-  worker, its registration script and the web manifest keep stable names across
-  releases, and were served with no `Cache-Control` — so browsers and CDNs applied
-  their own default. The browser then never saw a changed `sw.js`, the previous
-  service worker stayed in control, and it kept serving the previous release's
-  interface while the API already answered the new version. A hard reload
-  (Ctrl+Shift+R) was the only way out. Content-hashed assets are now cached
-  forever (their name changes with their content); everything else is revalidated
-  on every load.
-- **Blocks vanishing between devices** — progress block, embeds, database views.
-  This is the reason for the patch. A browser stuck on a bundle older than a block
-  type it receives does not merely fail to render it: the CRDT layer deletes any
-  element whose type is missing from its schema, and that deletion syncs to every
-  other client. Editing the same page from an up-to-date browser and from a cached
-  installed app could therefore erase those blocks, in both directions. The app
-  now compares its own build stamp against the server's version *before* opening
-  any sync connection: a mismatched client repairs itself (service workers
-  unregistered, caches emptied, reload) and, if it comes back still mismatched,
-  shows a blocking screen instead of editing.
+- **Settings could not be scrolled to the bottom.** The dialog's inner panel took
+  the height of its own content instead of the dialog's, so nothing overflowed and
+  nothing scrolled: everything past the visible box was simply cut off, on desktop
+  and on mobile alike. Short sections fit, which is why it went unnoticed — but the
+  update controls are the last block of the Workspace section, so **the *Apply
+  update* and *View release* buttons were unreachable**. Same for the bottom of any
+  long section (a large member list, a full trash).
+- **Any dialog taller than the window was clipped at both ends**, not just at the
+  bottom, with no scrollbar anywhere. Dialogs and confirmation dialogs are now
+  capped at the visible viewport height and scroll their content.
+- **Boxes sized against the mobile browser chrome.** The settings dialog and the
+  database row sheet used `vh`, which ignores the phone's URL bar and gesture bar;
+  they now use the dynamic viewport, and the settings panel keeps a bottom margin
+  so its last row is never tucked under the gesture bar.
 
 ### Upgrading
 
-- **Docker:** `docker compose pull && docker compose up -d` — or the in-app
-  Update button. **Bare metal:** re-run the installer, or the Update button.
-- **Behind a CDN (Cloudflare & co.): purge once after upgrading** — `/`,
-  `/index.html`, `/sw.js`, `/registerSW.js`, `/manifest.webmanifest`. The new
-  headers govern responses served from now on; entries already cached without them
-  are not evicted by the upgrade itself.
-- Every browser and installed app then repairs itself on its next load, with no
-  user action.
+- **Docker:** `docker compose pull && docker compose up -d`. **Bare metal:** re-run
+  the installer.
+- The in-app Update button works again *after* this version is installed — on
+  0.9.0/0.9.1 it is one of the buttons you cannot reach, so this upgrade has to go
+  through Docker or the installer.
 
 No migration.
 
-### Notes
+### Coming from 0.9.0 — the 0.9.1 fixes also apply
 
-- Blocks already lost to the old bug do not come back on their own. The Yjs update
-  log is append-only, so the history is still on your server, but this release
-  exposes no restore path for it.
-- The guard is client-side by nature. A browser that cannot reach
-  `/api/v1/version` — offline, or not signed in yet — is left alone rather than
-  locked out: refusing to open a workspace on missing information would be worse
-  than the risk it guards against.
+0.9.1 fixed a cache bug where the app shell (`index.html`, `sw.js`, the manifest)
+was served with no `Cache-Control`: browsers and CDNs kept the previous release's
+interface while the API already answered the new version, and a browser stuck on an
+old bundle **deleted the block types it did not know** (progress block, embeds,
+database views) from the collaborative document — the deletion then syncing to
+every other client. Content-hashed assets are now immutable, everything else is
+revalidated, and a client whose build stamp does not match the server repairs
+itself before opening any sync connection, or refuses to edit.
+
+**If you run behind a CDN (Cloudflare & co.), purge once after upgrading:** `/`,
+`/index.html`, `/sw.js`, `/registerSW.js`, `/manifest.webmanifest`. The new headers
+govern responses served from now on; entries already cached without them are not
+evicted by the upgrade itself.
