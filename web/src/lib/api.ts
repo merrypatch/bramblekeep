@@ -387,9 +387,11 @@ export async function getApplyStatus(): Promise<ApplyProgress> {
   return (await res.json()) as ApplyProgress;
 }
 
-/** Current binary version (polled to detect the end of the restart). */
+/** Current binary version (polled to detect the end of the restart, and compared
+ * to the bundle's build stamp — cf. `lib/freshness`). `no-store`: a cached answer
+ * would defeat both uses. */
 export async function getVersion(): Promise<string> {
-  const res = await fetch("/api/v1/version");
+  const res = await fetch("/api/v1/version", { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return ((await res.json()) as { version: string }).version;
 }

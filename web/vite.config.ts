@@ -2,10 +2,24 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { readFileSync } from "node:fs";
 import path from "node:path";
+
+/** Version of the binary that will embed this bundle. `Cargo.toml` is the single
+ * source of truth (`web/package.json` is not released), and `pnpm build` always
+ * runs from the same tree as `cargo build` — so a browser whose bundle stamp
+ * differs from `/api/v1/version` is NOT running the front-end this server ships.
+ * That is what `lib/freshness` detects. */
+function cargoVersion(): string {
+  const toml = readFileSync(path.resolve(__dirname, "../Cargo.toml"), "utf8");
+  const found = /^version\s*=\s*"([^"]+)"/m.exec(toml);
+  if (!found) throw new Error("Cargo.toml: [package] version not found");
+  return found[1];
+}
 
 // Mobile-first PWA (cf. design decision D3): a pocket-sized workspace.
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(cargoVersion()) },
   plugins: [
     react(),
     tailwindcss(),

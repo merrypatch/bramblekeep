@@ -1229,5 +1229,12 @@
   "credit": {
     "photoBy": "Photo by",
     "on": "on"
+  },
+  "stale": {
+    "title": "This page is running an old version",
+    "body": "Your browser kept a cached copy of the app that no longer matches the server. Editing in this state could delete recent blocks from your pages, so the workspace stays closed until it is reloaded.",
+    "hint": "If reloading is not enough, close every tab and window of the app (including the installed app), then reopen it.",
+    "versions": "Loaded {{build}} · server {{server}}",
+    "reload": "Reload the app"
   }
 }

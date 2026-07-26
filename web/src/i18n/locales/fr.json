@@ -1229,5 +1229,12 @@
   "credit": {
     "photoBy": "Photo de",
     "on": "sur"
+  },
+  "stale": {
+    "title": "Cette page utilise une ancienne version",
+    "body": "Votre navigateur a gardé en cache une copie de l'application qui ne correspond plus au serveur. Éditer dans cet état pourrait supprimer des blocs récents de vos pages : l'espace de travail reste fermé jusqu'au rechargement.",
+    "hint": "Si le rechargement ne suffit pas, fermez tous les onglets et fenêtres de l'application (y compris l'application installée), puis rouvrez-la.",
+    "versions": "Chargé {{build}} · serveur {{server}}",
+    "reload": "Recharger l'application"
   }
 }

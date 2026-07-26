@@ -1229,5 +1229,12 @@
   "credit": {
     "photoBy": "Foto de",
     "on": "en"
+  },
+  "stale": {
+    "title": "Esta página usa una versión antigua",
+    "body": "Tu navegador conservó en caché una copia de la aplicación que ya no coincide con el servidor. Editar en este estado podría borrar bloques recientes de tus páginas, así que el espacio de trabajo permanece cerrado hasta que se recargue.",
+    "hint": "Si recargar no basta, cierra todas las pestañas y ventanas de la aplicación (incluida la aplicación instalada) y vuelve a abrirla.",
+    "versions": "Cargado {{build}} · servidor {{server}}",
+    "reload": "Recargar la aplicación"
   }
 }

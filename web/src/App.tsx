@@ -22,6 +22,8 @@ const OnboardingFlow = lazy(() =>
   import("@/components/OnboardingFlow").then((m) => ({ default: m.OnboardingFlow })),
 );
 import { getMe, logout, requestLink, verifyToken, type User } from "@/lib/api";
+import { StaleClient } from "@/components/StaleClient";
+import { useFreshness } from "@/hooks/useFreshness";
 import { isLanguage, setLanguage } from "@/i18n";
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -103,10 +105,15 @@ function Login() {
   );
 }
 
-/** Authentication gate: /auth/verify always passes; otherwise login is required. */
+/** Authentication gate: /auth/verify always passes; otherwise login is required.
+ * Doubles as the freshness gate: nothing that opens a sync socket mounts before
+ * the running bundle is confirmed to be this server's (cf. `lib/freshness` — a
+ * stale bundle deletes the block types it does not know from the CRDT). */
 export default function App() {
   const location = useLocation();
   const [user, setUser] = useState<User | null | undefined>(undefined);
+  // Runs in parallel with getMe, so the gate costs no extra round trip.
+  const freshness = useFreshness();
 
   useEffect(() => {
     getMe()
@@ -135,8 +142,10 @@ export default function App() {
       </Suspense>
     );
   }
-  if (user === undefined) return <AppShellSkeleton />;
+  if (user === undefined || freshness.state === "checking") return <AppShellSkeleton />;
   if (!user) return <Login />;
+  // Before onboarding too: the welcome funnel writes pages through the CRDT.
+  if (freshness.state === "stale") return <StaleClient serverVersion={freshness.serverVersion} />;
 
   // First login: welcome funnel until onboarding is completed.
   if (user.onboarded_ts == null) {
