@@ -30,6 +30,23 @@ async fn security_headers_present_on_responses() {
     assert!(csp.contains("frame-ancestors 'none'"), "CSP must forbid embedding: {csp}");
     assert!(!csp.contains("unsafe-eval"), "no unsafe-eval: {csp}");
 
+    // Images and media: our own origin only (a URL supplied by a user is
+    // mirrored server-side, cf. `files::remote`) — no third-party host, so no
+    // reader's IP leaks at render time.
+    for directive in ["img-src 'self' data: blob:", "media-src 'self' data: blob:"] {
+        assert!(csp.contains(directive), "expected `{directive}`: {csp}");
+    }
+
+    // `frame-src` is the only opening towards third parties (`embed` block), and
+    // it is limited to the two video platforms.
+    assert!(
+        csp.contains("frame-src https://www.youtube-nocookie.com https://player.vimeo.com"),
+        "frame-src must allowlist exactly the two players: {csp}",
+    );
+    for host in ["youtube.com/embed", "*", "http://"] {
+        assert!(!csp.contains(host), "CSP must not contain `{host}`: {csp}");
+    }
+
     assert_eq!(
         h.get(header::X_CONTENT_TYPE_OPTIONS).map(|v| v.to_str().unwrap()),
         Some("nosniff"),

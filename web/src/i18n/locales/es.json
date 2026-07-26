@@ -68,7 +68,8 @@
     "icons": "Iconos",
     "remove": "Quitar",
     "searchPlaceholder": "Buscar un icono…",
-    "noIcons": "Ningún icono."
+    "noIcons": "Ningún icono.",
+    "image": "Imagen"
   },
   "pageLinkDialog": {
     "titleDb": "Vincular una base existente",
@@ -926,9 +927,36 @@
       "linkDb": {
         "title": "Vincular una base existente",
         "subtext": "Inserta en línea una base ya creada"
+      },
+      "taskProgress": {
+        "title": "Progreso de las tareas",
+        "subtext": "Porcentaje de finalización de la lista de casillas de abajo"
+      },
+      "embed": {
+        "title": "Vídeo insertado (YouTube / Vimeo)",
+        "subtext": "Reproductor de un vídeo alojado en una plataforma"
       }
     },
-    "newPage": "Nueva página"
+    "taskProgress": {
+      "aria": "Progreso de las tareas: {{done}} de {{total}} hechas",
+      "empty": "Añade casillas debajo de este bloque para seguir el progreso.",
+      "scope": {
+        "next": "lista de abajo",
+        "page": "toda la página",
+        "switch": "Alternar entre la lista de abajo y toda la página"
+      }
+    },
+    "toast": {
+      "mirrorFailed": "No se pudo importar este medio. Comprueba la URL y el formato (imagen, vídeo o audio), o sube el archivo desde tu ordenador."
+    },
+    "newPage": "Nueva página",
+    "embed": {
+      "placeholder": "Pega un enlace de YouTube o Vimeo",
+      "action": "Insertar",
+      "hint": "Solo YouTube y Vimeo. El vídeo permanece en la plataforma: los lectores cargan su reproductor.",
+      "invalid": "Enlace no reconocido. Se espera un vídeo de YouTube o Vimeo. Para un ARCHIVO de vídeo (.mp4, .webm), usa el bloque de vídeo.",
+      "frameTitle": "Reproductor de vídeo insertado"
+    }
   },
   "history": {
     "title": "Historial",
@@ -1089,6 +1117,9 @@
     "noAccess": "No tienes acceso a esta página",
     "coverChange": "Cambiar",
     "coverRemove": "Quitar",
+    "coverReposition": "Reposicionar",
+    "coverPosSave": "Guardar la posición",
+    "coverRepositionHint": "Arrastra la imagen para reposicionarla (flechas para ajustar)",
     "addIcon": "Añadir un icono",
     "addCover": "Añadir una portada",
     "networkTitle": "No se puede conectar con el servidor",
@@ -1154,5 +1185,15 @@
   },
   "backlinks": {
     "title": "Referencias vinculadas ({{count}})"
+  },
+  "imageSource": {
+    "upload": "Subir desde mi ordenador",
+    "or": "o",
+    "urlPlaceholder": "URL de la imagen",
+    "use": "Usar",
+    "importing": "Importando…",
+    "notImage": "Este archivo no es una imagen.",
+    "failed": "No se pudo importar. Comprueba el archivo o la URL.",
+    "hint": "La imagen se guarda en tu servidor (importada una vez), nunca se carga desde el sitio de origen."
   }
 }

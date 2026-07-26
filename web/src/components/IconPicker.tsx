@@ -4,18 +4,20 @@ import DynamicIcon, { iconNames } from "lucide-react/dist/esm/DynamicIcon.js";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { lucideValue } from "@/components/ItemIcon";
+import { fileIconValue, lucideValue } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 
 /** Max number of icons rendered (each icon = a lazy import → we cap it). */
 const MAX_ICONS = 120;
 
 /**
- * Icon picker: emoji tab (full catalog, native rendering = zero CDN) or Lucide
- * icons tab (search + lazy grid). `onPick` receives the ready-to-store value
- * (raw emoji or `lucide:<name>`). `onRemove` clears the icon.
+ * Icon picker: emoji tab (full catalog, native rendering = zero CDN), Lucide
+ * icons tab (search + lazy grid), or custom image tab (upload from the computer
+ * or URL mirrored server-side). `onPick` receives the ready-to-store value (raw
+ * emoji, `lucide:<name>` or `file:sha256:…`). `onRemove` clears the icon.
  */
 export function IconPicker({
   onPick,
@@ -25,7 +27,7 @@ export function IconPicker({
   onRemove?: () => void;
 }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<"emoji" | "icons">("emoji");
+  const [tab, setTab] = useState<"emoji" | "icons" | "image">("emoji");
 
   return (
     <div className="w-[340px] max-w-[90vw] rounded-md border bg-popover shadow-md">
@@ -35,6 +37,9 @@ export function IconPicker({
         </TabButton>
         <TabButton active={tab === "icons"} onClick={() => setTab("icons")}>
           {t("iconPicker.icons")}
+        </TabButton>
+        <TabButton active={tab === "image"} onClick={() => setTab("image")}>
+          {t("iconPicker.image")}
         </TabButton>
         {onRemove && (
           <Button
@@ -58,8 +63,12 @@ export function IconPicker({
           height={360}
           previewConfig={{ showPreview: false }}
         />
-      ) : (
+      ) : tab === "icons" ? (
         <IconsTab onPick={(name) => onPick(lucideValue(name))} />
+      ) : (
+        <div className="p-3">
+          <ImageSourcePicker onPicked={(stored) => onPick(fileIconValue(stored.hash))} />
+        </div>
       )}
     </div>
   );

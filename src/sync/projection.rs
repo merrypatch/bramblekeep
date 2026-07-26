@@ -97,10 +97,29 @@ fn walk<T: ReadTxn>(
                 // are projected separately (recursion); we therefore exclude
                 // their content, and also the XML wrapper `<tag>…</tag>`.
                 // This plain text feeds FTS5 (not markup).
-                props: serde_json::json!({ "text": inline_text(txn, &el) }).to_string(),
+                props: block_props(txn, &el),
             });
             walk(txn, el.children(txn), item_id, Some(id), seq, out);
         }
+    }
+}
+
+/// Projected props of a block: its inline text, plus the `url` of media blocks
+/// (image / video / audio / file) when present.
+///
+/// Why `url` is projected: it is the only server-side trace of a file attached
+/// INSIDE the content. Public file access (`file_in_publication`) needs it to
+/// authorize serving an image of a published page without a login — the Yjs doc
+/// carries it, but decoding a doc per image request would be absurd. Additive
+/// (a key that only appears on the blocks that have it), and derived like the
+/// rest: the projection stays a pure function of the CRDT.
+fn block_props<T: ReadTxn>(txn: &T, el: &yrs::XmlElementRef) -> String {
+    let text = inline_text(txn, el);
+    match el.get_attribute(txn, "url") {
+        Some(url) if !url.is_empty() => {
+            serde_json::json!({ "text": text, "url": url }).to_string()
+        }
+        _ => serde_json::json!({ "text": text }).to_string(),
     }
 }
 

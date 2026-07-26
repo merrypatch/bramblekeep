@@ -9,7 +9,8 @@ const IconPicker = lazy(() =>
   import("@/components/IconPicker").then((m) => ({ default: m.IconPicker })),
 );
 
-/** An item's icon, clickable to open the picker (emoji / Lucide) when editable.
+/** An item's icon, clickable to open the picker (emoji / Lucide / image) when
+ * editable.
  * `stopPropagation` on the trigger → doesn't open the surrounding card/row. */
 export function IconEditor({
   icon,

@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 
 import { InlineDatabase, type ViewState } from "@/components/db/InlineDatabase";
 import { InlineDbHostContext } from "@/components/db/hostContext";
+import { EmbedBlock } from "@/components/EmbedBlock";
+import { TaskProgressBlock } from "@/components/TaskProgress";
 import { ApiError, getItem } from "@/lib/api";
 import { migrateFilters } from "@/lib/db";
 
@@ -121,6 +123,49 @@ export const DbViewBlockSpec = createReactBlockSpec(
   },
 );
 
+/** `taskProgress` block: % completion of a checklist. `scope` = the run of
+ * checkboxes that follows the block (`next`) or the whole page (`page`). Nothing
+ * is stored: the count is derived from the document at each change. */
+export const TaskProgressBlockSpec = createReactBlockSpec(
+  {
+    type: "taskProgress",
+    propSchema: { scope: { default: "next", values: ["next", "page"] as const } },
+    content: "none",
+  },
+  {
+    render: (props) => (
+      <TaskProgressBlock
+        editor={props.editor}
+        blockId={props.block.id}
+        scope={props.block.props.scope}
+        onToggleScope={() =>
+          props.editor.updateBlock(props.block, {
+            props: { scope: props.block.props.scope === "page" ? "next" : "page" },
+          })
+        }
+      />
+    ),
+  },
+);
+
+/** `embed` block: YouTube / Vimeo player. Only the source URL is stored; the
+ * player URL is rebuilt from a validated id at render time (cf. `lib/embed`). */
+export const EmbedBlockSpec = createReactBlockSpec(
+  {
+    type: "embed",
+    propSchema: { url: { default: "" } },
+    content: "none",
+  },
+  {
+    render: (props) => (
+      <EmbedBlock
+        url={props.block.props.url}
+        onChangeUrl={(url) => props.editor.updateBlock(props.block, { props: { url } })}
+      />
+    ),
+  },
+);
+
 /** Tolerant parse of the per-view sort/filter JSON stored in the dbview block.
  * Migrates each view's legacy flat `filters` array to the current tree shape. */
 function parseViewState(json: string): ViewState {
@@ -210,6 +255,12 @@ export const PageMentionSpec = createReactInlineContentSpec(
 );
 
 export const editorSchema = BlockNoteSchema.create({
-  blockSpecs: { ...defaultBlockSpecs, page: PageBlockSpec(), dbview: DbViewBlockSpec() },
+  blockSpecs: {
+    ...defaultBlockSpecs,
+    page: PageBlockSpec(),
+    dbview: DbViewBlockSpec(),
+    taskProgress: TaskProgressBlockSpec(),
+    embed: EmbedBlockSpec(),
+  },
   inlineContentSpecs: { ...defaultInlineContentSpecs, pageLink: PageMentionSpec },
 });

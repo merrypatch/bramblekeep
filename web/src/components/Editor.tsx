@@ -9,9 +9,10 @@ import {
   SuggestionMenuController,
   useCreateBlockNote,
 } from "@blocknote/react";
-import { AtSign, FileText, Link2, Table2 } from "lucide-react";
+import { AtSign, FileText, Link2, ListChecks, Table2, Youtube } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
 
@@ -19,8 +20,17 @@ import { InlineDbHostContext } from "@/components/db/hostContext";
 import { PageLinkDialog } from "@/components/PageLinkDialog";
 import { PresenceCursors } from "@/components/PresenceCursors";
 import { PageSkeleton } from "@/components/ui/skeletons";
-import { createDatabase, createItem, searchMentions } from "@/lib/api";
+import {
+  createDatabase,
+  createItem,
+  fileUrl,
+  mirrorFileFromUrl,
+  searchMentions,
+  uploadFile,
+} from "@/lib/api";
 import { editorSchema } from "@/lib/editorSchema";
+import { isEmbeddableUrl } from "@/lib/embed";
+import { isRemoteMediaUrl, MEDIA_BLOCK_TYPES } from "@/lib/remoteMedia";
 import type { HostContext } from "@/lib/filter";
 import { colorFromName, useBroadcastPointer } from "@/lib/presence";
 import { useConfirmPublicChild } from "@/lib/publishConsent";
@@ -112,9 +122,54 @@ export function Editor({
         user: { name: userName, color: colorFromName(userName) },
         provider: { awareness },
       },
+      // Enables the "Upload" tab of media blocks, plus drag & drop and paste of
+      // a file into the page. The file goes into the FileStore (hash-addressed);
+      // the block references our own URL, never a path.
+      uploadFile: async (file) => fileUrl((await uploadFile(file)).hash),
     },
     [doc, userName, bnDictionary],
   );
+
+  // Media given by URL: the server mirrors it into the store and the block then
+  // points at the local file. Reason: the CSP forbids third-party hosts
+  // (`img-src 'self' data: blob:`), so a remote URL would display nothing — and
+  // mirroring also avoids leaking each reader's IP to that host at render time.
+  useEffect(() => {
+    // URLs already handled (mirrored or failed): never retried in a loop.
+    const seen = new Set<string>();
+    // `false` = local changes only: otherwise every connected client would
+    // mirror the same URL at the same time (same hash in the end, but N useless
+    // server fetches). The author's client does the work; the result reaches the
+    // others through the CRDT.
+    return editor.onChange((_editor, { getChanges }) => {
+      for (const change of getChanges()) {
+        if (change.type === "delete") continue;
+        const block = change.block;
+        if (!MEDIA_BLOCK_TYPES.has(block.type)) continue;
+        const props: unknown = block.props;
+        const url =
+          typeof props === "object" && props !== null && typeof (props as { url?: unknown }).url === "string"
+            ? (props as { url: string }).url
+            : "";
+        if (!isRemoteMediaUrl(url, window.location.origin) || seen.has(url)) continue;
+        seen.add(url);
+        // A YouTube / Vimeo link is a watch PAGE, not a video file: mirroring it
+        // would fetch HTML. It becomes an `embed` block (sandboxed iframe).
+        if (isEmbeddableUrl(url)) {
+          const target = editor.getBlock(block.id);
+          if (target) editor.updateBlock(target, { type: "embed", props: { url } });
+          continue;
+        }
+        mirrorFileFromUrl(url)
+          .then(({ hash }) => {
+            // Re-read by id: the block may have moved since the change.
+            const target = editor.getBlock(block.id);
+            if (target) editor.updateBlock(target, { props: { url: fileUrl(hash) } });
+          })
+          .catch(() => toast.error(t("editor.toast.mirrorFailed")));
+      }
+    }, false);
+  }, [editor, t]);
 
   // Creates a sub-page: new child item + insertion of a `page` block that references
   // it, then we open it. The sidebar refreshes via onTreeChange.
@@ -229,6 +284,32 @@ export function Editor({
                     setLinkTarget(editor.getTextCursorPosition().block.id);
                     setLinkKind("db");
                     setLinkOpen(true);
+                  },
+                },
+                {
+                  title: t("editor.item.taskProgress.title"),
+                  subtext: t("editor.item.taskProgress.subtext"),
+                  aliases: ["progress", "percent", "todo", "tasks", "checklist", "avancement"],
+                  group: t("editor.group.basic"),
+                  icon: <ListChecks className="size-4" />,
+                  onItemClick: () => {
+                    editor.updateBlock(editor.getTextCursorPosition().block, {
+                      type: "taskProgress",
+                      props: { scope: "next" },
+                    });
+                  },
+                },
+                {
+                  title: t("editor.item.embed.title"),
+                  subtext: t("editor.item.embed.subtext"),
+                  aliases: ["embed", "youtube", "vimeo", "video", "player"],
+                  group: t("editor.group.basic"),
+                  icon: <Youtube className="size-4" />,
+                  onItemClick: () => {
+                    editor.updateBlock(editor.getTextCursorPosition().block, {
+                      type: "embed",
+                      props: { url: "" },
+                    });
                   },
                 },
                 ...getDefaultReactSlashMenuItems(editor),

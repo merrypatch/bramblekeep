@@ -68,7 +68,8 @@
     "icons": "Icons",
     "remove": "Remove",
     "searchPlaceholder": "Search an icon…",
-    "noIcons": "No icon."
+    "noIcons": "No icon.",
+    "image": "Image"
   },
   "pageLinkDialog": {
     "titleDb": "Link an existing database",
@@ -926,9 +927,36 @@
       "linkDb": {
         "title": "Link an existing database",
         "subtext": "Insert an already-created database inline"
+      },
+      "taskProgress": {
+        "title": "Task progress",
+        "subtext": "Completion percentage of the checklist below"
+      },
+      "embed": {
+        "title": "Video embed (YouTube / Vimeo)",
+        "subtext": "Player of a video hosted by a platform"
       }
     },
-    "newPage": "New page"
+    "taskProgress": {
+      "aria": "Task progress: {{done}} of {{total}} done",
+      "empty": "Add checkboxes below this block to track progress.",
+      "scope": {
+        "next": "list below",
+        "page": "whole page",
+        "switch": "Switch between the list below and the whole page"
+      }
+    },
+    "toast": {
+      "mirrorFailed": "Could not import this media. Check the URL and the format (image, video or audio), or upload the file from your computer."
+    },
+    "newPage": "New page",
+    "embed": {
+      "placeholder": "Paste a YouTube or Vimeo link",
+      "action": "Embed",
+      "hint": "YouTube and Vimeo only. The video stays on the platform: readers load its player.",
+      "invalid": "Unrecognized link. Expected a YouTube or Vimeo video. For a video FILE (.mp4, .webm), use the video block instead.",
+      "frameTitle": "Embedded video player"
+    }
   },
   "history": {
     "title": "History",
@@ -1089,6 +1117,9 @@
     "noAccess": "You don't have access to this page",
     "coverChange": "Change",
     "coverRemove": "Remove",
+    "coverReposition": "Reposition",
+    "coverPosSave": "Save position",
+    "coverRepositionHint": "Drag the image to reposition it (arrow keys to fine-tune)",
     "addIcon": "Add an icon",
     "addCover": "Add a cover",
     "networkTitle": "Cannot reach the server",
@@ -1154,5 +1185,15 @@
   },
   "backlinks": {
     "title": "Linked references ({{count}})"
+  },
+  "imageSource": {
+    "upload": "Upload from my computer",
+    "or": "or",
+    "urlPlaceholder": "Image URL",
+    "use": "Use",
+    "importing": "Importing…",
+    "notImage": "This file is not an image.",
+    "failed": "Import failed. Check the file or the URL.",
+    "hint": "The image is stored on your server (imported once), never loaded from the source site."
   }
 }

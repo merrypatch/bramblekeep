@@ -3576,7 +3576,7 @@ function FilesCell({
     setBusy(true);
     try {
       const uploaded = await Promise.all(
-        files.map(async (f) => ({ hash: await uploadFile(f), name: f.name })),
+        files.map(async (f) => ({ hash: (await uploadFile(f)).hash, name: f.name })),
       );
       onChange([...value, ...uploaded]);
     } finally {

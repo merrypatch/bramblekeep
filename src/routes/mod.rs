@@ -3,7 +3,7 @@
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Multipart, Path, Query, State};
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::Response;
 use axum::{Extension, Json, response::IntoResponse};
 use bytes::Bytes;
@@ -274,6 +274,7 @@ fn dup_subtree<'a>(
                 title,
                 icon: meta.icon.clone(),
                 cover: meta.cover.clone(),
+                cover_pos: meta.cover_pos.clone(),
                 db_schema: meta.db_schema.clone(),
                 properties: meta.properties.clone(),
             },
@@ -337,6 +338,8 @@ pub struct PatchItem {
     title: Option<String>,
     icon: Option<String>,
     cover: Option<String>,
+    /// Cover framing "<x>,<y>" in percent (migration 0025); `""` → centered.
+    cover_pos: Option<String>,
     db_schema: Option<String>,
     properties: Option<String>,
 }
@@ -384,6 +387,7 @@ async fn build_changes(app: &AppState, old: &crate::store::ItemMeta, body: &Patc
         ("title", "Name", &body.title, &old.title),
         ("icon", "Icon", &body.icon, &old.icon),
         ("cover", "Cover", &body.cover, &old.cover),
+        ("cover_pos", "Cover framing", &body.cover_pos, &old.cover_pos),
     ] {
         if let Some(nv) = new_opt {
             let ov = old_opt.clone().unwrap_or_default();
@@ -451,6 +455,7 @@ pub async fn patch_item(
             title: body.title,
             icon: body.icon,
             cover: body.cover,
+            cover_pos: body.cover_pos,
             db_schema: body.db_schema,
             properties: body.properties,
         },
@@ -1379,6 +1384,41 @@ pub async fn upload_file(State(app): State<AppState>, mut mp: Multipart) -> Resu
     Ok(Json(json!({ "hash": hash, "mime": mime })))
 }
 
+/// Body of `POST /api/v1/files/from-url`: the remote URL to mirror.
+#[derive(Deserialize)]
+pub struct FileFromUrl {
+    url: String,
+}
+
+/// Imports a remote media file (image / video / audio) into the store (mirror):
+/// the server downloads it once, stores it by hash, and the content then
+/// references `/api/files/{hash}` — the CSP stays closed to third-party hosts and
+/// no reader's IP leaks at render time. SSRF guard + caps live in `files::remote`.
+///
+/// Rate-limited per user: it is the only route that makes the server fetch a
+/// user-supplied URL.
+pub async fn file_from_url(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Json(body): Json<FileFromUrl>,
+) -> Result<Json<Value>> {
+    if !app.fetch_rl.check(&user.id, now_ms()) {
+        return Err(Error::TooManyRequests);
+    }
+    let url = body.url.trim().to_string();
+    if url.is_empty() {
+        return Err(Error::Upload("empty URL".into()));
+    }
+    // ureq is blocking: off the async runtime.
+    let (bytes, mime) = tokio::task::spawn_blocking(move || crate::files::remote::fetch_media(&url))
+        .await
+        .map_err(|e| Error::Upload(e.to_string()))?
+        .map_err(Error::Upload)?;
+    let hash = app.files.put(&bytes).await?;
+    crate::store::record_file(&app.db, &hash, bytes.len() as i64, Some(&mime)).await?;
+    Ok(Json(json!({ "hash": hash, "mime": mime })))
+}
+
 /// Serves a file by its hash.
 ///
 /// Access model (cf. spec §5.4): files are content-addressed and
@@ -1393,20 +1433,84 @@ pub async fn upload_file(State(app): State<AppState>, mut mp: Multipart) -> Resu
 ///
 /// Hardening of served content: `nosniff`, CSP `sandbox` (a file opened in
 /// direct navigation cannot execute scripts or plugins), and `Content-Disposition`
-/// = `attachment` for everything that is not an image (images remain `inline`
-/// for cover/thumbnail display). `Cache-Control: private`.
+/// = `attachment` for everything that is not media (image / video / audio stay
+/// `inline`: cover, thumbnail, and in-page playback). `Cache-Control: private`.
+/// Byte ranges are honored (`Accept-Ranges: bytes`) — a `<video>` needs them to
+/// seek.
 pub async fn serve_file(
     State(app): State<AppState>,
     Extension(_user): Extension<User>,
     Path(hash): Path<String>,
+    headers: HeaderMap,
 ) -> Response {
-    file_response(&app, &hash).await
+    file_response(&app, &hash, headers.get(header::RANGE)).await
+}
+
+/// Result of parsing a `Range` header against a known length.
+#[derive(Debug, PartialEq, Eq)]
+enum ByteRange {
+    /// Satisfiable single range, bounds inclusive.
+    Range { start: u64, end: u64 },
+    /// Syntactically valid but outside the file → 416.
+    Unsatisfiable,
+    /// Absent, malformed, or a form we do not implement (multi-range) → whole
+    /// file, which the RFC allows.
+    Ignore,
+}
+
+/// Parses a single `Range: bytes=…` against `len`. Supported forms:
+/// `bytes=0-499`, `bytes=500-` (to the end), `bytes=-500` (last 500 bytes).
+fn parse_byte_range(header: &str, len: u64) -> ByteRange {
+    let Some(spec) = header.trim().strip_prefix("bytes=") else {
+        return ByteRange::Ignore;
+    };
+    let spec = spec.trim();
+    // Multi-range: valid HTTP, not implemented (would need multipart/byteranges).
+    if spec.contains(',') {
+        return ByteRange::Ignore;
+    }
+    let Some((from, to)) = spec.split_once('-') else {
+        return ByteRange::Ignore;
+    };
+    let (from, to) = (from.trim(), to.trim());
+    if len == 0 {
+        return ByteRange::Unsatisfiable;
+    }
+    // Suffix form `-N`: the last N bytes.
+    if from.is_empty() {
+        let Ok(n) = to.parse::<u64>() else {
+            return ByteRange::Ignore;
+        };
+        if n == 0 {
+            return ByteRange::Unsatisfiable;
+        }
+        let n = n.min(len);
+        return ByteRange::Range { start: len - n, end: len - 1 };
+    }
+    let Ok(start) = from.parse::<u64>() else {
+        return ByteRange::Ignore;
+    };
+    if start >= len {
+        return ByteRange::Unsatisfiable;
+    }
+    let end = if to.is_empty() {
+        len - 1
+    } else {
+        match to.parse::<u64>() {
+            Ok(v) => v.min(len - 1),
+            Err(_) => return ByteRange::Ignore,
+        }
+    };
+    if end < start {
+        return ByteRange::Unsatisfiable;
+    }
+    ByteRange::Range { start, end }
 }
 
 /// Builds the file response by hash (content + header hardening),
 /// independently of the access gate (auth for `serve_file`, membership in a
 /// public page for `public_file`). 404 if hash is unknown.
-async fn file_response(app: &AppState, hash: &str) -> Response {
+async fn file_response(app: &AppState, hash: &str, range: Option<&HeaderValue>) -> Response {
     match app.files.get(hash).await {
         Ok(Some(bytes)) => {
             let mime = crate::store::file_mime(&app.db, hash)
@@ -1414,8 +1518,36 @@ async fn file_response(app: &AppState, hash: &str) -> Response {
                 .ok()
                 .flatten()
                 .unwrap_or_else(|| "application/octet-stream".into());
-            let is_image = mime.starts_with("image/");
-            let mut resp = bytes.into_response();
+            // Media is displayed/played in place; anything else is downloaded.
+            let inline = mime.starts_with("image/")
+                || mime.starts_with("video/")
+                || mime.starts_with("audio/");
+            let len = bytes.len() as u64;
+            let asked = range
+                .and_then(|v| v.to_str().ok())
+                .map(|h| parse_byte_range(h, len))
+                .unwrap_or(ByteRange::Ignore);
+
+            let mut resp = match asked {
+                ByteRange::Range { start, end } => {
+                    let slice = bytes[start as usize..=end as usize].to_vec();
+                    let mut r = slice.into_response();
+                    *r.status_mut() = StatusCode::PARTIAL_CONTENT;
+                    if let Ok(v) = HeaderValue::from_str(&format!("bytes {start}-{end}/{len}")) {
+                        r.headers_mut().insert(header::CONTENT_RANGE, v);
+                    }
+                    r
+                }
+                ByteRange::Unsatisfiable => {
+                    let mut r = StatusCode::RANGE_NOT_SATISFIABLE.into_response();
+                    if let Ok(v) = HeaderValue::from_str(&format!("bytes */{len}")) {
+                        r.headers_mut().insert(header::CONTENT_RANGE, v);
+                    }
+                    r
+                }
+                ByteRange::Ignore => bytes.into_response(),
+            };
+
             let h = resp.headers_mut();
             h.insert(
                 header::CONTENT_TYPE,
@@ -1431,8 +1563,10 @@ async fn file_response(app: &AppState, hash: &str) -> Response {
             );
             h.insert(
                 header::CONTENT_DISPOSITION,
-                HeaderValue::from_static(if is_image { "inline" } else { "attachment" }),
+                HeaderValue::from_static(if inline { "inline" } else { "attachment" }),
             );
+            // Seeking in a <video> requires range support to be advertised.
+            h.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
             h.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=31536000"));
             resp
         }
@@ -1457,6 +1591,7 @@ async fn public_item_meta(app: &AppState, item_id: &ItemId) -> Result<Value> {
         "title": meta.title,
         "icon": meta.icon,
         "cover": meta.cover,
+        "cover_pos": meta.cover_pos,
     }))
 }
 
@@ -1531,6 +1666,7 @@ pub async fn public_page_doc(
 pub async fn public_file(
     State(app): State<AppState>,
     Path((token, hash)): Path<(String, String)>,
+    headers: HeaderMap,
 ) -> Response {
     let pub_id = match crate::store::publication_by_token(&app.db, &token).await {
         Ok(Some(p)) => p,
@@ -1538,7 +1674,7 @@ pub async fn public_file(
         Err(e) => return e.into_response(),
     };
     match crate::store::file_in_publication(&app.db, &pub_id, &hash).await {
-        Ok(true) => file_response(&app, &hash).await,
+        Ok(true) => file_response(&app, &hash, headers.get(header::RANGE)).await,
         Ok(false) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => e.into_response(),
     }
@@ -1871,4 +2007,52 @@ fn parse_item_id(id: &str) -> Result<ItemId> {
     Uuid::parse_str(id)
         .map(ItemId)
         .map_err(|e| Error::BadId(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ByteRange, parse_byte_range};
+
+    #[test]
+    fn parses_the_range_forms_a_video_player_sends() {
+        // Initial probe of a <video>: first bytes.
+        assert_eq!(parse_byte_range("bytes=0-1023", 5000), ByteRange::Range { start: 0, end: 1023 });
+        // Seek: from an offset to the end.
+        assert_eq!(parse_byte_range("bytes=2048-", 5000), ByteRange::Range { start: 2048, end: 4999 });
+        // Suffix (MP4 moov atom at the end of the file).
+        assert_eq!(parse_byte_range("bytes=-500", 5000), ByteRange::Range { start: 4500, end: 4999 });
+        // A suffix bigger than the file yields the whole file.
+        assert_eq!(parse_byte_range("bytes=-9000", 5000), ByteRange::Range { start: 0, end: 4999 });
+        // An end past the file is clamped to the last byte.
+        assert_eq!(parse_byte_range("bytes=4900-9999", 5000), ByteRange::Range { start: 4900, end: 4999 });
+        // Whitespace tolerated.
+        assert_eq!(parse_byte_range(" bytes=0-9 ", 5000), ByteRange::Range { start: 0, end: 9 });
+    }
+
+    #[test]
+    fn refuses_a_range_outside_the_file() {
+        assert_eq!(parse_byte_range("bytes=5000-", 5000), ByteRange::Unsatisfiable);
+        assert_eq!(parse_byte_range("bytes=6000-7000", 5000), ByteRange::Unsatisfiable);
+        assert_eq!(parse_byte_range("bytes=100-50", 5000), ByteRange::Unsatisfiable);
+        assert_eq!(parse_byte_range("bytes=-0", 5000), ByteRange::Unsatisfiable);
+        // Empty file: nothing can be satisfied.
+        assert_eq!(parse_byte_range("bytes=0-10", 0), ByteRange::Unsatisfiable);
+    }
+
+    #[test]
+    fn falls_back_to_the_whole_file_when_unsupported() {
+        // Unimplemented multi-range, other units, syntax noise: whole file
+        // (a 200 answer is always allowed in reply to a Range).
+        for h in [
+            "bytes=0-99,200-299",
+            "items=0-99",
+            "bytes=abc-def",
+            "bytes=0-xyz",
+            "bytes=",
+            "nonsense",
+            "",
+        ] {
+            assert_eq!(parse_byte_range(h, 5000), ByteRange::Ignore, "{h}");
+        }
+    }
 }

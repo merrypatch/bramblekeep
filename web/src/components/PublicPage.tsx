@@ -17,7 +17,10 @@ import {
   type PublicItemMeta,
   type PublicNavItem,
 } from "@/lib/api";
+import { ItemIcon } from "@/components/ItemIcon";
+import { coverObjectPosition, parseCoverPos } from "@/lib/coverPosition";
 import { publicSchema } from "@/lib/publicSchema";
+import { localFileHash } from "@/lib/remoteMedia";
 import { PageSkeleton } from "@/components/ui/skeletons";
 import { FRAGMENT } from "@/lib/sync";
 import { useIsDark } from "@/lib/theme";
@@ -60,8 +63,23 @@ function Breadcrumb({
     <nav className="mb-4 flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
       {trail.map((p, i) => {
         const last = i === trail.length - 1;
-        const label = `${p.icon ? `${p.icon} ` : ""}${p.title || "Sans titre"}`;
+        const title = p.title || "Sans titre";
         const href = i === 0 ? `/public/${token}` : `/public/${token}/${p.id}`;
+        // ItemIcon (not the raw string): an icon can be an emoji, a Lucide name
+        // or an image — files resolved through the publication token.
+        const label = (
+          <span className="flex items-center gap-1">
+            {p.icon && (
+              <ItemIcon
+                icon={p.icon}
+                size={14}
+                className="shrink-0"
+                resolveFile={(hash) => publicFileUrl(token, hash)}
+              />
+            )}
+            {title}
+          </span>
+        );
         return (
           <span key={p.id} className="flex items-center gap-1">
             {i > 0 && <ChevronRight className="size-3.5 shrink-0" />}
@@ -117,8 +135,15 @@ function PublicRender({
         user: { name: "", color: "#888888" },
         provider: { awareness },
       },
+      // Content images point at `/api/files/{hash}` (authenticated). Here there
+      // is no session: they are rewritten to the token-based route, which only
+      // serves files actually attached to the published set.
+      resolveFileUrl: async (url) => {
+        const hash = localFileHash(url);
+        return hash ? publicFileUrl(token, hash) : url;
+      },
     },
-    [doc],
+    [doc, token],
   );
 
   return (
@@ -129,10 +154,18 @@ function PublicRender({
           src={publicFileUrl(token, meta.cover)}
           alt=""
           className="mb-6 h-48 w-full rounded-lg object-cover"
+          // Same framing as in the app (items.cover_pos).
+          style={{ objectPosition: coverObjectPosition(parseCoverPos(meta.cover_pos)) }}
         />
       )}
       <h1 className="mb-6 flex items-center gap-2 text-3xl font-bold tracking-tight">
-        {meta.icon && <span>{meta.icon}</span>}
+        {meta.icon && (
+          <ItemIcon
+            icon={meta.icon}
+            size={32}
+            resolveFile={(hash) => publicFileUrl(token, hash)}
+          />
+        )}
         <span>{meta.title || "Sans titre"}</span>
       </h1>
       <BlockNoteView

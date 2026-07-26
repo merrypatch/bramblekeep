@@ -3,6 +3,7 @@
 
 import { type BlockNode, getBlocks, getItem, listRows } from "@/lib/api";
 import { type DbColumn, META_TYPES, parseDateValue, parseProps, parseSchema, type PropValues } from "@/lib/db";
+import { countTasks, type TaskTreeNode, taskPercent } from "@/lib/taskProgress";
 import i18n from "@/i18n";
 
 /** Triggers the download of a text file in the browser. */
@@ -43,6 +44,17 @@ function blocksToMarkdown(blocks: BlockNode[]): string {
   }
   for (const list of byParent.values()) list.sort((a, b) => a.seq - b.seq);
 
+  // Nested view of the same blocks, for the `taskProgress` count (which needs
+  // siblings + descendants, not the flat projection).
+  const toTree = (parent: string | null): TaskTreeNode[] =>
+    (byParent.get(parent) ?? []).map((b) => ({
+      id: b.id,
+      type: b.type,
+      props: b.props,
+      children: toTree(b.id),
+    }));
+  const tree = toTree(null);
+
   const lines: string[] = [];
   const walk = (parent: string | null, depth: number) => {
     for (const b of byParent.get(parent) ?? []) {
@@ -73,6 +85,19 @@ function blocksToMarkdown(blocks: BlockNode[]): string {
         case "dbview":
           lines.push(`${indent}- ${t || i18n.t("common.subItem")}`);
           break;
+        case "embed": {
+          // The projection keeps the media/embed `url`: export the source link
+          // rather than losing the block silently.
+          const url = (b.props as { url?: unknown })?.url;
+          if (typeof url === "string" && url) lines.push(`${indent}${url}`);
+          break;
+        }
+        case "taskProgress": {
+          const scope = (b.props as { scope?: unknown })?.scope === "page" ? "page" : "next";
+          const c = countTasks(tree, b.id, scope);
+          lines.push(`${indent}**${taskPercent(c)}% — ${c.done}/${c.total}**`);
+          break;
+        }
         default:
           if (t) lines.push(`${indent}${t}`);
       }

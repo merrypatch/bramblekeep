@@ -40,11 +40,17 @@ use mail::Mailer;
 use ratelimit::RateLimiter;
 use sync::SyncHub;
 
-/// Max upload size (covers, images). Generous but bounded.
-const MAX_UPLOAD: usize = 25 * 1024 * 1024;
+/// Max upload size (covers, images, short videos). Generous but bounded: the
+/// upload handler and `LocalStore` handle whole buffers, so this size is also
+/// the RAM cost of one upload in flight.
+const MAX_UPLOAD: usize = 50 * 1024 * 1024;
 
 /// Login rate-limit window (cf. `ratelimit`): 10 minutes.
 const LOGIN_RL_WINDOW_MS: i64 = 10 * 60 * 1000;
+
+/// Remote image mirroring window: 60 imports / 5 minutes / user. Generous for a
+/// page being filled in, bounded enough not to turn the server into a proxy.
+const FETCH_RL_WINDOW_MS: i64 = 5 * 60 * 1000;
 
 /// Shared application state, cloned into each handler.
 #[derive(Clone)]
@@ -58,6 +64,9 @@ pub struct AppState {
     pub login_rl_ip: RateLimiter,
     /// Login link request limiter, by target email (anti-bombardment).
     pub login_rl_email: RateLimiter,
+    /// Remote image mirroring limiter, by user: the only route that makes the
+    /// server fetch a user-supplied URL.
+    pub fetch_rl: RateLimiter,
 }
 
 impl AppState {
@@ -78,6 +87,7 @@ impl AppState {
             cookie_secure,
             login_rl_ip: RateLimiter::new(LOGIN_RL_WINDOW_MS, 20),
             login_rl_email: RateLimiter::new(LOGIN_RL_WINDOW_MS, 5),
+            fetch_rl: RateLimiter::new(FETCH_RL_WINDOW_MS, 60),
         }
     }
 }
@@ -85,12 +95,20 @@ impl AppState {
 /// Content Security Policy (CSP) applied to the entire HTTP surface.
 /// Built Vite front-end: only external scripts (`script-src 'self'`),
 /// inline styles injected by BlockNote/Mantine (`style-src 'unsafe-inline'`),
-/// images via `/api/files` + `data:`/`blob:`, sync WebSocket same origin
-/// (`connect-src 'self'`), PWA service worker (`worker-src 'self'`). No inline
-/// script in the front-end (cf. spec §7). Served files receive a stricter CSP,
-/// set by `serve_file` and not overridden here.
+/// images and media via `/api/files` + `data:`/`blob:`, sync WebSocket same
+/// origin (`connect-src 'self'`), PWA service worker (`worker-src 'self'`). No
+/// inline script in the front-end (cf. spec §7). Served files receive a stricter
+/// CSP, set by `serve_file` and not overridden here.
+///
+/// `frame-src` is the ONLY opening towards third parties: the two video
+/// platforms of the `embed` block, whose player URL the front-end rebuilds from
+/// a validated id (`web/src/lib/embed.ts`). Nothing else can be framed, and no
+/// other directive accepts a remote host — images and videos supplied by URL are
+/// mirrored server-side instead (`files::remote`).
 const CSP: &str = "default-src 'self'; base-uri 'self'; object-src 'none'; \
     frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; \
+    media-src 'self' data: blob:; \
+    frame-src https://www.youtube-nocookie.com https://player.vimeo.com; \
     style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; \
     font-src 'self' data:; worker-src 'self'";
 
@@ -236,6 +254,9 @@ pub fn build_app(state: AppState) -> Router {
             "/api/v1/files",
             post(routes::upload_file).layer(DefaultBodyLimit::max(MAX_UPLOAD)),
         )
+        // Mirror of a remote image: the server downloads it, the content then
+        // references the local hash (CSP stays closed to third-party hosts).
+        .route("/api/v1/files/from-url", post(routes::file_from_url))
         .route("/api/files/{hash}", get(routes::serve_file))
         .layer(middleware::from_fn_with_state(
             state.clone(),

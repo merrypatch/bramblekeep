@@ -1,10 +1,21 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ImageSourcePicker } from "@/components/ImageSourcePicker";
 import { ItemIcon } from "@/components/ItemIcon";
 import { Button } from "@/components/ui/button";
 import { PickerSkeleton } from "@/components/ui/skeletons";
-import { fileUrl, uploadFile, type ItemMeta, type MetaPatch } from "@/lib/api";
+import { fileUrl, type ItemMeta, type MetaPatch, type StoredFile } from "@/lib/api";
+import {
+  type CoverPos,
+  coverObjectPosition,
+  coverSlack,
+  dragCoverPos,
+  formatCoverPos,
+  nudgeCoverPos,
+  parseCoverPos,
+  type Size,
+} from "@/lib/coverPosition";
 import { cn } from "@/lib/utils";
 
 // Loaded on demand: bundles the emoji catalog + Lucide icons (heavy),
@@ -24,13 +35,22 @@ export function PageHeader({
   readOnly?: boolean;
 }) {
   const { t } = useTranslation();
-  const fileInput = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [title, setTitle] = useState(meta?.title ?? "");
   // Mobile: cover actions (change/remove) have no hover.
   // A tap on the cover shows them; a tap elsewhere hides them.
   const [coverActions, setCoverActions] = useState(false);
   const coverRef = useRef<HTMLDivElement>(null);
+  const coverImg = useRef<HTMLImageElement>(null);
+  // Cover framing: `repositioning` = drag mode (explicit, like the "Reposition"
+  // of the reference tools), `pos` = live framing shown while dragging.
+  const [repositioning, setRepositioning] = useState(false);
+  const [pos, setPos] = useState<CoverPos>(() => parseCoverPos(meta?.cover_pos));
+  // Drag origin: pointer + framing at pointerdown (deltas are relative to it).
+  const drag = useRef<{ px: number; py: number; from: CoverPos } | null>(null);
+  // "Where from?" panel for the cover (computer / URL): a single entry point,
+  // then the source question — same panel as the icon picker.
+  const [coverSourceOpen, setCoverSourceOpen] = useState(false);
 
   // Reset the local title only when switching pages (not on every meta
   // update, otherwise typing would be overwritten by the PATCH response).
@@ -38,7 +58,30 @@ export function PageHeader({
     setTitle(meta?.title ?? "");
     setPickerOpen(false);
     setCoverActions(false);
+    setCoverSourceOpen(false);
   }, [meta?.id]);
+
+  // Framing realigned on the stored value: page switch, save, change of image,
+  // or edit by a collaborator.
+  useEffect(() => {
+    setPos(parseCoverPos(meta?.cover_pos));
+    setRepositioning(false);
+    drag.current = null;
+  }, [meta?.id, meta?.cover, meta?.cover_pos]);
+
+  // Click outside the source panel → closes it (like the icon picker). The
+  // action bar is excluded: its "Change" button toggles the panel itself.
+  useEffect(() => {
+    if (!coverSourceOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const el = e.target as HTMLElement;
+      if (!el.closest("[data-cover-source]") && !el.closest("[data-cover-actions]")) {
+        setCoverSourceOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [coverSourceOpen]);
 
   // Tap outside the cover → hides the actions (mobile).
   useEffect(() => {
@@ -52,16 +95,38 @@ export function PageHeader({
 
   if (!meta) return null;
 
-  async function onCoverPicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    const hash = await uploadFile(file);
-    await onChange({ cover: hash });
+  /** Applies a stored file as the cover. `ImageSourcePicker` has already checked
+   * that it is an image. A new image RESETS the framing: the old focal point
+   * means nothing on another picture. */
+  async function applyCover(stored: StoredFile) {
+    setCoverSourceOpen(false);
+    await onChange({ cover: stored.hash, cover_pos: "" });
   }
 
   function commitTitle() {
     if (title !== (meta?.title ?? "")) void onChange({ title });
+  }
+
+  /** Pannable overflow of the current image in its box, in px per axis.
+   * Recomputed at each move: the box depends on the viewport. */
+  function slackNow(): Size {
+    const img = coverImg.current;
+    const box = coverRef.current;
+    if (!img || !box) return { w: 0, h: 0 };
+    const r = box.getBoundingClientRect();
+    return coverSlack({ w: img.naturalWidth, h: img.naturalHeight }, { w: r.width, h: r.height });
+  }
+
+  function saveFraming() {
+    setRepositioning(false);
+    drag.current = null;
+    void onChange({ cover_pos: formatCoverPos(pos) });
+  }
+
+  function cancelFraming() {
+    setRepositioning(false);
+    drag.current = null;
+    setPos(parseCoverPos(meta?.cover_pos));
   }
 
   return (
@@ -69,23 +134,124 @@ export function PageHeader({
       {meta.cover && (
         <div
           ref={coverRef}
-          className="bk-page-cover group relative h-40 w-full sm:h-56 print:!h-48"
-          onClick={() => setCoverActions(true)}
+          className={cn(
+            "bk-page-cover group relative h-40 w-full overflow-hidden sm:h-56 print:!h-48",
+            // touch-none: the drag must pan the image, not scroll the page.
+            repositioning && "cursor-grab touch-none select-none active:cursor-grabbing",
+          )}
+          onClick={() => {
+            if (!repositioning) setCoverActions(true);
+          }}
+          tabIndex={repositioning ? 0 : undefined}
+          aria-label={repositioning ? t("page.coverRepositionHint") : undefined}
+          onPointerDown={(e) => {
+            if (!repositioning) return;
+            // A press on the action bar must stay a click: capturing the pointer
+            // here would redirect pointerup (and the click) to the container.
+            if ((e.target as HTMLElement).closest("[data-cover-actions]")) return;
+            e.preventDefault(); // no native image drag / text selection
+            e.currentTarget.setPointerCapture(e.pointerId);
+            drag.current = { px: e.clientX, py: e.clientY, from: pos };
+          }}
+          onPointerMove={(e) => {
+            const d = drag.current;
+            if (!d) return;
+            setPos(dragCoverPos(d.from, e.clientX - d.px, e.clientY - d.py, slackNow()));
+          }}
+          onPointerUp={() => {
+            drag.current = null;
+          }}
+          onPointerCancel={() => {
+            drag.current = null;
+          }}
+          onKeyDown={(e) => {
+            if (!repositioning) return;
+            const step = e.shiftKey ? 10 : 2;
+            const by: Record<string, [number, number]> = {
+              ArrowLeft: [-step, 0],
+              ArrowRight: [step, 0],
+              ArrowUp: [0, -step],
+              ArrowDown: [0, step],
+            };
+            const delta = by[e.key];
+            if (delta) {
+              e.preventDefault();
+              setPos((p) => nudgeCoverPos(p, delta[0], delta[1]));
+            } else if (e.key === "Enter") {
+              saveFraming();
+            } else if (e.key === "Escape") {
+              cancelFraming();
+            }
+          }}
         >
-          <img src={fileUrl(meta.cover)} alt="" className="h-full w-full object-cover" />
+          <img
+            ref={coverImg}
+            src={fileUrl(meta.cover)}
+            alt=""
+            draggable={false}
+            // object-cover + object-position in %: the image always fills the box,
+            // the % only splits the overflow — no empty edge, whatever the value.
+            className="pointer-events-none h-full w-full object-cover"
+            style={{ objectPosition: coverObjectPosition(pos) }}
+          />
           {!readOnly && (
             <div
+              data-cover-actions=""
               className={cn(
                 "absolute top-2 right-2 gap-1 sm:group-hover:flex",
-                coverActions ? "flex" : "hidden",
+                coverActions || repositioning ? "flex" : "hidden",
               )}
             >
-              <Button size="sm" variant="secondary" onClick={() => fileInput.current?.click()}>
-                {t("page.coverChange")}
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => void onChange({ cover: "" })}>
-                {t("page.coverRemove")}
-              </Button>
+              {repositioning ? (
+                <>
+                  <Button size="sm" onClick={saveFraming}>
+                    {t("page.coverPosSave")}
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={cancelFraming}>
+                    {t("common.cancel")}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setRepositioning(true);
+                      // Focus for the arrow keys (drag stays the main gesture).
+                      coverRef.current?.focus();
+                    }}
+                  >
+                    {t("page.coverReposition")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setCoverSourceOpen((o) => !o)}
+                  >
+                    {t("page.coverChange")}
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => void onChange({ cover: "" })}>
+                    {t("page.coverRemove")}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+          {!readOnly && coverSourceOpen && !repositioning && (
+            <div
+              data-cover-actions=""
+              data-cover-source=""
+              className="absolute inset-x-2 top-12 mx-auto max-w-md rounded-md border bg-background/95 p-3 shadow-lg backdrop-blur"
+            >
+              <ImageSourcePicker onPicked={applyCover} />
+            </div>
+          )}
+          {repositioning && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center">
+              <span className="rounded-full bg-background/90 px-3 py-1 text-xs text-foreground shadow-sm backdrop-blur">
+                {t("page.coverRepositionHint")}
+              </span>
             </div>
           )}
         </div>
@@ -148,11 +314,19 @@ export function PageHeader({
             {!meta.cover && (
               <button
                 className="rounded px-2 py-1 hover:bg-accent"
-                onClick={() => fileInput.current?.click()}
+                onClick={() => setCoverSourceOpen((o) => !o)}
               >
                 🖼️ {t("page.addCover")}
               </button>
             )}
+          </div>
+        )}
+
+        {/* No cover yet: the source panel sits under the quick actions (there is
+            no image to overlay). */}
+        {!readOnly && !meta.cover && coverSourceOpen && (
+          <div data-cover-source="" className="max-w-md rounded-md border p-3">
+            <ImageSourcePicker onPicked={applyCover} autoFocusUrl />
           </div>
         )}
 
@@ -172,13 +346,6 @@ export function PageHeader({
         />
       </div>
 
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => void onCoverPicked(e)}
-      />
     </div>
   );
 }

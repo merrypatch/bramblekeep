@@ -14,6 +14,8 @@ use tokio::fs;
 
 use crate::error::{Error, Result};
 
+pub mod remote;
+
 fn io(e: std::io::Error) -> Error {
     Error::Io(e.to_string())
 }

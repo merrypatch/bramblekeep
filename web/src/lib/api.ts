@@ -194,6 +194,8 @@ export type ItemMeta = {
   title: string | null;
   icon: string | null;
   cover: string | null;
+  /** Cover framing "<x>,<y>" in percent (null = centered). */
+  cover_pos: string | null;
   owner_id: string | null;
   parent_item_id: string | null;
   /** Schema JSON if the item is a database, otherwise null. */
@@ -623,7 +625,7 @@ export async function ancestors(id: string): Promise<Crumb[]> {
   return ((await res.json()) as { ancestors: Crumb[] }).ancestors;
 }
 
-export type MetaPatch = Partial<Pick<ItemMeta, "title" | "icon" | "cover">>;
+export type MetaPatch = Partial<Pick<ItemMeta, "title" | "icon" | "cover" | "cover_pos">>;
 
 export async function patchItem(id: string, patch: MetaPatch): Promise<ItemMeta> {
   const res = await fetch(`/api/v1/items/${id}`, {
@@ -673,12 +675,30 @@ export async function purgeItem(id: string): Promise<void> {
   if (!res.ok) throw await toApiError(res);
 }
 
-export async function uploadFile(file: File): Promise<string> {
+/** A stored file: hash (the reference put in the content) + MIME sniffed from
+ * the CONTENT by the server. The MIME lets the caller refuse a file that does
+ * not fit the slot (an icon or a cover must be an image). */
+export type StoredFile = { hash: string; mime: string | null };
+
+export async function uploadFile(file: File): Promise<StoredFile> {
   const fd = new FormData();
   fd.append("file", file);
   const res = await fetch("/api/v1/files", { method: "POST", body: fd });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return ((await res.json()) as { hash: string }).hash;
+  return (await res.json()) as StoredFile;
+}
+
+/** Mirrors a remote image into the store: the server downloads it once and
+ * returns its hash. The content then references the LOCAL file — the CSP stays
+ * closed to third-party hosts and no reader's IP leaks at render time. */
+export async function mirrorFileFromUrl(url: string): Promise<StoredFile> {
+  const res = await fetch("/api/v1/files/from-url", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as StoredFile;
 }
 
 /** Serving URL of a content-addressed file. */
@@ -693,6 +713,8 @@ export type PublicItemMeta = {
   title: string | null;
   icon: string | null;
   cover: string | null;
+  /** Cover framing "<x>,<y>" in percent (null = centered). */
+  cover_pos: string | null;
 };
 export type PublicNavItem = {
   id: string;

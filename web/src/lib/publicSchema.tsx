@@ -2,6 +2,9 @@ import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
 import { createReactBlockSpec } from "@blocknote/react";
 import { FileText, Table2 } from "lucide-react";
 
+import { EmbedBlock } from "@/components/EmbedBlock";
+import { TaskProgressBlock } from "@/components/TaskProgress";
+
 /** PUBLIC RENDER schema: default blocks + neutralized variants of `page`
  * and `dbview`. The Yjs doc may contain these custom blocks; the schema must
  * therefore declare the same `type`/`propSchema`, but their render is passive
@@ -56,10 +59,37 @@ const PublicDbViewBlockSpec = createReactBlockSpec(
   },
 );
 
+/** Task progress: same count as in the editor (the checkboxes are public too),
+ * but no scope switching (read-only). */
+const PublicTaskProgressBlockSpec = createReactBlockSpec(
+  {
+    type: "taskProgress",
+    propSchema: { scope: { default: "next", values: ["next", "page"] as const } },
+    content: "none",
+  },
+  {
+    render: (props) => (
+      <TaskProgressBlock
+        editor={props.editor}
+        blockId={props.block.id}
+        scope={props.block.props.scope}
+      />
+    ),
+  },
+);
+
+/** Embed: same sandboxed player, no URL form (read-only). */
+const PublicEmbedBlockSpec = createReactBlockSpec(
+  { type: "embed", propSchema: { url: { default: "" } }, content: "none" },
+  { render: (props) => <EmbedBlock url={props.block.props.url} /> },
+);
+
 export const publicSchema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
     page: PublicPageBlockSpec(),
     dbview: PublicDbViewBlockSpec(),
+    taskProgress: PublicTaskProgressBlockSpec(),
+    embed: PublicEmbedBlockSpec(),
   },
 });

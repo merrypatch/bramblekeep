@@ -80,6 +80,10 @@ pub struct ItemMeta {
     pub title: Option<String>,
     pub icon: Option<String>,
     pub cover: Option<String>,
+    /// Cover framing "<x>,<y>" in percent (migration 0025). NULL = centered.
+    /// `#[sqlx(default)]`: not selected by the queries that don't display a cover.
+    #[sqlx(default)]
+    pub cover_pos: Option<String>,
     pub owner_id: Option<String>,
     pub parent_item_id: Option<String>,
     /// Schema JSON if the item is a database (typed columns), otherwise NULL.
@@ -247,7 +251,7 @@ pub async fn descendant_ids(db: &Db, item_id: &ItemId) -> Result<Vec<String>> {
 /// Page metadata.
 pub async fn get_item_meta(db: &Db, item_id: &ItemId) -> Result<Option<ItemMeta>> {
     let meta = sqlx::query_as::<_, ItemMeta>(
-        "SELECT id, title, icon, cover, owner_id, parent_item_id, db_schema, properties, deleted_ts FROM items WHERE id = ? AND workspace_id = ?",
+        "SELECT id, title, icon, cover, cover_pos, owner_id, parent_item_id, db_schema, properties, deleted_ts FROM items WHERE id = ? AND workspace_id = ?",
     )
     .bind(item_id.to_string())
     .bind(DEFAULT_WORKSPACE)
@@ -1273,6 +1277,8 @@ pub struct ItemMetaPatch {
     pub title: Option<String>,
     pub icon: Option<String>,
     pub cover: Option<String>,
+    /// Cover framing "<x>,<y>" in percent; `""` → back to centered.
+    pub cover_pos: Option<String>,
     pub db_schema: Option<String>,
     pub properties: Option<String>,
 }
@@ -1288,6 +1294,7 @@ pub async fn update_item_meta(
            title      = COALESCE(?, title), \
            icon       = COALESCE(?, icon), \
            cover      = COALESCE(?, cover), \
+           cover_pos  = COALESCE(?, cover_pos), \
            db_schema  = COALESCE(?, db_schema), \
            properties = COALESCE(?, properties), \
            updated_ts = ?, \
@@ -1297,6 +1304,7 @@ pub async fn update_item_meta(
     .bind(patch.title)
     .bind(patch.icon)
     .bind(patch.cover)
+    .bind(patch.cover_pos)
     .bind(patch.db_schema)
     .bind(patch.properties)
     .bind(now_ms())
@@ -2106,19 +2114,39 @@ pub async fn publication_for_item(db: &Db, item_id: &ItemId) -> Result<Option<Pu
 
 /// Is the file exposed by the publication? Base of public file access:
 /// without a login, we only serve a file if it is actually attached to a
-/// page in the set (no enumeration of all storage). Attachment = cover
-/// of an item in the set (`items.cover`) — the only page file usage today;
-/// to be extended to content images when the editor wires them (the Yjs doc
-/// carries them, the current projection does not).
+/// page in the set (no enumeration of all storage). Three kinds of attachment:
+///   * the cover of an item in the set (`items.cover`);
+///   * its icon, when it is a custom image (`items.icon` = `file:sha256:…`,
+///     encoding in `web/src/lib/icon.ts`);
+///   * a file referenced by a BLOCK of an item in the set — the projection keeps
+///     the `url` of media blocks (cf. `projection::block_props`), so an image
+///     inserted in the content of a published page is served.
+///
+/// The hash is matched inside `blocks.props` (JSON): the `sha256:<hex>` form is
+/// specific enough, and a non-hexadecimal hash is refused up front — no LIKE
+/// wildcard can come from the caller.
 pub async fn file_in_publication(db: &Db, publication_id: &str, hash: &str) -> Result<bool> {
+    let hex = hash.strip_prefix("sha256:").unwrap_or(hash);
+    if hex.is_empty() || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Ok(false);
+    }
+    let needle = format!("%sha256:{hex}%");
+    let icon = format!("file:sha256:{hex}");
     let ok: bool = sqlx::query_scalar(
         "SELECT EXISTS( \
              SELECT 1 FROM public_page_items p \
              JOIN items it ON it.id = p.item_id \
-             WHERE p.publication_id = ? AND it.cover = ?)",
+             WHERE p.publication_id = ? AND (it.cover = ? OR it.icon = ?)) \
+         OR EXISTS( \
+             SELECT 1 FROM public_page_items p \
+             JOIN blocks b ON b.item_id = p.item_id \
+             WHERE p.publication_id = ? AND b.props LIKE ?)",
     )
     .bind(publication_id)
     .bind(hash)
+    .bind(icon)
+    .bind(publication_id)
+    .bind(needle)
     .fetch_one(db)
     .await?;
     Ok(ok)

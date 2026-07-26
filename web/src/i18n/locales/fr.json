@@ -68,7 +68,8 @@
     "icons": "Icônes",
     "remove": "Retirer",
     "searchPlaceholder": "Rechercher une icône…",
-    "noIcons": "Aucune icône."
+    "noIcons": "Aucune icône.",
+    "image": "Image"
   },
   "pageLinkDialog": {
     "titleDb": "Lier une base existante",
@@ -926,9 +927,36 @@
       "linkDb": {
         "title": "Lier une base existante",
         "subtext": "Insère en ligne une base déjà créée"
+      },
+      "taskProgress": {
+        "title": "Avancement des tâches",
+        "subtext": "Pourcentage de complétion de la liste de cases ci-dessous"
+      },
+      "embed": {
+        "title": "Vidéo intégrée (YouTube / Vimeo)",
+        "subtext": "Lecteur d'une vidéo hébergée par une plateforme"
       }
     },
-    "newPage": "Nouvelle page"
+    "taskProgress": {
+      "aria": "Avancement des tâches : {{done}} sur {{total}} faites",
+      "empty": "Ajoutez des cases à cocher sous ce bloc pour suivre l'avancement.",
+      "scope": {
+        "next": "liste ci-dessous",
+        "page": "toute la page",
+        "switch": "Basculer entre la liste ci-dessous et toute la page"
+      }
+    },
+    "toast": {
+      "mirrorFailed": "Impossible d'importer ce média. Vérifiez l'URL et le format (image, vidéo ou audio), ou envoyez le fichier depuis votre ordinateur."
+    },
+    "newPage": "Nouvelle page",
+    "embed": {
+      "placeholder": "Collez un lien YouTube ou Vimeo",
+      "action": "Intégrer",
+      "hint": "YouTube et Vimeo uniquement. La vidéo reste chez la plateforme : les lecteurs chargent son player.",
+      "invalid": "Lien non reconnu. Attendu : une vidéo YouTube ou Vimeo. Pour un FICHIER vidéo (.mp4, .webm), utilisez plutôt le bloc vidéo.",
+      "frameTitle": "Lecteur vidéo intégré"
+    }
   },
   "history": {
     "title": "Historique",
@@ -1089,6 +1117,9 @@
     "noAccess": "Vous n'avez pas accès à cette page",
     "coverChange": "Changer",
     "coverRemove": "Retirer",
+    "coverReposition": "Repositionner",
+    "coverPosSave": "Enregistrer la position",
+    "coverRepositionHint": "Faites glisser l'image pour la repositionner (flèches pour ajuster)",
     "addIcon": "Ajouter une icône",
     "addCover": "Ajouter une couverture",
     "networkTitle": "Connexion au serveur impossible",
@@ -1154,5 +1185,15 @@
   },
   "backlinks": {
     "title": "Références liées ({{count}})"
+  },
+  "imageSource": {
+    "upload": "Envoyer depuis mon ordinateur",
+    "or": "ou",
+    "urlPlaceholder": "URL de l'image",
+    "use": "Utiliser",
+    "importing": "Import en cours…",
+    "notImage": "Ce fichier n'est pas une image.",
+    "failed": "Import impossible. Vérifiez le fichier ou l'URL.",
+    "hint": "L'image est stockée sur votre serveur (importée une fois), jamais chargée depuis le site source."
   }
 }
