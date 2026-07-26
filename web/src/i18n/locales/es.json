@@ -319,6 +319,7 @@
         "radial": "Radial"
       },
       "bucket": {
+        "hour": "Por hora",
         "day": "Por día",
         "week": "Por semana",
         "month": "Por mes"

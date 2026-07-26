@@ -50,10 +50,15 @@ export function ChartView({
   kind,
   stacked,
   result,
+  zeroBased = true,
 }: {
   kind: ChartKind;
   stacked: boolean;
   result: ChartResult;
+  /** Anchor the value axis at 0. True for counts and sums, false for an
+   * average / min / max of a measured value, whose variation would otherwise be
+   * squashed against the top of a 0-based axis. */
+  zeroBased?: boolean;
 }) {
   const { t } = useTranslation();
   const { labels, datasets, single } = result;
@@ -141,8 +146,10 @@ export function ChartView({
       plugins: { legend: { display: !single, position: "top" as const, labels: { color: NEUTRAL } } },
       scales: {
         r: {
-          beginAtZero: true,
-          min: 0,
+          // Same reasoning as the cartesian y axis. Kept forced to 0 for the
+          // radial chart below, where the value IS an area from the centre.
+          beginAtZero: zeroBased,
+          ...(zeroBased ? { min: 0 } : {}),
           angleLines: { color: GRID },
           grid: { color: GRID },
           pointLabels: { color: NEUTRAL, font: { size: 11 } },
@@ -179,7 +186,7 @@ export function ChartView({
     plugins: { legend: { display: !single, position: "top" as const, labels: { color: NEUTRAL } } },
     scales: {
       x: { stacked, ticks: { color: NEUTRAL }, grid: { color: GRID } },
-      y: { stacked, beginAtZero: true, ticks: { color: NEUTRAL }, grid: { color: GRID } },
+      y: { stacked, beginAtZero: zeroBased, ticks: { color: NEUTRAL }, grid: { color: GRID } },
     },
   };
 

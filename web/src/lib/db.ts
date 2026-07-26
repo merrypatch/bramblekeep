@@ -131,8 +131,10 @@ export type ChartAgg = "count" | "sum" | "avg" | "min" | "max";
  * `burndown` = special case: total of ALL rows − cumulative sum of "done"
  * rows (see `chartDoneCol`), a single descending curve. */
 export type ChartTransform = "none" | "cumulative" | "remaining" | "burndown";
-/** Temporal grouping of the X axis when the grouping column is a date. */
-export type ChartBucket = "day" | "week" | "month";
+/** Temporal grouping of the X axis when the grouping column is a date.
+ * `hour` keeps several readings of the SAME day apart (a temperature taken at
+ * 01:50 and at 23:00 are two points, not one average). */
+export type ChartBucket = "hour" | "day" | "week" | "month";
 /** Operators available on a filter condition. The applicable subset depends
  * on the column type — see `operatorsForType` in `filter.ts`. The evaluation
  * (type-aware) also lives in `filter.ts`; only the shapes live here. */

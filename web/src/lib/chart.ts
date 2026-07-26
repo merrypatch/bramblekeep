@@ -3,7 +3,9 @@ import { type ChartBucket, type DbColumn, type DbView, parseDateValue, type Row 
 
 export type ChartResult = {
   labels: string[];
-  datasets: { label: string; data: number[]; dashed?: boolean }[];
+  /** `null` = no row in that bucket, and no meaningful value to invent (see
+   * `reduce`). Chart.js leaves a hole instead of drawing a point at 0. */
+  datasets: { label: string; data: (number | null)[]; dashed?: boolean }[];
   /** true if a single series (pie possible, legend hideable). */
   single: boolean;
 };
@@ -16,15 +18,27 @@ const META_DATE_FIELD: Record<string, "createdTs" | "updatedTs"> = {
   last_edited_time: "updatedTs",
 };
 
-/** Local "YYYY-MM-DD" from an epoch ms. */
+/** Local "YYYY-MM-DDTHH:mm" from an epoch ms (the time matters to the `hour`
+ * bucket; the other buckets ignore it). */
 function isoFromEpoch(ms: number): string {
   const d = new Date(ms);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** (Sortable) key + display label of a date depending on the bucket. */
-function bucketOf(iso10: string, bucket: ChartBucket): { key: string; sort: number; label: string } {
+/** (Sortable) key + display label of a date depending on the bucket.
+ * `iso` = "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm" (the format a date cell stores). */
+function bucketOf(iso: string, bucket: ChartBucket): { key: string; sort: number; label: string } {
+  const iso10 = iso.slice(0, 10);
   const [y, m, d] = iso10.split("-").map(Number);
+  if (bucket === "hour") {
+    // A date column without the time option stores no hour → midnight.
+    const h = Number(iso.slice(11, 13)) || 0;
+    return {
+      key: `${iso10}T${pad(h)}`,
+      sort: new Date(y, m - 1, d, h).getTime(),
+      label: `${pad(d)}/${pad(m)} ${pad(h)}h`,
+    };
+  }
   if (bucket === "month") {
     return { key: `${y}-${pad(m)}`, sort: y * 12 + (m - 1), label: `${pad(m)}/${y}` };
   }
@@ -40,12 +54,23 @@ function bucketOf(iso10: string, bucket: ChartBucket): { key: string; sort: numb
   return { key: iso10, sort: new Date(y, m - 1, d).getTime(), label: `${pad(d)}/${pad(m)}` };
 }
 
-/** Fills in the missing buckets between the min and the max (continuous time axis). */
+/** Fills in the missing buckets between the min and the max (continuous time axis).
+ *
+ * Not for `hour`: filling a range of hours would drown a handful of readings in
+ * empty slots (24 per day, 168 per week) and the axis would be unreadable. There,
+ * only the hours that actually carry a row are plotted, in chronological order. */
 function fillDateBuckets(
   present: Map<string, { sort: number; label: string }>,
   bucket: ChartBucket,
 ): { key: string; label: string }[] {
   const all = [...present.entries()].map(([key, v]) => ({ key, ...v }));
+  if (bucket === "hour") {
+    const isHour = (key: string) => /^\d{4}-\d{2}-\d{2}T\d{2}$/.test(key);
+    const hours = all.filter((i) => isHour(i.key)).sort((a, b) => a.sort - b.sort);
+    // "Sans date" and friends keep their place at the end, as below.
+    const rest = all.filter((i) => !isHour(i.key));
+    return [...hours, ...rest].map((i) => ({ key: i.key, label: i.label }));
+  }
   // Valid (fillable) date keys vs the rest (e.g. "Sans date"), pushed to the end.
   const items = all.filter((i) => /^\d{4}-\d{2}(-\d{2})?$/.test(i.key));
   const extras = all.filter((i) => !/^\d{4}-\d{2}(-\d{2})?$/.test(i.key)).map((i) => ({ key: i.key, label: i.label }));
@@ -73,8 +98,17 @@ function fillDateBuckets(
   return [...out, ...extras];
 }
 
-const reduce = (arr: number[], agg: string): number => {
-  if (arr.length === 0) return 0;
+/**
+ * Aggregate of the values of one bucket.
+ *
+ * An EMPTY bucket (a filled-in gap in the time axis) is not zero for every
+ * aggregate: no row means no count and no sum, so `0` is the honest answer — but
+ * an average, a minimum or a maximum of nothing does not exist, and returning `0`
+ * drew a temperature curve diving to 0°C on every day without a reading. `null`
+ * there, which Chart.js renders as a hole in the line.
+ */
+const reduce = (arr: number[], agg: string): number | null => {
+  if (arr.length === 0) return agg === "count" || agg === "sum" ? 0 : null;
   const sum = arr.reduce((a, b) => a + b, 0);
   if (agg === "avg") return Math.round((sum / arr.length) * 100) / 100;
   if (agg === "min") return Math.min(...arr);
@@ -104,16 +138,18 @@ export function buildChart(
   const xKeyOf = (r: Row): { key: string; label: string; sort: number } => {
     if (!view.groupBy) return { key: "all", label: i18n.t("chart.all"), sort: 0 };
     if (timeAxis) {
-      let iso10: string | null;
+      // Kept whole ("YYYY-MM-DD" or "YYYY-MM-DDTHH:mm"): the `hour` bucket needs
+      // the time, the coarser ones drop it themselves.
+      let iso: string | null;
       if (metaField) {
         const ts = r[metaField];
-        iso10 = ts != null ? isoFromEpoch(ts) : null;
+        iso = ts != null ? isoFromEpoch(ts) : null;
       } else {
         const dv = parseDateValue(r.props[view.groupBy]);
-        iso10 = dv ? dv.start.slice(0, 10) : null;
+        iso = dv ? dv.start : null;
       }
-      if (!iso10) return { key: "no-date", label: i18n.t("chart.noDate"), sort: 0 };
-      const b = bucketOf(iso10, bucket);
+      if (!iso) return { key: "no-date", label: i18n.t("chart.noDate"), sort: 0 };
+      const b = bucketOf(iso, bucket);
       return { key: b.key, label: b.label, sort: b.sort };
     }
     const v = label(r, view.groupBy) || "Sans valeur";
@@ -193,14 +229,16 @@ export function buildChart(
   }));
 
   // Transformation along the X axis (cumulative / remaining), per series.
+  // An empty bucket contributes nothing to the running total, and the transformed
+  // curve stays continuous (a cumulative total does not "stop" on a gap).
   if (transform !== "none") {
     datasets = datasets.map((ds) => {
-      const total = ds.data.reduce((a, b) => a + b, 0);
+      const total = ds.data.reduce<number>((a, b) => a + (b ?? 0), 0);
       let run = 0;
       return {
         ...ds,
         data: ds.data.map((v) => {
-          run += v;
+          run += v ?? 0;
           return transform === "cumulative" ? run : total - run;
         }),
       };
@@ -210,7 +248,9 @@ export function buildChart(
   // Sort by value (single series, no date): reorders labels + data.
   let labels = xs.map((x) => x.label);
   if (view.chartSort === "value" && !timeAxis && datasets.length === 1) {
-    const idx = datasets[0].data.map((_, i) => i).sort((a, b) => datasets[0].data[b] - datasets[0].data[a]);
+    // Missing values sort last rather than poisoning the comparison with NaN.
+    const at = (i: number) => datasets[0].data[i] ?? Number.NEGATIVE_INFINITY;
+    const idx = datasets[0].data.map((_, i) => i).sort((a, b) => at(b) - at(a));
     labels = idx.map((i) => labels[i]);
     datasets = datasets.map((ds) => ({ ...ds, data: idx.map((i) => ds.data[i]) }));
   }

@@ -1788,7 +1788,7 @@ export function DatabaseView({
                     ) && (
                       <>
                         <DropdownMenuLabel className="text-xs text-muted-foreground">{t("dbview.chart.groupDates")}</DropdownMenuLabel>
-                        {(["day", "week", "month"] as NonNullable<DbView["chartBucket"]>[]).map(
+                        {(["hour", "day", "week", "month"] as NonNullable<DbView["chartBucket"]>[]).map(
                           (b) => (
                             <MenuRadio
                               key={b}
@@ -2188,6 +2188,14 @@ export function DatabaseView({
             kind={activeView.chartKind ?? "bar"}
             stacked={!!activeView.chartStacked}
             result={chartData}
+            // A count or a sum is read against zero; an average / min / max of a
+            // measured value is not — forcing 0 onto the axis flattens a body
+            // temperature (39.1 → 40.3) into a straight line at the top.
+            zeroBased={
+              (activeView.chartAgg ?? "count") === "count" ||
+              activeView.chartAgg === "sum" ||
+              (activeView.chartTransform ?? "none") !== "none"
+            }
           />
         ) : (
           <ViewHint>{t("dbview.hint.chartNeedsAxis")}</ViewHint>
