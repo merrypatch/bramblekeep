@@ -161,9 +161,19 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[min(44rem,88vh)] w-[min(64rem,95vw)] max-w-[95vw] gap-0 overflow-hidden p-0 sm:max-w-[64rem]">
+      {/* Height chain, and it must stay unbroken — measured, not guessed:
+          `DialogContent` is a grid whose single in-flow row was sized `auto`, so
+          the wrapper below grew to its CONTENT height (1266px inside a 539px
+          dialog) instead of the dialog's. `h-full` then resolved to that content
+          height, the panel's `overflow-y-auto` had nothing to overflow, and the
+          bottom of a long section — a section's last buttons, e.g. Apply update —
+          was simply clipped by `overflow-hidden` with no way to scroll to it.
+          `grid-rows-[1fr]` caps the row at the dialog height; `min-h-0` lets the
+          flex children shrink below their content so the panel can scroll.
+          `dvh` rather than `vh` on top: `vh` ignores the mobile browser chrome. */}
+      <DialogContent className="grid-rows-[1fr] h-[min(44rem,88dvh)] w-[min(64rem,95vw)] max-w-[95vw] gap-0 overflow-hidden p-0 sm:max-w-[64rem]">
         <DialogTitle className="sr-only">{t("settings.title")}</DialogTitle>
-        <div className="flex h-full w-full min-w-0 flex-col sm:flex-row">
+        <div className="flex h-full min-h-0 w-full min-w-0 flex-col sm:flex-row">
           {/* Mobile: scrollable horizontal bar at the top. Desktop: column on the left. */}
           <nav className="flex shrink-0 gap-1 overflow-x-auto border-b bg-muted/30 p-2 max-sm:pt-11 [scrollbar-width:none] sm:w-60 sm:flex-col sm:gap-0 sm:space-y-1 sm:overflow-visible sm:border-r sm:border-b-0 sm:p-4 [&::-webkit-scrollbar]:hidden">
             <p className="px-2 pb-1 text-xs font-medium text-muted-foreground max-sm:hidden">{t("settings.title")}</p>
@@ -183,7 +193,9 @@ export function SettingsDialog({
             ))}
           </nav>
 
-          <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
+          {/* Extra bottom padding: the last row of a section must not end flush
+              against the edge, where a phone's gesture bar can cover it. */}
+          <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 pb-12 sm:px-8 sm:py-7 sm:pb-12">
             {section === "general" && <GeneralSection user={user} onUserChange={onUserChange} />}
             {section === "account" && <AccountSection user={user} ws={ws} onLogout={onLogout} />}
             {section === "trash" && <TrashSection isAdmin={isAdmin} />}

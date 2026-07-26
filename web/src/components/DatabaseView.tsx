@@ -2538,7 +2538,9 @@ export function DatabaseView({
           side={isMobile ? "bottom" : "right"}
           className={cn(
             "dot-grid gap-0 overflow-y-auto p-0",
-            isMobile ? "h-[80vh] rounded-t-xl" : "w-full sm:max-w-3xl",
+            // `dvh` for the same reason as the settings dialog: `vh` ignores the
+            // mobile browser chrome, pushing the bottom of the sheet off-screen.
+            isMobile ? "h-[80dvh] rounded-t-xl" : "w-full sm:max-w-3xl",
           )}
           // Don't close the drawer when interacting with a column dialog
           // (edit / add / confirm) opened on top, rendered in a portal.
