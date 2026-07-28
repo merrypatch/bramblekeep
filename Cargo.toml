@@ -12,7 +12,7 @@ tokio = { version = "1", features = ["full"] }
 yrs = "0.23"
 futures-util = "0.3"
 bytes = "1"
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 infer = "0.16"
 time = "0.3"
