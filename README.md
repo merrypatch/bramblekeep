@@ -6,6 +6,35 @@ Unified, self-hosted, **single-binary** workspace — a free, open-source altern
 
 Rust backend (Axum + SQLite) + embedded Vite/React/TypeScript frontend. The release binary + `bramblekeep.db` + the `files/` folder = the complete installation.
 
+<p align="center">
+  <img src=".github/assets/home.png" alt="Bramblekeep home page: new page, all pages, documentation and support entry points" width="840">
+</p>
+<p align="center"><sub>Home — where to go from a standing start, with your page tree in the sidebar.</sub></p>
+
+<p align="center">
+  <img src=".github/assets/page.png" alt="A page with a cover image and the slash menu open" width="840">
+</p>
+<p align="center"><sub>A page — cover with the photographer's credit, emoji icon, and the <code>/</code> menu: sub-pages, inline databases, embeds, headings, lists.</sub></p>
+
+<p align="center">
+  <img src=".github/assets/db.png" alt="A database in table view with the new-column dialog open" width="840">
+</p>
+<p align="center"><sub>A database — typed columns, including relation, rollup, formula and read-only metadata.</sub></p>
+
+## What it does
+
+- **Pages and blocks.** A rich editor (BlockNote) over a CRDT: several people type in the same page at once, and the content survives a restart of the server. Sub-pages nest to any depth, `@` mentions link pages together and are listed back as **backlinks**.
+- **Databases.** Fourteen column types plus four read-only metadata ones, and six views over the same rows: **table, board (kanban), calendar, gallery, chart, graph** — each with its own filters, sort and search. Rows are real pages you can open and write inside.
+- **Relations, rollups, formulas.** Link two databases, aggregate across the link, or compute a value from the row (28 functions across logic, numbers, text and dates).
+- **Charts.** Bars, line, area, pie, radar, radial — grouped by hour / day / week / month on a date axis, split into series by any column (a relation included), with cumulative, remaining and burndown transforms.
+- **A graph view**, in a database and across all your pages: relation links and page references, laid out by a force simulation computed in the browser.
+- **Sharing.** Per-page levels (read / edit / creator / admin) inherited by the subtree, workspace roles (owner / admin / member), and **public pages** — a token link readable without any account, optionally covering the subtree.
+- **Sign-in your way.** Email + password (no mail relay needed) or a magic link when SMTP is configured. Opaque sessions, no JWT.
+- **Built-in documentation**, ten chapters shipped inside the binary, so it always matches the version you run. English, French and Spanish, like the rest of the interface.
+- **The small things that matter**: full-text search inside content, favourites, drag & drop of the page tree, 30-day trash, per-page change history, content-addressed uploads, Markdown / PDF / CSV export, CSV and relation-preserving ZIP import, light/dark themes, and installable as a PWA.
+
+Zero telemetry, and no outbound network call unless you ask for one — update checking is opt-in.
+
 ## Getting started (self-host)
 
 ### Fastest: one command (Linux)
@@ -19,15 +48,15 @@ curl -fsSL https://raw.githubusercontent.com/merrypatch/bramblekeep/master/insta
 ```
 
 It prints the URL to open. The first visitor creates the owner account with an
-email and a password — no SMTP needed. The script is
-inspectable — read [`install.sh`](./install.sh) before piping it to a shell.
+email and a password — no SMTP needed. The script is inspectable: read
+[`install.sh`](./install.sh) before piping it to a shell.
 
 Useful overrides:
 
 - `PUBLIC_BASE_URL=https://notes.example.com` — the URL users actually reach (default: the host's IP).
 - `PORT=9000` — host port to publish (default `8080`).
 - `NO_DOCKER=1` — install the bare binary + a systemd service instead of Docker.
-- `VERSION=v0.2.0` — pin a version. `--uninstall` — remove it (your data is kept).
+- `VERSION=v0.11.0` — pin a version. `--uninstall` — remove it (your data is kept).
 
 ### Docker (manual)
 
@@ -112,11 +141,25 @@ Locked out (forgotten password on an instance that cannot send email)?
 `bramblekeep set-password <email>` resets it from the server — the password is
 read on stdin, and on an instance with no account it creates the owner.
 
+### Backup
+
+Three things, and nothing else: the SQLite database (`bramblekeep.db`), the
+`files/` folder (uploads, addressed by content hash), and your `.env`. Copy them
+with the server stopped, or use SQLite's own backup mechanism on a running
+instance. There is no external service to restore and no queue to drain.
+
 ## Status
 
-Active development. Working today: rich pages edited in BlockNote synced over WebSocket (yrs CRDT), persisted in `yjs_updates` and projected to `blocks` (survives a binary restart), full-text search, file uploads (content-addressed), email+password or magic-link auth with per-item sharing, and structured databases with multiple views. Signed static release binaries + a multi-arch Docker image, with one-click in-app updates (self-replace on bare metal, Watchtower on Docker).
+Active development, and usable today for what the list above describes: pages
+synced over WebSocket (yrs CRDT), persisted in `yjs_updates` and projected to
+`blocks` — a restart of the binary loses nothing — plus databases and their six
+views, sharing, public pages, and the built-in documentation. Releases ship signed
+static binaries and a multi-arch Docker image, with one-click in-app updates
+(self-replace on bare metal, Watchtower on Docker).
 
-Not yet: public (login-free) pages, S3 file storage, email/AI integrations — reserved in the schema, built when their version arrives.
+Reserved in the schema and deliberately not built yet: S3 file storage, and
+ingesting content from other channels (inbound email, messaging). Sending mail
+exists — receiving does not.
 
 ## Prerequisites
 
@@ -163,12 +206,25 @@ cd .. && cargo build --release
 
 ```bash
 cargo clippy --all-targets -- -D warnings && cargo test \
-  && (cd web && pnpm typecheck && pnpm lint)
+  && (cd web && pnpm typecheck && pnpm lint && pnpm test)
 ```
+
+CI runs the same gate, plus a blocking supply-chain audit (`cargo audit`,
+`cargo deny`, and an OSV scan of the frontend lockfile).
 
 ## Architecture
 
-Mono-crate `bramblekeep` with internal modules (`core`, `store`, `db`, `embed`, `routes`, `config`). The dependency direction remains strictly one-way: `core` (pure types) depends on nothing internal. Extraction into dedicated crates will happen only when a boundary becomes problematic in practice — see addendum D4.
+Mono-crate `bramblekeep` with internal modules: `core` (pure domain types and
+tree/credential logic, zero I/O), `store` (SQLite, additive migrations, FTS5),
+`sync` (yrs CRDT and the update log), `auth`, `routes`, `files`, `mail`, `search`,
+`update`, `embed` and `config`. The dependency direction remains strictly
+one-way: `core` depends on nothing internal. Extraction into dedicated crates
+will happen only when a boundary becomes problematic in practice — see addendum
+D4.
+
+All content **writes** go through the CRDT; all **reads** (search, views, export)
+go through the `blocks` projection rebuilt from it. Writing to `blocks` directly
+would be the one architectural bug that matters here.
 
 ## Contributing
 

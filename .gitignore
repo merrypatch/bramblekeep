@@ -10,6 +10,10 @@
 *.db-wal
 *.db.bak*
 /files
+# Upload directory of a throwaway instance (`FILES_DIR=files-scratch cargo run`):
+# its blobs are test content, never repository content.
+files-scratch/
+files-*/
 
 # Front
 web/node_modules
