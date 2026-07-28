@@ -1,0 +1,64 @@
+# Automated dependency updates.
+#
+# Cadence is MONTHLY on purpose: security fixes do not wait for it — Dependabot
+# security updates (enabled in the repository settings) open their PR as soon as
+# an advisory lands, independently of this schedule. What is scheduled here is the
+# routine version churn, and a weekly cadence on three ecosystems turns into a
+# standing chore for no gain.
+#
+# Minor and patch bumps are grouped into one PR per ecosystem; majors come alone,
+# because a major deserves to be read on its own. Every PR still has to pass the
+# full gate (clippy, tests, typecheck, lint, and the blocking supply-chain audit),
+# which is what makes automatic bumps safe to merge at all.
+version: 2
+
+updates:
+  # Rust backend.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      cargo-minor-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+
+  # Frontend (pnpm lockfile lives in web/).
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      web-minor-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+    ignore:
+      # BlockNote is the editor, not a dependency we bump casually: a major
+      # carries schema and UI-API changes that need a manual pass over the custom
+      # blocks (`page`, `dbview`, `embed`, `taskProgress`) and the read-only docs
+      # renderer. Minors and patches still come through the group above.
+      - dependency-name: "@blocknote/*"
+        update-types: ["version-update:semver-major"]
+
+  # Workflow actions (checkout, setup-node, install-action…). These pin the
+  # release and CI supply chain, so they are worth keeping current.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions-all:
+        applies-to: version-updates
+        patterns: ["*"]

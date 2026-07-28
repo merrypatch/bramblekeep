@@ -228,7 +228,13 @@ would be the one architectural bug that matters here.
 
 ## Contributing
 
-Pull requests welcome — see [`.github/CONTRIBUTING.md`](./.github/CONTRIBUTING.md). Contributions are accepted under a lightweight [Contributor License Agreement](./CLA.md) (you keep ownership of your work); a bot walks you through signing on your first PR.
+Pull requests welcome — see [`.github/CONTRIBUTING.md`](./.github/CONTRIBUTING.md)
+and the [Code of Conduct](./CODE_OF_CONDUCT.md). Contributions are accepted under a
+lightweight [Contributor License Agreement](./CLA.md) (you keep ownership of your
+work); a bot walks you through signing on your first PR.
+
+Found a security problem? Report it privately through the
+[security policy](./SECURITY.md) — not in a public issue.
 
 ## License
 

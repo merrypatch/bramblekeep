@@ -2,6 +2,10 @@
 
 Contributions are welcome. A few things to know before you open a pull request.
 
+By taking part you agree to the [Code of Conduct](../CODE_OF_CONDUCT.md). Found a
+security problem instead? Do not open an issue — follow the
+[security policy](../SECURITY.md).
+
 ## License & CLA
 
 Bramblekeep is [dual-licensed](../LICENSING.md) (AGPL-3.0-or-later + a commercial license). To keep that model sound, every contribution is accepted under a **Contributor License Agreement**: [`CLA.md`](../CLA.md).
