@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Route, Routes, useMatch, useNavigate, useParams } from "react-router-dom";
 
-import { ChevronDown, Download, History, Star, Trash2, Upload, Users } from "lucide-react";
+import { BookOpen, ChevronDown, Download, Files, Heart, History, Plus, Star, Trash2, Upload, Users } from "lucide-react";
 
 import { HistoryDrawer } from "@/components/HistoryDrawer";
 import { ImportCsvDialog } from "@/components/ImportCsvDialog";
@@ -42,6 +42,7 @@ import { exportCsv, exportMarkdown } from "@/lib/export";
 import { exportDbBundle } from "@/lib/bundle";
 import { ImportBundleDialog } from "@/components/ImportBundleDialog";
 import { usePresence } from "@/lib/presence";
+import { cn } from "@/lib/utils";
 import type { Awareness } from "y-protocols/awareness";
 import {
   createDatabase,
@@ -81,18 +82,108 @@ function PageView({
 }
 
 /** Home (no page open): random illustrated avatar + personalized greeting. */
-function HomeEmpty({ user }: { user: User }) {
+/**
+ * Home: the greeting, plus the four places worth going from a standing start.
+ * Two of them (new page, all pages) also live in the sidebar — this is not a
+ * replacement, it is the entry point for someone who has just signed in and has
+ * an empty tree. The documentation lives HERE and not in the sidebar: it is read
+ * occasionally, and the sidebar belongs to your own pages.
+ */
+function HomeEmpty({
+  user,
+  onCreate,
+  onShowAll,
+  onShowDocs,
+  onShowCredits,
+}: {
+  user: User;
+  onCreate: (kind: "page" | "database") => void;
+  onShowAll: () => void;
+  onShowDocs: () => void;
+  onShowCredits: () => void;
+}) {
   // Random avatar, stable for the duration of display (new on each visit).
   const { t } = useTranslation();
   const seed = useMemo(() => Math.random().toString(36).slice(2), []);
+
+  const actions: {
+    key: string;
+    icon: typeof Plus;
+    title: string;
+    body: string;
+    run: () => void;
+    /** The support card keeps its pulsing dot, as in the sidebar. */
+    dot?: boolean;
+  }[] = [
+    {
+      key: "page",
+      icon: Plus,
+      title: t("home.action.newPage"),
+      body: t("home.action.newPageBody"),
+      run: () => onCreate("page"),
+    },
+    {
+      key: "all",
+      icon: Files,
+      title: t("sidebar.allPages"),
+      body: t("home.action.allPagesBody"),
+      run: onShowAll,
+    },
+    {
+      key: "docs",
+      icon: BookOpen,
+      title: t("docs.title"),
+      body: t("home.action.docsBody"),
+      run: onShowDocs,
+    },
+    {
+      key: "credits",
+      icon: Heart,
+      title: t("sidebar.credits.title"),
+      body: t("home.action.creditsBody"),
+      run: onShowCredits,
+      dot: true,
+    },
+  ];
+
   return (
-    <div className="dot-grid flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-center gap-4 p-6 text-center">
-      <Avatar name={seed} size={88} />
-      <div className="space-y-1">
-        <h2 className="text-xl font-semibold tracking-tight">{t("home.greeting", { name: user.display_name })}</h2>
-        <p className="text-sm text-muted-foreground">
-{t("home.empty")}
-        </p>
+    <div className="dot-grid flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-center gap-6 p-6">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <Avatar name={seed} size={88} />
+        <div className="space-y-1">
+          <h2 className="text-xl font-semibold tracking-tight">
+            {t("home.greeting", { name: user.display_name })}
+          </h2>
+          <p className="text-sm text-muted-foreground">{t("home.empty")}</p>
+        </div>
+      </div>
+
+      {/* One column on a phone, two from `sm` up: four cards in a row would be
+          unreadable on mobile, and the project is mobile-first. */}
+      <div className="grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
+        {actions.map((a) => {
+          const Icon = a.icon;
+          return (
+            <button
+              key={a.key}
+              type="button"
+              onClick={a.run}
+              className="relative flex items-start gap-3 rounded-lg border bg-card/70 p-4 text-left transition-colors hover:bg-accent"
+            >
+              {a.dot && (
+                <span className="absolute right-3 top-3 flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-blue-500 opacity-75" />
+                  <span className="relative inline-flex size-2 rounded-full bg-blue-500" />
+                </span>
+              )}
+              <Icon className={cn("mt-0.5 size-5 shrink-0", a.dot ? "text-primary" : "text-muted-foreground")} />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{a.title}</span>
+                <span className="block text-xs leading-snug text-muted-foreground">{a.body}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -112,9 +203,6 @@ export function Shell({
   const navigate = useNavigate();
   const activeId = useMatch("/p/:id")?.params.id ?? null;
   const isAllPagesActive = !!useMatch("/pages");
-  // Splat pattern: matches /docs AND /docs/<chapter> in ONE hook call — two
-  // `useMatch` behind a `||` would be a conditional hook.
-  const isDocsActive = !!useMatch("/docs/*");
 
   const [items, setItems] = useState<ItemMeta[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -317,12 +405,10 @@ export function Shell({
         items={items}
         activeId={activeId}
         isAllPagesActive={isAllPagesActive}
-        isDocsActive={isDocsActive}
         currentUserId={user.id}
         onSelect={(id) => navigate(`/p/${id}`)}
         onHome={() => navigate("/")}
         onShowAll={() => navigate("/pages")}
-        onShowDocs={() => navigate("/docs")}
         onShowCredits={() => navigate("/credits")}
         onToggleFavorite={(id, fav) => void onToggleFavorite(id, fav)}
         onCreate={(kind) => void onCreate(kind)}
@@ -485,7 +571,15 @@ export function Shell({
           <Routes>
             <Route
               path="/"
-              element={<HomeEmpty user={user} />}
+              element={
+                <HomeEmpty
+                  user={user}
+                  onCreate={(kind) => void onCreate(kind)}
+                  onShowAll={() => navigate("/pages")}
+                  onShowDocs={() => navigate("/docs")}
+                  onShowCredits={() => navigate("/credits")}
+                />
+              }
             />
             <Route
               path="/pages"

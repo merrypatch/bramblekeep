@@ -1139,7 +1139,14 @@
   },
   "home": {
     "greeting": "Hello {{name}}",
-    "empty": "Create or select a page to start."
+    "empty": "Create or select a page to start.",
+    "action": {
+      "newPage": "New page",
+      "newPageBody": "Start writing right away — a blank page, ready.",
+      "allPagesBody": "Browse everything you can reach, and the graph of their links.",
+      "docsBody": "How this works, from writing to databases. Ships with your version.",
+      "creditsBody": "Free and open. See what makes it possible, and how to help."
+    }
   },
   "allPages": {
     "title": "All pages",

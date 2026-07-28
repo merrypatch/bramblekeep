@@ -1,4 +1,4 @@
-import { BookOpen, ChevronRight, Clock, Copy, FileStack, FileText, Files, FolderTree, Heart, LogOut, MoreHorizontal, Pencil, Plus, Settings, Star, Table2, Trash2 } from "lucide-react";
+import { ChevronRight, Clock, Copy, FileStack, FileText, Files, FolderTree, Heart, LogOut, MoreHorizontal, Pencil, Plus, Settings, Star, Table2, Trash2 } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -97,12 +97,10 @@ export function AppSidebar({
   items,
   activeId,
   isAllPagesActive,
-  isDocsActive,
   currentUserId,
   onSelect,
   onHome,
   onShowAll,
-  onShowDocs,
   onShowCredits,
   onToggleFavorite,
   onCreate,
@@ -119,16 +117,12 @@ export function AppSidebar({
   activeId: string | null;
   /** Is the "All pages" page (/pages) open? (link highlight) */
   isAllPagesActive: boolean;
-  /** Is the documentation open? (link highlight) */
-  isDocsActive: boolean;
   currentUserId: string;
   onSelect: (id: string) => void;
   /** Navigates to the home route (brand click). */
   onHome: () => void;
   /** Opens the dedicated page listing everything accessible. */
   onShowAll: () => void;
-  /** Opens the built-in documentation. */
-  onShowDocs: () => void;
   /** Opens the "Credits" page (what makes the project possible + contributing). */
   onShowCredits: () => void;
   /** Toggles an item's favorite (favorite = per user, not gated by permissions). */
@@ -150,10 +144,6 @@ export function AppSidebar({
   // On mobile, opening a page closes the drawer (otherwise it hides the page).
   const select = (id: string) => {
     onSelect(id);
-    if (isMobile) setOpenMobile(false);
-  };
-  const showDocs = () => {
-    onShowDocs();
     if (isMobile) setOpenMobile(false);
   };
   const showCredits = () => {
@@ -658,17 +648,6 @@ export function AppSidebar({
                   {t("sidebar.dropToRoot")}
                 </li>
               )}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={isDocsActive}
-                  onClick={showDocs}
-                  tooltip={t("docs.title")}
-                  className="text-muted-foreground"
-                >
-                  <BookOpen className="size-4 shrink-0" />
-                  <span className="truncate">{t("docs.title")}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={isAllPagesActive}

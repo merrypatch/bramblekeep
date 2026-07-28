@@ -1139,7 +1139,14 @@
   },
   "home": {
     "greeting": "Bonjour {{name}}",
-    "empty": "Crée ou sélectionne une page pour commencer."
+    "empty": "Crée ou sélectionne une page pour commencer.",
+    "action": {
+      "newPage": "Nouvelle page",
+      "newPageBody": "Écrivez tout de suite — une page vierge, prête.",
+      "allPagesBody": "Parcourez tout ce qui vous est accessible, et le graphe de leurs liens.",
+      "docsBody": "Comment tout ça marche, de l'écriture aux bases. Livrée avec votre version.",
+      "creditsBody": "Libre et ouvert. Voyez ce qui le rend possible, et comment aider."
+    }
   },
   "allPages": {
     "title": "Toutes les pages",
