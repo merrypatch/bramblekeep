@@ -210,6 +210,48 @@ pub async fn create_item(
     Ok(Json(json!({ "id": id.to_string(), "published": published })))
 }
 
+#[derive(Deserialize)]
+pub struct MoveItemInput {
+    /// New parent page; `null`/absent = root page (no parent).
+    parent: Option<String>,
+    /// Sibling the page must land ABOVE; `null`/absent = last of its siblings.
+    before: Option<String>,
+}
+
+/// Moves a page in the sidebar tree: reorder among siblings, reparent, or pull
+/// out to the root. Single endpoint for the drag & drop and the "Move to…" menu.
+///
+/// The ordering key is computed server-side (the client sends a neighbour, not a
+/// number), and the whole thing — parent, order, public scope — commits as one
+/// transaction (`store::move_page`).
+///
+/// Permissions mirror creation: `edit` on the page being moved, and `creator`+ on
+/// the destination parent, since the move is exactly "make this page a child of
+/// that one". No check on the OLD parent: whoever can edit the page can take it
+/// out of where it sits.
+pub async fn move_item(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+    Json(body): Json<MoveItemInput>,
+) -> Result<Json<Value>> {
+    let item_id = parse_item_id(&id)?;
+    require_access(&app, &item_id, &user, "edit").await?;
+    let parent = match body.parent.as_deref() {
+        Some(p) => {
+            let pid = parse_item_id(p)?;
+            require_access(&app, &pid, &user, "creator").await?;
+            Some(pid.to_string())
+        }
+        None => None,
+    };
+    let outcome =
+        crate::store::move_page(&app.db, &item_id, parent.as_deref(), body.before.as_deref(), &user.id)
+            .await?;
+    crate::store::record_activity(&app.db, &item_id, &user.id).await?;
+    Ok(Json(json!({ "published": outcome.published })))
+}
+
 /// Duplicates a page/database and all its descendants (sub-pages, rows). The
 /// copy belongs to the user and is placed under the same parent. The written
 /// content is copied via CRDT (complete state reapplied to the new doc),

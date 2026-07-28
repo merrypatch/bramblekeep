@@ -1,4 +1,4 @@
-import { ChevronRight, Clock, Copy, FileStack, FileText, Files, Heart, LogOut, MoreHorizontal, Pencil, Plus, Settings, Star, Table2, Trash2 } from "lucide-react";
+import { ChevronRight, Clock, Copy, FileStack, FileText, Files, FolderTree, Heart, LogOut, MoreHorizontal, Pencil, Plus, Settings, Star, Table2, Trash2 } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -105,6 +105,7 @@ export function AppSidebar({
   onToggleFavorite,
   onCreate,
   onCreateSub,
+  onMove,
   onDuplicate,
   onRename,
   onDelete,
@@ -128,6 +129,9 @@ export function AppSidebar({
   onToggleFavorite: (id: string, favorite: boolean) => void;
   onCreate: (kind: "page" | "database") => void;
   onCreateSub: (parentId: string) => void;
+  /** Moves a page: `parent` null = root, `before` = sibling to land above
+   * (null = last). Drag & drop and "Move to…" both go through this. */
+  onMove: (id: string, parent: string | null, before: string | null) => void;
   onDuplicate: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
@@ -155,6 +159,14 @@ export function AppSidebar({
   const [deleting, setDeleting] = useState<ItemMeta | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Drag & drop of the tree. `dragId` = page being dragged, `drop` = where it
+  // would land: ABOVE a row (reorder among its siblings) or INSIDE it (reparent).
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [drop, setDrop] = useState<{ id: string | null; where: "before" | "inside" } | null>(null);
+  // "Move to…" (context menu): the touch/keyboard path to the same endpoint —
+  // HTML5 drag & drop does not exist on a phone.
+  const [moving, setMoving] = useState<ItemMeta | null>(null);
+  const [moveQuery, setMoveQuery] = useState("");
 
   useEffect(() => {
     setRenameValue(renaming?.title ?? "");
@@ -205,6 +217,106 @@ export function AppSidebar({
   const deletingDescendants = deleting ? countDescendants(childrenOf, deleting.id) : 0;
   const isDeletingDb = !!deleting?.db_schema;
 
+  /** Is `id` inside `ancestor`'s branch? Mirrors the server refusal (a page
+   * cannot be moved into its own descendance) so an invalid drop is shown as
+   * forbidden instead of being sent and rejected. */
+  const isInBranch = (ancestor: string, id: string): boolean => {
+    let cur: ItemMeta | undefined = byId.get(id);
+    const seen = new Set<string>();
+    while (cur) {
+      if (cur.id === ancestor) return true;
+      if (!cur.parent_item_id || seen.has(cur.id)) return false;
+      seen.add(cur.id);
+      cur = byId.get(cur.parent_item_id);
+    }
+    return false;
+  };
+
+  /** Can the dragged page land there? `target` null = the root drop zone. */
+  const canDropOn = (target: ItemMeta | null, where: "before" | "inside"): boolean => {
+    if (!dragId) return false;
+    if (!target) return true; // root: always allowed (the page has an editor)
+    // Reordering above a row means becoming a sibling of it: what matters is its
+    // PARENT, which may perfectly well be inside the dragged branch.
+    const destination = where === "inside" ? target.id : target.parent_item_id;
+    if (!destination) return true;
+    if (isInBranch(dragId, destination)) return false;
+    // A page parented to a database is a row: refused server-side, greyed here.
+    return !byId.get(destination)?.db_schema;
+  };
+
+  /** Drop handler shared by every row: translates the hovered zone into the
+   * (parent, before) pair the endpoint expects. */
+  const applyDrop = (target: ItemMeta | null, where: "before" | "inside") => {
+    const id = dragId;
+    setDragId(null);
+    setDrop(null);
+    if (!id) return;
+    if (!target) {
+      onMove(id, null, null);
+      return;
+    }
+    if (where === "inside") onMove(id, target.id, null);
+    else onMove(id, target.parent_item_id, target.id);
+  };
+
+  /** Drag props of a tree row. Whole-row drag (no separate handle): that is what
+   * a sidebar does everywhere else, and it leaves the row's click intact. */
+  const dragProps = (it: ItemMeta) =>
+    it.can_edit
+      ? {
+          draggable: true,
+          onDragStart: (e: React.DragEvent) => {
+            e.dataTransfer.setData("text/plain", it.id);
+            e.dataTransfer.effectAllowed = "move" as const;
+            setDragId(it.id);
+          },
+          onDragEnd: () => {
+            setDragId(null);
+            setDrop(null);
+          },
+        }
+      : {};
+
+  /** Drop props of a tree row: the upper quarter reorders above it, the rest
+   * reparents into it. */
+  const dropProps = (it: ItemMeta) =>
+    dragId && dragId !== it.id
+      ? {
+          onDragOver: (e: React.DragEvent) => {
+            const box = e.currentTarget.getBoundingClientRect();
+            const where: "before" | "inside" = e.clientY - box.top < box.height * 0.25 ? "before" : "inside";
+            if (!canDropOn(it, where)) {
+              e.dataTransfer.dropEffect = "none";
+              setDrop(null);
+              return;
+            }
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            setDrop({ id: it.id, where });
+          },
+          onDragLeave: () => setDrop((d) => (d?.id === it.id ? null : d)),
+          onDrop: (e: React.DragEvent) => {
+            e.preventDefault();
+            const where = drop?.id === it.id ? drop.where : "inside";
+            if (canDropOn(it, where)) applyDrop(it, where);
+            else {
+              setDragId(null);
+              setDrop(null);
+            }
+          },
+        }
+      : {};
+
+  /** Visual state of a row during a drag: insertion line above, or highlight of
+   * the row that would become the new parent. */
+  const dropClass = (id: string) =>
+    cn(
+      dragId === id && "opacity-50",
+      drop?.id === id && drop.where === "before" && "border-t-2 border-t-primary",
+      drop?.id === id && drop.where === "inside" && "rounded-md bg-sidebar-accent ring-1 ring-primary",
+    );
+
   // Page actions, shared by the "…" menu (dropdown on click) AND the context
   // menu (right-click) — a single source. `Item`/`Separator` = primitives of the
   // calling menu (Dropdown* or Context*), passed as components.
@@ -231,6 +343,18 @@ export function AppSidebar({
         <Item onSelect={() => setRenaming(it)}>
           <Pencil className="text-muted-foreground" />
           {t("sidebar.rename")}
+        </Item>
+      )}
+      {/* Same move as the drag & drop, reachable by touch and keyboard. */}
+      {it.can_edit && (
+        <Item
+          onSelect={() => {
+            setMoveQuery("");
+            setMoving(it);
+          }}
+        >
+          <FolderTree className="text-muted-foreground" />
+          {t("sidebar.moveTo")}
         </Item>
       )}
       {it.can_edit && (
@@ -260,12 +384,13 @@ export function AppSidebar({
       <Fragment key={it.id}>
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <SidebarMenuItem>
+            <SidebarMenuItem className={dropClass(it.id)} {...dropProps(it)}>
               <SidebarMenuButton
                 isActive={it.id === activeId}
                 onClick={() => select(it.id)}
                 tooltip={labelOf(it)}
                 style={{ paddingLeft: 8 + depth * 12 }}
+                {...dragProps(it)}
               >
                 {hasKids ? (
                   <span
@@ -500,6 +625,29 @@ export function AppSidebar({
                 </DropdownMenu>
               </SidebarMenuItem>
               {shownRoots.map((it) => renderNode(it, 0))}
+              {/* Root drop zone: dropping here detaches the page from its parent.
+                  Only present during a drag — an always-visible empty strip in
+                  the sidebar would just be noise. */}
+              {dragId && (
+                <li
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDrop({ id: null, where: "inside" });
+                  }}
+                  onDragLeave={() => setDrop((d) => (d?.id === null ? null : d))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    applyDrop(null, "inside");
+                  }}
+                  className={cn(
+                    "mx-1 my-1 rounded-md border border-dashed px-2 py-1.5 text-center text-xs text-muted-foreground",
+                    drop?.id === null && "border-primary bg-sidebar-accent text-foreground",
+                  )}
+                >
+                  {t("sidebar.dropToRoot")}
+                </li>
+              )}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={isAllPagesActive}
@@ -543,13 +691,32 @@ export function AppSidebar({
           <span className="text-xs leading-snug text-muted-foreground">{t("sidebar.credits.body")}</span>
           <span className="mt-0.5 text-xs font-medium text-primary">{t("sidebar.credits.cta")} →</span>
         </button>
-        <div className="flex items-center gap-1">
+        {/* Same destination on the collapsed rail, where the card does not fit:
+            the heart alone, with its dot. Without it, closing the sidebar hid
+            the support page entirely. */}
+        <button
+          type="button"
+          onClick={showCredits}
+          title={t("sidebar.credits.title")}
+          aria-label={t("sidebar.credits.title")}
+          className="relative mx-auto hidden size-8 items-center justify-center rounded-md text-primary hover:bg-sidebar-accent group-data-[collapsible=icon]:flex"
+        >
+          <Heart className="size-4" />
+          <span className="absolute right-0.5 top-0.5 flex size-2">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-blue-500 opacity-75" />
+            <span className="relative inline-flex size-2 rounded-full bg-blue-500" />
+          </span>
+        </button>
+        {/* Expanded: avatar and bell side by side. Rail: stacked, and
+            `flex-col-reverse` puts the bell ABOVE the avatar, which stays at the
+            very bottom as in the expanded footer. */}
+        <div className="flex items-center gap-1 group-data-[collapsible=icon]:flex-col-reverse">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
               title={user.display_name}
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
             >
               <Avatar name={user.display_name} config={avatarConfig(user.avatar)} size={26} />
               <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
@@ -568,10 +735,9 @@ export function AppSidebar({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* Notification bell: next to the user in expanded mode (hidden in the rail). */}
-        <div className="group-data-[collapsible=icon]:hidden">
-          <NotificationBell onNavigate={select} />
-        </div>
+        {/* Notification bell: beside the user when expanded, above them on the
+            rail — a collapsed sidebar must not cost you your notifications. */}
+        <NotificationBell onNavigate={select} />
         </div>
       </SidebarFooter>
 
@@ -582,6 +748,67 @@ export function AppSidebar({
         onLogout={onLogout}
         onUserChange={onUserChange}
       />
+
+      {/* "Move to…": destination picker. Same endpoint as the drag & drop, and
+          the only path that works on a phone or from the keyboard. Candidates
+          exclude the page itself, its own descendance (the server refuses it) and
+          databases (a page parented to one becomes a row). */}
+      <Dialog open={moving !== null} onOpenChange={(o) => !o && setMoving(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("sidebar.moveToTitle", { name: moving ? labelOf(moving) : "" })}</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={moveQuery}
+            autoFocus
+            onChange={(e) => setMoveQuery(e.target.value)}
+            placeholder={t("sidebar.moveSearch")}
+          />
+          <ul className="max-h-72 space-y-0.5 overflow-y-auto">
+            {moving?.parent_item_id && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onMove(moving.id, null, null);
+                    setMoving(null);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+                >
+                  <FileStack className="size-4 shrink-0 text-muted-foreground" />
+                  {t("sidebar.moveRoot")}
+                </button>
+              </li>
+            )}
+            {moving &&
+              items
+                .filter(
+                  (cand) =>
+                    cand.can_edit &&
+                    !cand.db_schema &&
+                    cand.id !== moving.parent_item_id &&
+                    !isInBranch(moving.id, cand.id) &&
+                    labelOf(cand).toLowerCase().includes(moveQuery.trim().toLowerCase()),
+                )
+                .slice(0, 50)
+                .map((cand) => (
+                  <li key={cand.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onMove(moving.id, cand.id, null);
+                        setMoving(null);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+                    >
+                      <ItemIcon icon={cand.icon} kind="page" size={16} className="shrink-0" />
+                      <span className="truncate">{labelOf(cand)}</span>
+                    </button>
+                  </li>
+                ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
 
       {/* Rename */}
       <Dialog open={renaming !== null} onOpenChange={(o) => !o && setRenaming(null)}>

@@ -10,6 +10,7 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 pub mod credentials;
+pub mod tree;
 
 /// Declares a type-wrapped identifier over `Uuid`, with v7 generation
 /// (native chronological ordering) and TypeScript export.

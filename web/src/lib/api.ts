@@ -176,6 +176,28 @@ export async function getMemberPages(
   return (await res.json()) as { owned: MemberPage[]; shared: MemberPage[] };
 }
 
+/**
+ * Moves a page in the sidebar tree. `parent` null = root page (no parent);
+ * `before` = id of the sibling it must land above, null = last of its siblings.
+ *
+ * The ordering key is computed server-side from those two neighbours, and parent
+ * + order + public scope commit together. Returns whether the page ended up
+ * publicly readable (it entered a published subtree).
+ */
+export async function moveItem(
+  id: string,
+  parent: string | null,
+  before: string | null,
+): Promise<{ published: boolean }> {
+  const res = await fetch(`/api/v1/items/${id}/move`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ parent, before }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as { published: boolean };
+}
+
 export async function transferOwnership(user_id: string): Promise<void> {
   const res = await fetch("/api/v1/workspaces/current/transfer", {
     method: "POST",

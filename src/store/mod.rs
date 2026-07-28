@@ -58,8 +58,9 @@ pub async fn create_page(
     let ts = now_ms();
     sqlx::query(
         "INSERT INTO items \
-           (id, workspace_id, source_channel, ts, status, owner_id, parent_item_id, updated_ts, updated_by) \
-         VALUES (?, ?, 'page', ?, 'active', ?, ?, ?, ?)",
+           (id, workspace_id, source_channel, ts, status, owner_id, parent_item_id, updated_ts, updated_by, \
+            sidebar_seq) \
+         VALUES (?, ?, 'page', ?, 'active', ?, ?, ?, ?, ?)",
     )
     .bind(item_id.to_string())
     .bind(DEFAULT_WORKSPACE)
@@ -68,6 +69,10 @@ pub async fn create_page(
     .bind(parent_item_id)
     .bind(ts)
     .bind(owner_id)
+    // Sidebar key seeded with the creation timestamp: a new page lands at the
+    // end of its siblings, exactly where creation order used to put it
+    // (cf. migration 0028). Drag & drop overwrites it afterwards.
+    .bind(ts)
     .execute(db)
     .await?;
     Ok(())
@@ -178,7 +183,7 @@ pub async fn list_pages(db: &Db, user_id: &str) -> Result<Vec<ItemMeta>> {
            AND deleted_ts IS NULL \
            AND (parent_item_id IS NULL \
                 OR parent_item_id NOT IN (SELECT id FROM items WHERE db_schema IS NOT NULL)) \
-         ORDER BY id",
+         ORDER BY COALESCE(sidebar_seq, ts), id",
     )
     .bind(DEFAULT_WORKSPACE)
     .bind(user_id)
@@ -975,6 +980,246 @@ pub async fn set_user_status(db: &Db, user_id: &str, status: &str) -> Result<()>
     }
     tx.commit().await?;
     Ok(())
+}
+
+/// Outcome of a page move, for the client: whether the page ended up publicly
+/// readable (it entered a published subtree) — same field the creation route
+/// returns, and what the UI needs to confirm what just happened.
+#[derive(Debug, Clone, Copy)]
+pub struct MoveOutcome {
+    pub published: bool,
+}
+
+/// Ancestor chain of a page as `child → parent` pairs, walking UP from `item`
+/// (inclusive). Feeds `core::tree::is_ancestor_of` — the SQL fetches, the pure
+/// function decides.
+pub async fn parent_chain(db: &Db, item: &str) -> Result<std::collections::HashMap<String, String>> {
+    let rows: Vec<(String, Option<String>)> = sqlx::query_as(
+        "WITH RECURSIVE chain(id, parent_item_id, depth) AS ( \
+             SELECT id, parent_item_id, 0 FROM items WHERE id = ? AND workspace_id = ? \
+             UNION ALL \
+             SELECT i.id, i.parent_item_id, chain.depth + 1 \
+             FROM items i JOIN chain ON i.id = chain.parent_item_id \
+             WHERE chain.depth < 64 \
+         ) SELECT id, parent_item_id FROM chain",
+    )
+    .bind(item)
+    .bind(DEFAULT_WORKSPACE)
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(id, parent)| parent.map(|p| (id, p)))
+        .collect())
+}
+
+/// Moves a page in the sidebar tree: new parent (`None` = root) and position
+/// (`before` = the sibling it must land above, `None` = last).
+///
+/// Everything happens in ONE transaction — parent, ordering key and public scope
+/// cannot end up disagreeing. Refuses (`Error::BadId`) a move into the page's own
+/// descendance and a move under a database (a page parented to a database IS a
+/// database row, and `list_pages` hides those: the page would vanish).
+///
+/// Callers check permissions first (`routes::move_item`); this function owns the
+/// tree invariants only.
+pub async fn move_page(
+    db: &Db,
+    item: &ItemId,
+    new_parent: Option<&str>,
+    before: Option<&str>,
+    actor: &str,
+) -> Result<MoveOutcome> {
+    let item_s = item.to_string();
+    if let Some(parent) = new_parent {
+        // Cycle: the destination must not be the page itself nor one of its
+        // descendants. Decided by the pure function over the destination's chain.
+        let chain = parent_chain(db, parent).await?;
+        if crate::core::tree::is_ancestor_of(&chain, &item_s, parent) {
+            return Err(crate::error::Error::BadInput(
+                "a page cannot be moved into itself or one of its sub-pages".into(),
+            ));
+        }
+        let is_db: Option<bool> = sqlx::query_scalar(
+            "SELECT db_schema IS NOT NULL FROM items \
+             WHERE id = ? AND workspace_id = ? AND deleted_ts IS NULL",
+        )
+        .bind(parent)
+        .bind(DEFAULT_WORKSPACE)
+        .fetch_optional(db)
+        .await?;
+        match is_db {
+            None => return Err(crate::error::Error::NotFound),
+            Some(true) => {
+                return Err(crate::error::Error::BadInput(
+                    "a page cannot be moved into a database (its pages are rows)".into(),
+                ));
+            }
+            Some(false) => {}
+        }
+    }
+
+    let mut tx = db.begin().await?;
+
+    // Siblings of the destination, in display order, excluding the moved page
+    // (it may already live there — a pure reorder).
+    let siblings: Vec<(String, Option<i64>)> = match new_parent {
+        Some(parent) => {
+            sqlx::query_as(
+                "SELECT id, COALESCE(sidebar_seq, ts) FROM items \
+                 WHERE workspace_id = ? AND parent_item_id = ? AND source_channel = 'page' \
+                   AND deleted_ts IS NULL AND id != ? \
+                 ORDER BY COALESCE(sidebar_seq, ts), id",
+            )
+            .bind(DEFAULT_WORKSPACE)
+            .bind(parent)
+            .bind(&item_s)
+        }
+        None => sqlx::query_as(
+            "SELECT id, COALESCE(sidebar_seq, ts) FROM items \
+             WHERE workspace_id = ? AND parent_item_id IS NULL AND source_channel = 'page' \
+               AND deleted_ts IS NULL AND id != ? \
+             ORDER BY COALESCE(sidebar_seq, ts), id",
+        )
+        .bind(DEFAULT_WORKSPACE)
+        .bind(&item_s),
+    }
+    .fetch_all(&mut *tx)
+    .await?;
+
+    // Target index: before `before`, or at the end when it is absent/unknown.
+    let at = before
+        .and_then(|b| siblings.iter().position(|(id, _)| id == b))
+        .unwrap_or(siblings.len());
+    let key_at = |i: usize| -> Option<i64> { siblings.get(i).and_then(|(_, seq)| *seq) };
+    let seq = match crate::core::tree::seq_between(
+        at.checked_sub(1).and_then(key_at),
+        key_at(at),
+    ) {
+        Some(seq) => seq,
+        None => {
+            // Gap exhausted (or a list never renumbered): respace the siblings,
+            // then take the midpoint again — which now exists.
+            let keys = crate::core::tree::renumber(siblings.len());
+            for ((id, _), key) in siblings.iter().zip(&keys) {
+                sqlx::query("UPDATE items SET sidebar_seq = ? WHERE id = ?")
+                    .bind(key)
+                    .bind(id)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+            let before_key = at.checked_sub(1).and_then(|i| keys.get(i).copied());
+            let after_key = keys.get(at).copied();
+            crate::core::tree::seq_between(before_key, after_key)
+                .ok_or_else(|| crate::error::Error::BadInput("cannot order this position".into()))?
+        }
+    };
+
+    let moved = sqlx::query(
+        "UPDATE items SET parent_item_id = ?, sidebar_seq = ?, updated_ts = ?, updated_by = ? \
+         WHERE id = ? AND workspace_id = ? AND source_channel = 'page' AND deleted_ts IS NULL",
+    )
+    .bind(new_parent)
+    .bind(seq)
+    .bind(now_ms())
+    .bind(actor)
+    .bind(&item_s)
+    .bind(DEFAULT_WORKSPACE)
+    .execute(&mut *tx)
+    .await?;
+    if moved.rows_affected() == 0 {
+        return Err(crate::error::Error::NotFound);
+    }
+
+    let published = move_public_scope(&mut tx, &item_s, new_parent).await?;
+    tx.commit().await?;
+    Ok(MoveOutcome { published })
+}
+
+/// Realigns the public scope of a moved subtree (option 4, migration 0017).
+///
+/// Publication is INHERITED from the parent, so moving a page changes what is
+/// exposed: entering a published subtree publishes the branch, leaving one
+/// withdraws it from the web. A page that is a publication ROOT owns its own
+/// publication and is left alone — it was not published by inheritance.
+///
+/// Returns whether the moved page is publicly readable afterwards.
+async fn move_public_scope(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    item: &str,
+    new_parent: Option<&str>,
+) -> Result<bool> {
+    let is_root: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM publications WHERE id = ?)")
+        .bind(item)
+        .fetch_one(&mut **tx)
+        .await?;
+    if is_root {
+        return Ok(true);
+    }
+
+    // Publication of the destination (None = the destination is not public).
+    let target: Option<String> = match new_parent {
+        Some(parent) => {
+            sqlx::query_scalar("SELECT publication_id FROM public_page_items WHERE item_id = ?")
+                .bind(parent)
+                .fetch_optional(&mut **tx)
+                .await?
+        }
+        None => None,
+    };
+    let current: Option<String> =
+        sqlx::query_scalar("SELECT publication_id FROM public_page_items WHERE item_id = ?")
+            .bind(item)
+            .fetch_optional(&mut **tx)
+            .await?;
+    if target == current {
+        return Ok(target.is_some());
+    }
+
+    // The whole branch follows: a sub-page is exposed through its ancestors.
+    let subtree: Vec<String> = sqlx::query_scalar(
+        "WITH RECURSIVE sub(id) AS ( \
+             SELECT id FROM items WHERE id = ? \
+             UNION ALL SELECT i.id FROM items i JOIN sub ON i.parent_item_id = sub.id \
+         ) SELECT id FROM sub",
+    )
+    .bind(item)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    for id in &subtree {
+        // A nested publication root keeps its own publication, and so does its
+        // branch — do not drag it along.
+        let nested_root: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM publications WHERE id = ?)")
+                .bind(id)
+                .fetch_one(&mut **tx)
+                .await?;
+        if nested_root && id != item {
+            continue;
+        }
+        match &target {
+            Some(pid) => {
+                sqlx::query(
+                    "INSERT INTO public_page_items (item_id, publication_id, added_ts) \
+                     VALUES (?, ?, ?) \
+                     ON CONFLICT(item_id) DO UPDATE SET publication_id = excluded.publication_id",
+                )
+                .bind(id)
+                .bind(pid)
+                .bind(now_ms())
+                .execute(&mut **tx)
+                .await?;
+            }
+            None => {
+                sqlx::query("DELETE FROM public_page_items WHERE item_id = ?")
+                    .bind(id)
+                    .execute(&mut **tx)
+                    .await?;
+            }
+        }
+    }
+    Ok(target.is_some())
 }
 
 /// Account id for an email, if any. Used by the invitation path to decide

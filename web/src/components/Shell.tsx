@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { useConfirmPublicChild } from "@/lib/publishConsent";
+import { useConfirmMovePublic, useConfirmPublicChild } from "@/lib/publishConsent";
 import { acquireRoom, releaseRoom } from "@/lib/room";
 import { exportCsv, exportMarkdown } from "@/lib/export";
 import { exportDbBundle } from "@/lib/bundle";
@@ -49,6 +49,7 @@ import {
   duplicateItem,
   getItem,
   listItems,
+  moveItem,
   patchItem,
   setFavorite,
   type ItemMeta,
@@ -180,6 +181,7 @@ export function Shell({
   // Bumped after a CSV import to remount the active page (reloads its rows).
   const [refreshKey, setRefreshKey] = useState(0);
   const confirmPublicChild = useConfirmPublicChild();
+  const confirmMovePublic = useConfirmMovePublic();
   // Managing shares = administration power over the item, not just direct
   // ownership: the server also grants it through supervision (owner over
   // everyone, admin over a member — cf. require_owner/can_administer). The meta
@@ -213,6 +215,21 @@ export function Shell({
       await refresh();
       navigate(`/p/${id}`);
     } catch (e) {
+      setError(e instanceof Error ? e.message : t("common.unknownError"));
+    }
+  }
+
+  /** Sidebar move: reorder among siblings, reparent, or pull out to the root
+   * (`parent` null). Asks first when the move changes what is public — in either
+   * direction, cf. `useConfirmMovePublic`. */
+  async function onMove(id: string, parent: string | null, before: string | null) {
+    if (!(await confirmMovePublic(id, parent))) return;
+    try {
+      await moveItem(id, parent, before);
+      await refresh();
+    } catch (e) {
+      // The server refuses a cycle, a database destination and a missing right;
+      // its message says which, so it is worth surfacing as is.
       setError(e instanceof Error ? e.message : t("common.unknownError"));
     }
   }
@@ -304,6 +321,7 @@ export function Shell({
         onToggleFavorite={(id, fav) => void onToggleFavorite(id, fav)}
         onCreate={(kind) => void onCreate(kind)}
         onCreateSub={(pid) => void onCreateSub(pid)}
+        onMove={(id, parent, before) => void onMove(id, parent, before)}
         onDuplicate={(id) => void onDuplicate(id)}
         onRename={(id, title) => void onRename(id, title)}
         onDelete={(id) => void onDelete(id)}

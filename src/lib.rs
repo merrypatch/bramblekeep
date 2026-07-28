@@ -161,6 +161,9 @@ pub fn build_app(state: AppState) -> Router {
             "/api/v1/items",
             post(routes::create_item).get(routes::list_items),
         )
+        // Sidebar tree: reorder / reparent / pull out to the root (drag & drop
+        // and the "Move to…" menu share it).
+        .route("/api/v1/items/{id}/move", post(routes::move_item))
         .route("/api/v1/graph", get(routes::page_graph))
         .route("/api/v1/mentions", get(routes::search_mentions))
         .route(

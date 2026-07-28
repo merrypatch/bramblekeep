@@ -98,7 +98,10 @@
   "publishConsent": {
     "title": "This sub-page will be public",
     "body": "The parent page is published to the web. This sub-page will be accessible to anyone, without signing in, via the same public link. You can unpublish it at any time.",
-    "confirm": "Create the sub-page"
+    "confirm": "Create the sub-page",
+    "unpublishTitle": "This page will leave the web",
+    "unpublishBody": "It is currently public because its parent page is published. Moving it out withdraws it — and its own sub-pages — from the public link. You can publish it again at any time.",
+    "unpublishConfirm": "Move and withdraw"
   },
   "db": {
     "columnType": {
@@ -1086,7 +1089,12 @@
       "title": "Support the project",
       "body": "{{app}} is free and open. See what makes it possible.",
       "cta": "Learn more"
-    }
+    },
+    "moveTo": "Move to…",
+    "moveToTitle": "Move “{{name}}”",
+    "moveSearch": "Search for a destination page…",
+    "moveRoot": "No parent (root page)",
+    "dropToRoot": "Drop here to remove the parent"
   },
   "credits": {
     "title": "What makes {{app}} possible",
