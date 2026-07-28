@@ -135,4 +135,123 @@ describe("buildChart — series", () => {
     expect(r.datasets[1].data).toEqual([37.2]);
     expect(r.single).toBe(false);
   });
+
+  it("splits a relation column by linked-page title, not by id", () => {
+    // A relation cell stores ids; DatabaseView resolves them to titles through
+    // `seriesValues`. Without it the legend would read "row-neo".
+    const cols: DbColumn[] = [...COLUMNS, { id: "person", name: "Personne", type: "relation" }];
+    const titles: Record<string, string> = { "row-neo": "Neo", "row-biel": "Biel" };
+    const rows: Row[] = [
+      { ...reading("a", "2026-07-19T09:00", 39.1), props: { date: "2026-07-19T09:00", temp: 39.1, person: ["row-neo"] } },
+      { ...reading("b", "2026-07-19T09:00", 36.5), props: { date: "2026-07-19T09:00", temp: 36.5, person: ["row-biel"] } },
+    ];
+    const values = (row: Row, colId: string): string[] => {
+      const v = row.props[colId];
+      return Array.isArray(v) ? v.map((id) => titles[String(id)] ?? "").filter(Boolean) : [];
+    };
+    const r = buildChart(
+      rows,
+      view({ chartBucket: "hour", chartAgg: "avg", chartSeries: "person" }),
+      cols,
+      text,
+      values,
+    );
+    expect(r.datasets.map((d) => d.label)).toEqual(["Neo", "Biel"]);
+    expect(r.datasets[0].data).toEqual([39.1]);
+    expect(r.datasets[1].data).toEqual([36.5]);
+  });
+
+  it("feeds every series of a multi-value cell", () => {
+    // A reading tagged with two people belongs to both curves.
+    const cols: DbColumn[] = [...COLUMNS, { id: "tags", name: "Tags", type: "multiselect" }];
+    const rows: Row[] = [
+      { ...reading("a", "2026-07-19T09:00", 4), props: { date: "2026-07-19T09:00", temp: 4, tags: ["x", "y"] } },
+      { ...reading("b", "2026-07-19T09:00", 2), props: { date: "2026-07-19T09:00", temp: 2, tags: ["y"] } },
+    ];
+    const values = (row: Row, colId: string): string[] => {
+      const v = row.props[colId];
+      return Array.isArray(v) ? v.map(String) : [];
+    };
+    const r = buildChart(
+      rows,
+      view({ chartBucket: "hour", chartAgg: "sum", chartSeries: "tags" }),
+      cols,
+      text,
+      values,
+    );
+    expect(r.datasets.map((d) => d.label)).toEqual(["x", "y"]);
+    expect(r.datasets[0].data).toEqual([4]);
+    expect(r.datasets[1].data).toEqual([6]); // 4 + 2
+  });
+
+  it("groups the rows with an empty series cell together", () => {
+    const cols: DbColumn[] = [...COLUMNS, { id: "person", name: "Personne", type: "relation" }];
+    const rows: Row[] = [{ ...reading("a", "2026-07-19T09:00", 39.1), props: { date: "2026-07-19T09:00", temp: 39.1 } }];
+    const r = buildChart(
+      rows,
+      view({ chartBucket: "hour", chartAgg: "avg", chartSeries: "person" }),
+      cols,
+      text,
+      () => [],
+    );
+    expect(r.datasets).toHaveLength(1);
+    expect(r.datasets[0].data).toEqual([39.1]);
+  });
+});
+
+describe("buildChart — relation as the X axis", () => {
+  const cols: DbColumn[] = [...COLUMNS, { id: "person", name: "Personne", type: "relation" }];
+  const titles: Record<string, string> = { "row-neo": "Neo", "row-biel": "Biel" };
+  const values = (row: Row, colId: string): string[] => {
+    const v = row.props[colId];
+    if (Array.isArray(v)) return v.map((id) => titles[String(id)] ?? String(id)).filter(Boolean);
+    const s = String(v ?? "");
+    return s ? [s] : [];
+  };
+  const linked = (id: string, temp: number, people: string[]): Row => ({
+    id,
+    title: id,
+    icon: null,
+    cover: null,
+    props: { temp, person: people },
+  });
+
+  it("puts one bucket per linked page, labelled by title", () => {
+    const rows = [linked("a", 39.1, ["row-neo"]), linked("b", 36.5, ["row-biel"])];
+    const r = buildChart(rows, view({ groupBy: "person", chartAgg: "avg" }), cols, text, values);
+    expect(r.labels).toEqual(["Biel", "Neo"]); // alpha order, as for any text axis
+    expect(r.datasets[0].data).toEqual([36.5, 39.1]);
+  });
+
+  it("counts a row in every bucket it is linked to", () => {
+    const rows = [linked("a", 39.1, ["row-neo", "row-biel"]), linked("b", 37.1, ["row-neo"])];
+    const r = buildChart(rows, view({ groupBy: "person", chartAgg: "count" }), cols, text, values);
+    expect(r.labels).toEqual(["Biel", "Neo"]);
+    expect(r.datasets[0].data).toEqual([1, 2]);
+  });
+
+  it("crosses a relation axis with a series", () => {
+    const rows = [
+      { ...linked("a", 39.1, ["row-neo"]), props: { temp: 39.1, person: ["row-neo"], who: "Mum" } },
+      { ...linked("b", 38.0, ["row-neo"]), props: { temp: 38.0, person: ["row-neo"], who: "Dad" } },
+    ];
+    const r = buildChart(
+      rows,
+      view({ groupBy: "person", chartAgg: "avg", chartSeries: "who" }),
+      cols,
+      text,
+      values,
+    );
+    expect(r.labels).toEqual(["Neo"]);
+    expect(r.datasets.map((d) => d.label)).toEqual(["Mum", "Dad"]);
+    expect(r.datasets[0].data).toEqual([39.1]);
+    expect(r.datasets[1].data).toEqual([38]);
+  });
+
+  it("keeps the rows without a link in their own bucket", () => {
+    const rows = [linked("a", 39.1, ["row-neo"]), linked("b", 38.0, [])];
+    const r = buildChart(rows, view({ groupBy: "person", chartAgg: "avg" }), cols, text, values);
+    expect(r.labels).toHaveLength(2);
+    expect(r.labels).toContain("Neo");
+  });
 });

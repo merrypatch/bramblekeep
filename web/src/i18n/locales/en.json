@@ -1212,7 +1212,8 @@
     "ideal": "Ideal",
     "target": "Target",
     "rowCount": "Row count",
-    "noData": "No data to display."
+    "noData": "No data to display.",
+    "noValue": "No value"
   },
   "templateTokens": {
     "date": "Row creation date.",

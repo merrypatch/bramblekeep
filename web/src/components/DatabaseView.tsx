@@ -202,6 +202,33 @@ const CAL_MAX_MONTH = new Date(2200, 11, 31);
 /** Column types used as a time axis in a chart (date + meta dates). */
 const CHART_TIME_TYPES = new Set(["date", "created_time", "last_edited_time"]);
 
+/** Column types that can split a chart into series (one curve per value).
+ * `relation` and `multiselect` hold several values: a row then feeds every
+ * matching series (see `buildChart`'s `values`). */
+const CHART_SERIES_TYPES: ReadonlySet<ColumnType> = new Set<ColumnType>([
+  "select",
+  "status",
+  "formula",
+  "relation",
+  "multiselect",
+  "text",
+]);
+
+/** Column types usable as a chart's X axis. Same multi-value rule as the series:
+ * a row with two linked pages lands in both buckets. */
+const CHART_AXIS_TYPES: ReadonlySet<ColumnType> = new Set<ColumnType>([
+  "select",
+  "status",
+  "date",
+  "text",
+  "created_time",
+  "last_edited_time",
+  "formula",
+  "rollup",
+  "relation",
+  "multiselect",
+]);
+
 type SortState = { key: string; dir: "asc" | "desc" };
 
 /** Cleans an input to keep only a valid number: digits, a single decimal
@@ -797,6 +824,32 @@ export function DatabaseView({
     return model;
   }, [activeView, filteredRows, rows, relTitles, schema.columns, t, graphRefs]);
 
+  // Values of a cell as a LIST, for the chart: a relation stores ids (resolved
+  // against `relTitles`, so the legend shows "Neo" and not a UUID) and a
+  // multiselect several options — each one becomes its own series.
+  const chartValues = useCallback(
+    (row: Row, columnId: string): string[] => {
+      const type = columnById.get(columnId)?.type;
+      const v = row.props[columnId];
+      if (type === "relation") {
+        return Array.isArray(v) ? v.map((id) => relTitles.get(String(id)) ?? "").filter(Boolean) : [];
+      }
+      if (type === "multiselect") {
+        return Array.isArray(v)
+          ? v.map((x) => (typeof x === "string" ? x : ((x as { name?: string })?.name ?? ""))).filter(Boolean)
+          : [];
+      }
+      const text = cellText(row, columnId);
+      return text ? [text] : [];
+    },
+    [columnById, relTitles],
+  );
+  // Same, flattened: text of a cell for the X axis.
+  const chartText = useCallback(
+    (row: Row, columnId: string) => chartValues(row, columnId).join(", "),
+    [chartValues],
+  );
+
   const chartData = useMemo(() => {
     if (activeView?.type !== "chart" || !activeView.groupBy) return null;
     // Inject the computed values into the props so the chart reads them.
@@ -804,8 +857,8 @@ export function DatabaseView({
       const d = derived.get(r.id);
       return d ? { ...r, props: { ...r.props, ...d } } : r;
     });
-    return buildChart(chartRows, activeView, schema.columns, cellText);
-  }, [activeView, filteredRows, schema.columns, derived]);
+    return buildChart(chartRows, activeView, schema.columns, chartText, chartValues);
+  }, [activeView, filteredRows, schema.columns, derived, chartText, chartValues]);
 
   useEffect(() => setSchema(parseSchema(schemaJson)), [schemaJson]);
 
@@ -1764,17 +1817,7 @@ export function DatabaseView({
                       onPick={() => setChartParam({ groupBy: TITLE_KEY })}
                     />
                     {schema.columns
-                      .filter(
-                        (c) =>
-                          c.type === "select" ||
-                          c.type === "status" ||
-                          c.type === "date" ||
-                          c.type === "text" ||
-                          c.type === "created_time" ||
-                          c.type === "last_edited_time" ||
-                          c.type === "formula" ||
-                          c.type === "rollup",
-                      )
+                      .filter((c) => CHART_AXIS_TYPES.has(c.type))
                       .map((c) => (
                         <MenuRadio
                           key={c.id}
@@ -1808,7 +1851,7 @@ export function DatabaseView({
                       onPick={() => setChartParam({ chartSeries: undefined })}
                     />
                     {schema.columns
-                      .filter((c) => c.type === "select" || c.type === "status" || c.type === "formula")
+                      .filter((c) => CHART_SERIES_TYPES.has(c.type))
                       .map((c) => (
                         <MenuRadio
                           key={c.id}

@@ -1212,7 +1212,8 @@
     "ideal": "Ideal",
     "target": "Objetivo",
     "rowCount": "Número de filas",
-    "noData": "Sin datos que mostrar."
+    "noData": "Sin datos que mostrar.",
+    "noValue": "Sin valor"
   },
   "templateTokens": {
     "date": "Fecha de creación de la fila.",

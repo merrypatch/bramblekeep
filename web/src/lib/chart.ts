@@ -117,12 +117,20 @@ const reduce = (arr: number[], agg: string): number | null => {
 };
 
 /** Builds a chart's labels + series from the rows and the view's config.
- * Pure (no I/O); `label(row, colId)` = text of a cell. */
+ * Pure (no I/O); `label(row, colId)` = text of a cell.
+ *
+ * `values(row, colId)` = the values of a cell as a LIST, for the columns that
+ * hold SEVERAL (relation, multiselect). A row then feeds every one of them,
+ * whether they are series (a reading tagged "Neo, Biel" counts in both curves)
+ * or X buckets (it appears in the "Neo" column AND in the "Biel" one — the
+ * grouping semantics of the table view). Defaults to the single value of
+ * `label`. */
 export function buildChart(
   rows: Row[],
   view: DbView,
   columns: DbColumn[],
   label: (row: Row, colId: string) => string,
+  values?: (row: Row, colId: string) => string[],
 ): ChartResult {
   const xCol = columns.find((c) => c.id === view.groupBy);
   const metaField = xCol ? META_DATE_FIELD[xCol.type] : undefined;
@@ -134,9 +142,10 @@ export function buildChart(
   const valueId = view.chartValueCol;
   const transform = view.chartTransform ?? "none";
 
-  // X-axis key/label/sort of a row (date, meta date, or text value).
-  const xKeyOf = (r: Row): { key: string; label: string; sort: number } => {
-    if (!view.groupBy) return { key: "all", label: i18n.t("chart.all"), sort: 0 };
+  // X-axis keys/labels/sort of a row (date, meta date, or text values). Several
+  // keys only for a multi-value column (relation, multiselect).
+  const xKeysOf = (r: Row): { key: string; label: string; sort: number }[] => {
+    if (!view.groupBy) return [{ key: "all", label: i18n.t("chart.all"), sort: 0 }];
     if (timeAxis) {
       // Kept whole ("YYYY-MM-DD" or "YYYY-MM-DDTHH:mm"): the `hour` bucket needs
       // the time, the coarser ones drop it themselves.
@@ -148,13 +157,24 @@ export function buildChart(
         const dv = parseDateValue(r.props[view.groupBy]);
         iso = dv ? dv.start : null;
       }
-      if (!iso) return { key: "no-date", label: i18n.t("chart.noDate"), sort: 0 };
+      if (!iso) return [{ key: "no-date", label: i18n.t("chart.noDate"), sort: 0 }];
       const b = bucketOf(iso, bucket);
-      return { key: b.key, label: b.label, sort: b.sort };
+      return [{ key: b.key, label: b.label, sort: b.sort }];
     }
-    const v = label(r, view.groupBy) || "Sans valeur";
-    return { key: v, label: v, sort: 0 };
+    const vals = cellKeys(r, view.groupBy);
+    return vals.map((v) => ({ key: v, label: v, sort: 0 }));
   };
+
+  /** Non-empty keys of a cell; a cell with nothing gets its own "No value"
+   * bucket rather than dropping the row. */
+  function cellKeys(r: Row, colId: string): string[] {
+    const raw = values ? values(r, colId) : [label(r, colId)];
+    const clean = raw.map((v) => v.trim()).filter(Boolean);
+    return clean.length ? clean : [i18n.t("chart.noValue")];
+  }
+
+  // Series a row belongs to: [""] without a split, one or more keys otherwise.
+  const seriesKeysOf = (r: Row): string[] => (seriesId ? cellKeys(r, seriesId) : [""]);
 
   // x -> (series -> raw values). Also memorizes sort/label of date x's.
   const cells = new Map<string, Map<string, number[]>>();
@@ -162,20 +182,24 @@ export function buildChart(
   const seriesOrder: string[] = [];
 
   for (const r of rows) {
-    const { key: xKey, label: xLabel, sort: xSort } = xKeyOf(r);
-    if (!xMeta.has(xKey)) xMeta.set(xKey, { sort: xSort, label: xLabel });
+    const xKeys = xKeysOf(r);
+    for (const x of xKeys) if (!xMeta.has(x.key)) xMeta.set(x.key, { sort: x.sort, label: x.label });
 
-    const sKey = seriesId ? label(r, seriesId) || "Sans valeur" : "";
-    if (seriesId && !seriesOrder.includes(sKey)) seriesOrder.push(sKey);
+    const sKeys = seriesKeysOf(r);
+    if (seriesId) for (const s of sKeys) if (!seriesOrder.includes(s)) seriesOrder.push(s);
 
     const raw = agg === "count" ? 1 : Number(r.props[valueId ?? ""]);
     if (agg !== "count" && (raw == null || Number.isNaN(raw))) continue;
 
-    const bySeries = cells.get(xKey) ?? new Map<string, number[]>();
-    cells.set(xKey, bySeries);
-    const arr = bySeries.get(sKey) ?? [];
-    bySeries.set(sKey, arr);
-    arr.push(raw);
+    for (const x of xKeys) {
+      const bySeries = cells.get(x.key) ?? new Map<string, number[]>();
+      cells.set(x.key, bySeries);
+      for (const sKey of sKeys) {
+        const arr = bySeries.get(sKey) ?? [];
+        bySeries.set(sKey, arr);
+        arr.push(raw);
+      }
+    }
   }
 
   // Order of x's: filled & sorted dates, otherwise alpha (or by value below).
@@ -201,7 +225,9 @@ export function buildChart(
     const doneByX = new Map<string, number>();
     for (const r of rows) {
       if (!isDone(r)) continue;
-      const k = xKeyOf(r).key;
+      // A done row is burnt down ONCE, even if a multi-value X puts it in
+      // several buckets — otherwise the remaining total would go negative.
+      const k = xKeysOf(r)[0].key;
       doneByX.set(k, (doneByX.get(k) ?? 0) + valOf(r));
     }
     let run = 0;

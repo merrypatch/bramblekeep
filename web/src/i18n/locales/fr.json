@@ -1212,7 +1212,8 @@
     "ideal": "Idéal",
     "target": "Cible",
     "rowCount": "Nombre de lignes",
-    "noData": "Aucune donnée à afficher."
+    "noData": "Aucune donnée à afficher.",
+    "noValue": "Sans valeur"
   },
   "templateTokens": {
     "date": "Date de création de la ligne.",
