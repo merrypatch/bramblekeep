@@ -2,11 +2,13 @@
 /target
 **/*.rs.bk
 
-# SQLite (local data)
-bramblekeep.db
-bramblekeep.db-shm
-bramblekeep.db-wal
-bramblekeep.db.bak*
+# SQLite (local data). Any local database, whatever it is named: a throwaway
+# instance for testing (`DATABASE_URL=sqlite://scratch.db cargo run`) must never
+# reach a commit.
+*.db
+*.db-shm
+*.db-wal
+*.db.bak*
 /files
 
 # Front
