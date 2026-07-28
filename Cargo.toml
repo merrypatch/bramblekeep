@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 axum = { version = "0.8", features = ["macros", "ws", "multipart"] }
 tokio = { version = "1", features = ["full"] }
-yrs = "0.23"
+yrs = "0.27"
 futures-util = "0.3"
 bytes = "1"
 sha2 = "0.10"
