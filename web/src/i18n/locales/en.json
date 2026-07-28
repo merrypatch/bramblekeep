@@ -1245,7 +1245,8 @@
     "ideal": "Ideal",
     "target": "Target",
     "rowCount": "Row count",
-    "noData": "No data to display."
+    "noData": "No data to display.",
+    "seriesLabel": "{{agg}} of {{column}}"
   },
   "templateTokens": {
     "date": "Row creation date.",

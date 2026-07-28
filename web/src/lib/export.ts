@@ -111,7 +111,7 @@ function blocksToMarkdown(blocks: BlockNode[]): string {
 /** Exports a page's Markdown content (title + blocks). */
 export async function exportMarkdown(itemId: string): Promise<void> {
   const [meta, blocks] = await Promise.all([getItem(itemId), getBlocks(itemId)]);
-  const md = `# ${meta.title || "Sans titre"}\n\n${blocksToMarkdown(blocks)}\n`;
+  const md = `# ${meta.title || i18n.t("common.untitled")}\n\n${blocksToMarkdown(blocks)}\n`;
   download(`${safeName(meta.title)}.md`, md, "text/markdown");
 }
 
@@ -121,7 +121,7 @@ function cellExport(col: DbColumn, raw: unknown, linkTitles: Map<string, string>
   if (raw == null) return "";
   switch (col.type) {
     case "checkbox":
-      return raw === true ? "oui" : "non";
+      return raw === true ? i18n.t("formula.value.yes") : i18n.t("formula.value.no");
     case "date": {
       const dv = parseDateValue(raw);
       return dv ? (dv.end ? `${dv.start} → ${dv.end}` : dv.start) : "";

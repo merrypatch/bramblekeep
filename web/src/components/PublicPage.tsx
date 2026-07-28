@@ -6,6 +6,8 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import i18n from "@/i18n";
 import { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
 
@@ -64,7 +66,7 @@ function Breadcrumb({
     <nav className="mb-4 flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
       {trail.map((p, i) => {
         const last = i === trail.length - 1;
-        const title = p.title || "Sans titre";
+        const title = p.title || i18n.t("common.untitled");
         const href = i === 0 ? `/public/${token}` : `/public/${token}/${p.id}`;
         // ItemIcon (not the raw string): an icon can be an emoji, a Lucide name
         // or an image — files resolved through the publication token.
@@ -188,7 +190,7 @@ function PublicRender({
             resolveFile={(hash) => publicFileUrl(token, hash)}
           />
         )}
-        <span>{meta.title || "Sans titre"}</span>
+        <span>{meta.title || i18n.t("common.untitled")}</span>
       </h1>
       <BlockNoteView
         editor={editor}

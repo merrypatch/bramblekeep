@@ -301,6 +301,8 @@ function defaultSeriesLabel(view: DbView, columns: DbColumn[]): string {
   const agg = view.chartAgg ?? "count";
   if (agg === "count") return i18n.t("chart.rowCount");
   const col = columns.find((c) => c.id === view.chartValueCol)?.name ?? "";
-  const verb = agg === "sum" ? "Somme" : agg === "avg" ? "Moyenne" : agg === "min" ? "Min" : "Max";
-  return `${verb} de ${col}`;
+  // Reuses the aggregate names of the chart settings menu, so the legend says
+  // exactly what the menu says — in the reader's language.
+  const verb = i18n.t(`dbview.chart.agg.${agg}` as "dbview.chart.agg.sum");
+  return i18n.t("chart.seriesLabel", { agg: verb, column: col });
 }

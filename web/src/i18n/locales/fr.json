@@ -1245,7 +1245,8 @@
     "ideal": "Idéal",
     "target": "Cible",
     "rowCount": "Nombre de lignes",
-    "noData": "Aucune donnée à afficher."
+    "noData": "Aucune donnée à afficher.",
+    "seriesLabel": "{{agg}} de {{column}}"
   },
   "templateTokens": {
     "date": "Date de création de la ligne.",

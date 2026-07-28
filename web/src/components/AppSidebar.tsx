@@ -2,6 +2,8 @@ import { ChevronRight, Clock, Copy, FileStack, FileText, Files, FolderTree, Hear
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import i18n from "@/i18n";
+
 import { Avatar, avatarConfig } from "@/components/Avatar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { SearchBox } from "@/components/SearchBox";
@@ -59,7 +61,7 @@ import type { ItemMeta, User } from "@/lib/api";
 import { APP_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
-const labelOf = (it: ItemMeta) => it.title || "Sans titre";
+const labelOf = (it: ItemMeta) => it.title || i18n.t("common.untitled");
 
 /** Number of root pages shown before collapsing the overflow behind a "show more".
  * Subpages are already collapsible under their parent: only the number of roots

@@ -43,6 +43,7 @@ Bramblekeep — self-hosted workspace, single binary.
 
   bramblekeep                        start the server
   bramblekeep set-password <email>   set an account's password (reads it on stdin)
+  bramblekeep --version              print the version
   bramblekeep help                   this message
 
 set-password is the way back in when nobody can sign in: no SMTP relay, or a
@@ -110,6 +111,12 @@ async fn main() -> anyhow::Result<()> {
         }
         Some("help" | "--help" | "-h") => {
             print!("{USAGE}");
+            return Ok(());
+        }
+        // Asked for in the bug-report template: it must work, and it must not
+        // start a server as a side effect.
+        Some("version" | "--version" | "-V") => {
+            println!("bramblekeep {}", env!("CARGO_PKG_VERSION"));
             return Ok(());
         }
         Some(unknown) => anyhow::bail!("unknown command `{unknown}`. Try `bramblekeep help`."),

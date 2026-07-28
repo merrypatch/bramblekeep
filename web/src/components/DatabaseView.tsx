@@ -254,7 +254,7 @@ function cellText(row: Row, key: string): string {
   if (key === TITLE_KEY) return row.title ?? "";
   const v = row.props[key];
   if (v == null) return "";
-  if (typeof v === "boolean") return v ? "oui" : "non";
+  if (typeof v === "boolean") return v ? i18n.t("formula.value.yes") : i18n.t("formula.value.no");
   if (Array.isArray(v))
     return v.map((x) => (typeof x === "string" ? x : ((x as { name?: string })?.name ?? ""))).join(" ");
   if (typeof v === "object") {
@@ -2662,7 +2662,7 @@ export function DatabaseView({
                   ) : (
                     <div className="flex items-center gap-2 px-6 pb-4">
                       <ItemIcon icon={r.icon} size={20} className="shrink-0" />
-                      <span className="text-lg font-semibold">{r.title || "Sans titre"}</span>
+                      <span className="text-lg font-semibold">{r.title || t("common.untitled")}</span>
                     </div>
                   )}
                 </SheetHeader>
