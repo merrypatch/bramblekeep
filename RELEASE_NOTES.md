@@ -1,95 +1,64 @@
-## Bramblekeep v0.11.0
+## Bramblekeep v0.12.0
 
-You can sign in with a password, so a fresh instance no longer sends you to the
-server logs. And the app now carries its own documentation.
+An instance you cannot reach before the internet can is no longer claimable by
+whoever gets there first — if you want it that way.
 
 ### Added
 
-- **Email + password sign-in, alongside the magic link.** A brand-new instance has
-  no account: the first visitor creates the **owner** with an email and a password
-  and lands straight in — **no SMTP required**, which is what previously forced the
-  operator to read `docker logs` for a sign-in link.
-  - Settings → Account → Password: set it, change it (the current one is required),
-    or remove it to go back to links only. Minimum 12 characters, hashed with
-    argon2id.
-  - Changing your password **closes all your other sessions**.
-  - Magic links remain the path the interface puts forward once a mail relay is
-    configured, and an existing password keeps working — it is the way in when the
-    relay breaks.
-  - Locked out with no mail relay? `bramblekeep set-password <email>` on the
-    server. The password is read on standard input, and on an instance with no
-    account at all the command creates the owner.
-  - Owners and admins can **reset a member's password**: it is cleared and their
-    sessions are closed, with a fresh sign-in link mailed if a relay exists. No
-    credential is ever handed to the administrator.
-- **Built-in documentation**, on the home page → *Documentation*. Ten chapters in
-  English, French and Spanish, shipped inside the binary: they always describe the
-  version you are running, every member can read them without anything being
-  shared, and no outbound call is made to fetch them.
-- **Drag & drop in the sidebar.** Drag a page to reorder it among its siblings,
-  drop it onto another page to make it a sub-page, or onto the dashed strip to pull
-  it back out to the root. **Move to…** in the page menu does the same from a
-  phone or the keyboard. Moving a page in or out of a **published** subtree changes
-  what is public, and asks first — in both directions.
-- **"Turn into" in the block menu.** Hover a block, open **⋮⋮**, and change its
-  type: text, headings, lists, checklist, toggle, quote, code. Same block, same
-  position, only the lens changes.
-- **Charts split by a relation.** *Split into series* and the **X axis** now accept
-  a relation or a multi-select column, showing the linked pages' titles — one curve
-  per person, for instance. A row holding several values feeds every matching
-  series or bucket.
-- **A home page worth landing on:** new page, all pages, documentation, support the
-  project.
-
-### Changed
-
-- **Block background colours are no longer solid slabs.** Each of the nine colours
-  is now a wash of its hue over the page background, with rounded corners and
-  padding that grows outwards — the text column does not shift. The palette
-  swatches stay saturated so they remain distinguishable.
-- **The graph view tells pages and databases apart:** pages are circles, databases
-  are rounded squares, with a legend. Shape rather than shade, so it holds in both
-  themes and for colour-blind readers. Database relation graphs gained the same
-  legend (rows / linked rows).
-- **The notification bell and the support link stay reachable on the collapsed
-  sidebar rail**, where they used to disappear entirely.
-- **Email addresses are validated properly.** `admin`, `a@b` or `user@localhost`
-  used to pass and would then fail at SMTP send time; sign-in, sign-up and
-  invitations now reject what cannot be delivered to.
-- **Inviting someone with no mail relay configured no longer pretends to have sent
-  anything.** The invitation is created and the interface hands you the link to
-  pass on yourself. That link is only offered for an address that has no account
-  yet — it would otherwise open *that person's* session.
+- **`SETUP_CODE`, an optional secret to claim the instance.** Until now, a brand-new
+  instance was claimed by its first visitor: fine on a laptop, uncomfortable on a
+  VPS whose port answers before you have signed up. Start the instance with
+  `SETUP_CODE=a-long-secret` and creating the **owner** account requires it — the
+  sign-in screen shows one extra field, and nothing else changes.
+  - **Leaving it out keeps today's behaviour exactly.** No migration, no new
+    mandatory step, and no code to read from the logs — which is what the previous
+    release set out to remove.
+  - It gates **only** the first account. Once that account exists the code is
+    inert, and the sign-up route is closed to everyone anyway, code or not.
+  - Available everywhere the rest of the configuration is: `.env`,
+    `docker-compose.yml`, and `SETUP_CODE=… | sudo bash` on the one-line installer.
+  - Whitespace around the value is ignored, because a pasted secret carries some.
+    The comparison is made on digests, so a wrong code reveals nothing through
+    timing, and the sign-up route was already rate-limited per IP.
+- **`bramblekeep --version`.** The bug-report template asked reporters for its
+  output; it did not exist. It now prints the version and exits without starting a
+  server.
+- **A security policy** (`SECURITY.md`): private reporting through GitHub
+  advisories, a 7-day first answer, and an explicit list of what is deliberate
+  rather than a vulnerability — an unclaimed instance without `SETUP_CODE`, a
+  public link being a capability, admins supervising members' content, sign-in
+  links landing in the log with no SMTP relay.
+- **A code of conduct**, and a Dependabot configuration (monthly version updates,
+  grouped; security updates are not throttled by that schedule).
 
 ### Fixed
 
-- **The documentation's table of contents stays put** while a chapter scrolls.
-- A local SQLite database created for testing (`scratch.db` and friends) is now
-  git-ignored, and `web/dist/.gitkeep` is tracked, so a fresh clone builds.
+- **French strings in an English interface.** "Sans titre" was the fallback title
+  in the sidebar — so on every untitled page — on **public pages**, in the database
+  row peek and in the Markdown export. A checkbox read "oui"/"non" in search, in
+  filters, in chart labels and in the CSV export, and a chart legend read "Somme
+  de X". All of them now go through the interface's own translations.
+
+### Changed
+
+- The README describes what the tool actually does, with screenshots, and no
+  longer claims public pages are unimplemented — they shipped several releases
+  ago. The validation command it documents now includes the frontend test suite.
 
 ### Upgrading
 
 - **Docker:** `docker compose pull && docker compose up -d` — or the in-app Update
   button. **Bare metal:** re-run the installer, or the Update button.
-- **Two additive migrations** (`0027`, `0028`) apply at startup: a nullable password
-  column, and a sidebar ordering key seeded from each page's creation timestamp — so
-  your sidebar keeps exactly the order it had, and only the pages you drag move.
-- Nothing to reconfigure. Existing accounts keep signing in by magic link and have
-  no password until they set one.
+- **No migration**, and nothing to reconfigure. `SETUP_CODE` is opt-in; an instance
+  that already has an owner is unaffected by it either way.
 - If you serve behind a CDN, **purge `/sw.js`** after upgrading, or browsers keep
   running the previous bundle from the service worker cache.
 
 ### Security notes
 
-- Between a first start and the creation of the owner account, an instance is
-  **unclaimed**: whoever reaches it can claim it. Create the owner right after
-  starting the server, and do not expose the port publicly before that. The startup
-  banner says so when no account exists.
-- Every failed sign-in answers the same 401 — unknown email, no password, disabled
-  account, wrong password — and spends the same argon2 work against a dummy hash,
-  so response time is not an oracle either. Password attempts are rate-limited on
-  their own budget, so brute force cannot exhaust an address's magic-link quota.
-- Removing your password is refused while no mail relay is configured: it would
-  leave the account with no way in at all.
-- Inviting members still requires SMTP to deliver anything. Password sign-in works
-  without it.
+- Setting `SETUP_CODE` closes the unclaimed-instance window described in the
+  previous release. Without it, that window is unchanged: create the owner right
+  after the first start, and do not expose the port publicly before you have. The
+  startup banner now says which of the two situations you are in.
+- The code protects the claim, not the door. It is not a second factor, it does not
+  gate sign-in, and it is not a substitute for a strong owner password.
