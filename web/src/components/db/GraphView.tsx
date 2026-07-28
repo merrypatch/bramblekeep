@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Maximize, Minus, Plus } from "lucide-react";
 
-import type { GraphModel } from "@/lib/graph";
+import type { GraphModel, GraphNode } from "@/lib/graph";
+import { cn } from "@/lib/utils";
 
 /**
  * Force-directed relation graph on a 2D canvas — no dependency (hand-rolled
@@ -14,8 +15,13 @@ type Sim = { id: string; x: number; y: number; vx: number; vy: number; pinned: b
 
 type Props = {
   model: GraphModel;
-  onOpen: (id: string, group: "row" | "linked") => void;
+  onOpen: (id: string, group: GraphNode["group"]) => void;
   height: number;
+  /** Legend labels per node kind. A kind with no label gets no chip, and the
+   * legend disappears entirely when nothing is labelled. The wording belongs to
+   * the caller: the same graph shows "pages / databases" in All pages and
+   * "rows / linked rows" inside a database. */
+  kindLabels?: Partial<Record<GraphNode["group"], string>>;
 };
 
 /** Resolves a CSS custom property to a concrete rgb() string usable by canvas
@@ -30,7 +36,7 @@ function resolveColor(el: HTMLElement, cssVar: string): string {
   return c;
 }
 
-export function GraphView({ model, onOpen, height }: Props) {
+export function GraphView({ model, onOpen, height, kindLabels }: Props) {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -84,6 +90,8 @@ export function GraphView({ model, onOpen, height }: Props) {
     const colors = {
       row: resolveColor(wrap, "--primary"),
       linked: resolveColor(wrap, "--muted-foreground"),
+      // Databases: distinct fill AND distinct shape (square, below).
+      database: resolveColor(wrap, "--foreground"),
       edge: resolveColor(wrap, "--border"),
       label: resolveColor(wrap, "--foreground"),
       bg: resolveColor(wrap, "--card"),
@@ -275,8 +283,19 @@ export function GraphView({ model, onOpen, height }: Props) {
         const lit = nodeLit(s.id);
         ctx.globalAlpha = lit ? 1 : 0.2;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
-        ctx.fillStyle = nd.group === "row" ? colors.row : colors.linked;
+        if (nd.group === "database") {
+          // Rounded square: a database reads as a container, not a page — and the
+          // difference survives colour-blindness and both themes.
+          const side = rad * 1.8;
+          if (typeof ctx.roundRect === "function") {
+            ctx.roundRect(p.x - side / 2, p.y - side / 2, side, side, 3);
+          } else {
+            ctx.rect(p.x - side / 2, p.y - side / 2, side, side);
+          }
+        } else {
+          ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+        }
+        ctx.fillStyle = colors[nd.group];
         ctx.fill();
         // Selected node gets an accent ring; others a thin background outline.
         if (s.id === selected) {
@@ -436,6 +455,12 @@ export function GraphView({ model, onOpen, height }: Props) {
     };
   }, [model, height, zoomAround]);
 
+  // Kinds present in the model, in a stable display order, keeping only those
+  // the caller gave a label for.
+  const legend = (["row", "database", "linked"] as const)
+    .filter((kind) => kindLabels?.[kind] && model.nodes.some((nd) => nd.group === kind))
+    .map((kind) => ({ kind, label: kindLabels?.[kind] as string }));
+
   return (
     <div
       ref={wrapRef}
@@ -450,6 +475,28 @@ export function GraphView({ model, onOpen, height }: Props) {
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center gap-2 bg-card text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> {t("dbview.graph.loading")}
+        </div>
+      )}
+      {/* Legend: only the kinds actually present in the model, and only those the
+          caller named. Mirrors the canvas exactly — circle for a page/row, rounded
+          square for a database. */}
+      {legend.length > 0 && (
+        <div className="absolute top-2 left-2 flex items-center gap-3 rounded-md border bg-background/90 px-2 py-1 shadow-sm">
+          {legend.map(({ kind, label }) => (
+            <span key={kind} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span
+                aria-hidden
+                className={cn(
+                  "size-2.5 shrink-0",
+                  kind === "database" ? "rounded-[2px]" : "rounded-full",
+                  kind === "row" && "bg-primary",
+                  kind === "linked" && "bg-muted-foreground",
+                  kind === "database" && "bg-foreground",
+                )}
+              />
+              {label}
+            </span>
+          ))}
         </div>
       )}
       {/* Node spacing. */}

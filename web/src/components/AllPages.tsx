@@ -73,7 +73,9 @@ export function AllPages({
       nodes: graph.nodes.map((n) => ({
         id: n.id,
         label: n.title || untitled,
-        group: n.is_db ? "linked" : "row",
+        // Databases get their own kind: drawn as a rounded square, not a
+        // differently-coloured circle (cf. GraphView).
+        group: n.is_db ? "database" : "row",
       })),
       edges: graph.edges.map((e) => ({ source: e.src, target: e.dst })),
     };
@@ -214,7 +216,12 @@ export function AllPages({
 
       {mode === "graph" ? (
         graphModel ? (
-          <GraphView model={graphModel} height={600} onOpen={(id) => onSelect(id)} />
+          <GraphView
+            model={graphModel}
+            height={600}
+            onOpen={(id) => onSelect(id)}
+            kindLabels={{ row: t("allPages.legendPages"), database: t("allPages.legendDatabases") }}
+          />
         ) : (
           <p className="py-12 text-center text-sm text-muted-foreground">{t("allPages.graphLoading")}</p>
         )

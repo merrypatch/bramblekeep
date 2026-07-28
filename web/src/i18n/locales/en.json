@@ -382,7 +382,9 @@
       "zoomOut": "Zoom out",
       "reset": "Fit to view",
       "spacing": "Spacing",
-      "loading": "Building the graph…"
+      "loading": "Building the graph…",
+      "legendRows": "Rows",
+      "legendLinked": "Linked rows"
     },
     "dialog": {
       "deleteColTitle": "Delete this column?",
@@ -1163,7 +1165,9 @@
     "deleteConfirm": "Delete",
     "viewTable": "Table",
     "viewGraph": "Graph",
-    "graphLoading": "Loading the graph…"
+    "graphLoading": "Loading the graph…",
+    "legendPages": "Pages",
+    "legendDatabases": "Databases"
   },
   "updateConsent": {
     "title": "Check for updates?",
@@ -1229,12 +1233,12 @@
   "chart": {
     "all": "All",
     "noDate": "No date",
+    "noValue": "No value",
     "remaining": "Remaining",
     "ideal": "Ideal",
     "target": "Target",
     "rowCount": "Row count",
-    "noData": "No data to display.",
-    "noValue": "No value"
+    "noData": "No data to display."
   },
   "templateTokens": {
     "date": "Row creation date.",

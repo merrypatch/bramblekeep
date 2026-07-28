@@ -2251,6 +2251,10 @@ export function DatabaseView({
             model={graphModel}
             height={viewMaxH ?? 560}
             onOpen={(id) => setPeekRow(id)}
+            kindLabels={{
+              row: t("dbview.graph.legendRows"),
+              linked: t("dbview.graph.legendLinked"),
+            }}
           />
         ) : (
           <ViewHint>{t("dbview.hint.graphNeedsRelations")}</ViewHint>

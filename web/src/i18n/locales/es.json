@@ -382,7 +382,9 @@
       "zoomOut": "Alejar",
       "reset": "Ajustar a la vista",
       "spacing": "Espaciado",
-      "loading": "Construyendo el grafo…"
+      "loading": "Construyendo el grafo…",
+      "legendRows": "Filas",
+      "legendLinked": "Filas vinculadas"
     },
     "dialog": {
       "deleteColTitle": "¿Eliminar esta columna?",
@@ -1163,7 +1165,9 @@
     "deleteConfirm": "Eliminar",
     "viewTable": "Tabla",
     "viewGraph": "Grafo",
-    "graphLoading": "Cargando el grafo…"
+    "graphLoading": "Cargando el grafo…",
+    "legendPages": "Páginas",
+    "legendDatabases": "Bases de datos"
   },
   "updateConsent": {
     "title": "¿Buscar actualizaciones?",
@@ -1229,12 +1233,12 @@
   "chart": {
     "all": "Todo",
     "noDate": "Sin fecha",
+    "noValue": "Sin valor",
     "remaining": "Restante",
     "ideal": "Ideal",
     "target": "Objetivo",
     "rowCount": "Número de filas",
-    "noData": "Sin datos que mostrar.",
-    "noValue": "Sin valor"
+    "noData": "Sin datos que mostrar."
   },
   "templateTokens": {
     "date": "Fecha de creación de la fila.",
