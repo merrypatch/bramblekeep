@@ -77,20 +77,20 @@ async fn bootstrap_owner_and_invite_gate() {
     let owner_id = body["id"].as_str().unwrap().to_string();
 
     // Invite-based registration (default): an unknown email receives no link.
-    let (st, _) = send(&app, Method::POST, "/api/v1/auth/request-link", None, r#"{"email":"stranger@x"}"#).await;
+    let (st, _) = send(&app, Method::POST, "/api/v1/auth/request-link", None, r#"{"email":"stranger@example.com"}"#).await;
     assert_eq!(st, StatusCode::OK); // generic response
-    assert_eq!(count_tokens(&db, "stranger@x").await, 0, "no link for a non-invited user");
+    assert_eq!(count_tokens(&db, "stranger@example.com").await, 0, "no link for a non-invited user");
 
     // The owner invites stranger → a link is now issued.
     let tok = mk_session(&db, &owner_id).await;
-    let (st, _) = send(&app, Method::POST, "/api/v1/workspaces/current/invites", Some(&tok), r#"{"email":"stranger@x"}"#).await;
+    let (st, _) = send(&app, Method::POST, "/api/v1/workspaces/current/invites", Some(&tok), r#"{"email":"stranger@example.com"}"#).await;
     assert_eq!(st, StatusCode::OK);
-    let (st, _) = send(&app, Method::POST, "/api/v1/auth/request-link", None, r#"{"email":"stranger@x"}"#).await;
+    let (st, _) = send(&app, Method::POST, "/api/v1/auth/request-link", None, r#"{"email":"stranger@example.com"}"#).await;
     assert_eq!(st, StatusCode::OK);
-    assert!(count_tokens(&db, "stranger@x").await >= 1, "link issued for an invited user");
+    assert!(count_tokens(&db, "stranger@example.com").await >= 1, "link issued for an invited user");
 
     // stranger logs in → member (invitation consumed).
-    seed_token(&db, "t-stranger", "stranger@x").await;
+    seed_token(&db, "t-stranger", "stranger@example.com").await;
     let (st, body) = send(&app, Method::POST, "/api/v1/auth/verify", None, r#"{"token":"t-stranger"}"#).await;
     assert_eq!(st, StatusCode::OK);
     assert_eq!(body["role"], "member");
@@ -111,9 +111,9 @@ async fn open_registration_allows_self_signup() {
     assert_eq!(st, StatusCode::OK);
 
     // An unknown user receives a link without an invitation.
-    let (st, _) = send(&app, Method::POST, "/api/v1/auth/request-link", None, r#"{"email":"newbie@x"}"#).await;
+    let (st, _) = send(&app, Method::POST, "/api/v1/auth/request-link", None, r#"{"email":"newbie@example.com"}"#).await;
     assert_eq!(st, StatusCode::OK);
-    assert_eq!(count_tokens(&db, "newbie@x").await, 1);
+    assert_eq!(count_tokens(&db, "newbie@example.com").await, 1);
 
     let _ = std::fs::remove_file(&path);
 }

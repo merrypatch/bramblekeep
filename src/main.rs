@@ -38,6 +38,48 @@ fn spawn_trash_purger(db: Db, sync: SyncHub) {
     });
 }
 
+const USAGE: &str = "\
+Bramblekeep — self-hosted workspace, single binary.
+
+  bramblekeep                        start the server
+  bramblekeep set-password <email>   set an account's password (reads it on stdin)
+  bramblekeep help                   this message
+
+set-password is the way back in when nobody can sign in: no SMTP relay, or a
+forgotten password on an instance that cannot send mail. On an instance with no
+account yet, it creates the owner. The password is read from standard input, not
+from the arguments — an argument would be visible to `ps` and land in the shell
+history. Note that it IS echoed while typing.
+";
+
+/// `set-password <email>`: reads the password on stdin, applies the same policy
+/// as the HTTP route, revokes the account's sessions.
+async fn cli_set_password(config: &Config, email: &str) -> anyhow::Result<()> {
+    use std::io::{BufRead, Write};
+
+    eprint!("New password for {email} (min 12 characters): ");
+    std::io::stderr().flush()?;
+    let mut line = String::new();
+    std::io::stdin().lock().read_line(&mut line)?;
+    // Only the line terminator is stripped: a password may legitimately end
+    // with a space.
+    let password = line.trim_end_matches(['\n', '\r']);
+    if password.is_empty() {
+        anyhow::bail!("no password read on stdin");
+    }
+
+    let db = db::init(&config.database_url).await?;
+    match bramblekeep::auth::password::set_password_offline(&db, email, password).await {
+        Ok(true) => println!("Owner account {email} created — you can sign in with this password."),
+        Ok(false) => println!("Password updated for {email}. Their other sessions were revoked."),
+        Err(bramblekeep::error::Error::NotFound) => {
+            anyhow::bail!("no account for {email} (and the instance already has accounts)")
+        }
+        Err(e) => anyhow::bail!("{e}"),
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Load .env into the process environment before any config read.
@@ -56,6 +98,24 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = Config::from_env();
+
+    // One-off maintenance commands, before anything binds a port.
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        Some("set-password") => {
+            let Some(email) = args.get(1) else {
+                anyhow::bail!("usage: bramblekeep set-password <email>");
+            };
+            return cli_set_password(&config, email).await;
+        }
+        Some("help" | "--help" | "-h") => {
+            print!("{USAGE}");
+            return Ok(());
+        }
+        Some(unknown) => anyhow::bail!("unknown command `{unknown}`. Try `bramblekeep help`."),
+        None => {}
+    }
+
     let db = db::init(&config.database_url).await?;
     let files = Arc::new(LocalStore::new(&config.files_dir));
     let mailer = Arc::new(Mailer::from_config(&config));
@@ -75,6 +135,8 @@ async fn main() -> anyhow::Result<()> {
         config.update_manifest_url.clone(),
         config.update_check_interval_secs,
     );
+    // Kept for the banner below (the state itself moves into the router).
+    let banner_db = state.db.clone();
     let app = build_app(state);
 
     let addr = SocketAddr::from_str(&config.bind_addr)?;
@@ -84,8 +146,19 @@ async fn main() -> anyhow::Result<()> {
     // non-technical self-hoster who just launched the binary knows what to do.
     println!("\n  Bramblekeep is running.");
     println!("  → Open {}", config.public_base_url);
+    // Zero accounts = the instance is unclaimed: whoever opens it first becomes
+    // owner. Say so plainly, so the operator does it now rather than leaving an
+    // open instance sitting there.
+    let accounts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&banner_db)
+        .await
+        .unwrap_or(0);
+    if accounts == 0 {
+        println!("  No account yet: the first visitor creates the owner account — do it now.");
+    }
     if config.smtp_host.is_none() {
-        println!("  No email configured (SMTP): sign-in links are printed in this console.");
+        println!("  No email configured (SMTP): sign in with a password; invitations need SMTP.");
+        println!("  Locked out? `bramblekeep set-password <email>`.");
     }
     println!(
         "  Config (public URL, email, …): create a .env next to the binary — see .env.example.\n"

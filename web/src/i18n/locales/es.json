@@ -51,13 +51,27 @@
     "failed": "Error al importar."
   },
   "auth": {
-    "brandSubtitle": "Inicio de sesión sin contraseña — recibe un enlace por correo.",
+    "brandSubtitle": "Inicia sesión con tu contraseña, o un enlace por correo.",
     "verifying": "Iniciando sesión…",
     "linkInvalid": "Este enlace no es válido o ha caducado.",
     "sendFailed": "No se pudo enviar el enlace. Inténtalo de nuevo.",
     "sent": "Enlace enviado a {{email}}. Ábrelo para iniciar sesión.",
     "emailPlaceholder": "tu@ejemplo.com",
-    "getLink": "Recibir el enlace"
+    "getLink": "Recibir el enlace",
+    "setupIntro": "Esta instancia aún no tiene ninguna cuenta: la que crees será la propietaria. Una contraseña funciona sin configurar el correo.",
+    "passwordPlaceholder": "Contraseña ({{min}} caracteres mínimo)",
+    "confirmPlaceholder": "Confirma la contraseña",
+    "passwordTooShort": "Al menos {{min}} caracteres.",
+    "passwordMismatch": "Las dos contraseñas no coinciden.",
+    "createAccount": "Crear la cuenta",
+    "signIn": "Iniciar sesión",
+    "passwordOnly": "Contraseña",
+    "usePassword": "Iniciar sesión con contraseña",
+    "useLink": "Enviarme un enlace de acceso",
+    "badCredentials": "Correo o contraseña incorrectos.",
+    "tooMany": "Demasiados intentos. Inténtalo de nuevo en unos minutos.",
+    "noSmtpConsole": "Sin correo configurado en esta instancia: el enlace se imprime en la consola del servidor.",
+    "forgotNoSmtp": "¿La olvidaste? No hay correo configurado: la recuperación pasa por `bramblekeep set-password <email>` en el servidor."
   },
   "search": {
     "placeholder": "Buscar…",
@@ -655,7 +669,18 @@
       "removeBody": "{{name}} perderá inmediatamente el acceso al espacio y sus sesiones se cerrarán. La cuenta podrá reactivarse más tarde.",
       "removeConfirm": "Desactivar",
       "removed": "Miembro desactivado.",
-      "challenge": "Para confirmar, vuelve a escribir {{value}} abajo."
+      "challenge": "Para confirmar, vuelve a escribir {{value}} abajo.",
+      "noSmtp": "Sin correo configurado (SMTP): no se pueden enviar invitaciones. Invita igualmente para obtener un enlace que puedas transmitir tú.",
+      "inviteLinkTitle": "Enlace de invitación para {{email}}",
+      "inviteLinkHint": "No se envió ningún correo. Pásale este enlace a la persona: válido 15 minutos y de un solo uso.",
+      "copyLink": "Copiar el enlace",
+      "linkCopied": "Enlace copiado.",
+      "resetPassword": "Restablecer su contraseña",
+      "resetTitle": "¿Restablecer la contraseña de {{name}}?",
+      "resetBody": "Se elimina su contraseña y se cierran sus sesiones. Volverá a entrar con un enlace enviado por correo. No se te entrega ninguna credencial.",
+      "resetConfirm": "Restablecer la contraseña",
+      "resetDone": "Contraseña restablecida.",
+      "resetDoneNoMail": "Contraseña restablecida. Sin correo configurado: usa `bramblekeep set-password` o pásale un enlace."
     },
     "level": {
       "read": "Lectura",
@@ -742,6 +767,25 @@
       "saved": "Clave de Unsplash guardada.",
       "cleared": "Clave de Unsplash eliminada.",
       "failed": "No se pudo guardar la clave."
+    },
+    "save": "Guardar",
+    "security": {
+      "password": "Contraseña",
+      "isSet": "definida",
+      "notSet": "sin definir",
+      "set": "Definir una contraseña",
+      "change": "Cambiar la contraseña",
+      "remove": "Eliminar",
+      "removeNeedsSmtp": "Configura primero el SMTP: la contraseña es ahora mismo el único acceso a esta cuenta.",
+      "onlyWayIn": "Sin correo configurado: esta contraseña es tu único acceso. Guárdala en un lugar seguro.",
+      "changeHint": "Al menos 12 caracteres. Tus otras sesiones se cerrarán.",
+      "currentPlaceholder": "Contraseña actual",
+      "revokeNote": "Tus otras sesiones abiertas se cerrarán.",
+      "saved": "Contraseña actualizada.",
+      "removed": "Contraseña eliminada: solo enlace de acceso.",
+      "removeHint": "Solo podrás iniciar sesión con un enlace recibido por correo.",
+      "wrongCurrent": "Contraseña actual incorrecta.",
+      "failed": "Error al actualizar."
     }
   },
   "formula": {

@@ -1,8 +1,14 @@
-//! Passwordless authentication (magic-link) + opaque sessions.
+//! Authentication (magic-link + email/password) and opaque sessions.
 //!
 //! Spec §7.2 choice: NO JWT. The cookie carries a random opaque token; only
 //! its hash is stored. Revoking a session (or an invite) = a simple DELETE.
 //! Cookie `HttpOnly; SameSite=Lax` (+ `Secure` in prod).
+//!
+//! Two ways in, on purpose (see [`password`]): the magic link needs a working
+//! SMTP relay, the password needs nothing. Both end in the same place — a
+//! session row and the same cookie ([`start_session`]).
+
+pub mod password;
 
 use axum::extract::{ConnectInfo, Request, State};
 use axum::middleware::Next;
@@ -19,11 +25,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::AppState;
 use crate::error::{Error, Result};
 
-const SESSION_COOKIE: &str = "hub_session";
+pub(crate) const SESSION_COOKIE: &str = "hub_session";
 const LOGIN_TTL_MS: i64 = 15 * 60 * 1000;
 const SESSION_TTL_MS: i64 = 30 * 24 * 60 * 60 * 1000;
 
-fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
@@ -61,6 +67,10 @@ pub struct User {
     pub onboarded_ts: Option<i64>,
     /// UI language: 'en' | 'es' | 'fr' (default 'en').
     pub language: String,
+    /// Does the account have a password? Computed (`password_hash IS NOT NULL`),
+    /// never the hash itself — it must not leave the server under any shape.
+    /// Drives Settings → Security (set vs change vs remove).
+    pub has_password: bool,
 }
 
 /// Resolves the current user from the session cookie.
@@ -73,7 +83,8 @@ pub async fn current_user(app: &AppState, jar: &CookieJar) -> Result<Option<User
         return Ok(None);
     };
     let user = sqlx::query_as::<_, User>(
-        "SELECT u.id, u.email, u.display_name, u.role, u.status, u.avatar, u.onboarded_ts, u.language FROM sessions s \
+        "SELECT u.id, u.email, u.display_name, u.role, u.status, u.avatar, u.onboarded_ts, u.language, \
+          (u.password_hash IS NOT NULL) AS has_password FROM sessions s \
          JOIN users u ON u.id = s.user_id \
          WHERE s.token_hash = ? AND s.expires_ts > ? AND u.status = 'active'",
     )
@@ -184,10 +195,10 @@ pub async fn request_link(
     ClientIp(ip): ClientIp,
     Json(input): Json<RequestLinkInput>,
 ) -> Result<Json<Value>> {
-    let email = input.email.trim().to_lowercase();
-    if email.is_empty() || !email.contains('@') {
-        return Err(Error::BadId("invalid email".into()));
-    }
+    // Shape check shared with the password routes and the invitation: an
+    // undeliverable value (`admin`, `a@b`) never reaches the mailer.
+    let email = crate::core::credentials::normalize_email(&input.email)
+        .ok_or_else(|| Error::BadInput("this is not a valid email address".into()))?;
 
     // Rate-limit (cf. spec §7.2): caps hammering by IP and bombardment of a
     // given email. Generic 429 response — independent of account existence,
@@ -215,6 +226,15 @@ pub async fn request_link(
 /// Creates a live magic-link token and sends it by email. Shared between the
 /// link request (`request_link`) and the member invitation (`routes`).
 pub(crate) async fn issue_login_link(app: &AppState, email: &str) -> Result<()> {
+    let token = issue_login_token(app, email).await?;
+    send_login_token(app, email, &token).await;
+    Ok(())
+}
+
+/// Creates a live magic-link token and returns it, WITHOUT sending anything.
+/// Split out from [`issue_login_link`] for the invitation path, which needs the
+/// link itself when no relay is configured (`routes::invite_member`).
+pub(crate) async fn issue_login_token(app: &AppState, email: &str) -> Result<String> {
     let token = gen_token();
     sqlx::query(
         "INSERT INTO login_tokens (token_hash, email, expires_ts, consumed, created_ts) \
@@ -226,14 +246,21 @@ pub(crate) async fn issue_login_link(app: &AppState, email: &str) -> Result<()> 
     .bind(now_ms())
     .execute(&app.db)
     .await?;
+    Ok(token)
+}
+
+/// Mails a sign-in token. Best-effort: a relay failure is logged, never fatal —
+/// the caller has already committed the token (and, for an invitation, told the
+/// admin whether a mail was attempted at all).
+pub(crate) async fn send_login_token(app: &AppState, email: &str, token: &str) {
     // Localize to the recipient's account language when they already have one.
     let lang = crate::store::user_language_by_email(&app.db, email)
-        .await?
+        .await
+        .unwrap_or(None)
         .unwrap_or_else(|| "en".to_string());
-    if let Err(e) = app.mailer.send_login_link(email, &token, &lang).await {
+    if let Err(e) = app.mailer.send_login_link(email, token, &lang).await {
         tracing::warn!(error = %e, "failed to send sign-in link");
     }
-    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -271,8 +298,14 @@ pub async fn verify(
 
     // Upsert the account (created on first login).
     let user = upsert_user(&app, &email).await?;
+    let jar = jar.add(start_session(&app, &user).await?);
+    Ok((jar, Json(user)))
+}
 
-    // Create the session + set the opaque cookie.
+/// Opens a session for `user`: inserts the row and returns the cookie to set.
+/// Shared by every way in (magic link, email/password) so a new sign-in path
+/// cannot forget the invitation acceptance or the cookie flags.
+pub(crate) async fn start_session(app: &AppState, user: &User) -> Result<Cookie<'static>> {
     let session_token = gen_token();
     sqlx::query(
         "INSERT INTO sessions (token_hash, user_id, expires_ts, created_ts) VALUES (?, ?, ?, ?)",
@@ -291,9 +324,7 @@ pub async fn verify(
     {
         tracing::warn!(error = %e, "failed to accept pending invitations");
     }
-
-    let jar = jar.add(session_cookie(session_token, app.cookie_secure));
-    Ok((jar, Json(user)))
+    Ok(session_cookie(session_token, app.cookie_secure))
 }
 
 /// Current user, or 401.
@@ -369,7 +400,8 @@ pub async fn logout(State(app): State<AppState>, jar: CookieJar) -> Result<Cooki
 
 async fn upsert_user(app: &AppState, email: &str) -> Result<User> {
     if let Some(u) = sqlx::query_as::<_, User>(
-        "SELECT id, email, display_name, role, status, avatar, onboarded_ts, language FROM users WHERE email = ?",
+        "SELECT id, email, display_name, role, status, avatar, onboarded_ts, language, \
+         (password_hash IS NOT NULL) AS has_password FROM users WHERE email = ?",
     )
     .bind(email)
     .fetch_optional(&app.db)
@@ -429,7 +461,8 @@ async fn upsert_user(app: &AppState, email: &str) -> Result<User> {
     // Re-read the actually persisted row (also handles the case where a
     // concurrent connection won the race: we return ITS row, not an invented state).
     sqlx::query_as::<_, User>(
-        "SELECT id, email, display_name, role, status, avatar, onboarded_ts, language FROM users WHERE email = ?",
+        "SELECT id, email, display_name, role, status, avatar, onboarded_ts, language, \
+         (password_hash IS NOT NULL) AS has_password FROM users WHERE email = ?",
     )
     .bind(email)
     .fetch_optional(&app.db)

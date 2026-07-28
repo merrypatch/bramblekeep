@@ -42,6 +42,8 @@ export type User = {
   onboarded_ts: number | null;
   /** Interface language: 'en' | 'es' | 'fr' (default 'en'). */
   language: string;
+  /** Does the account have a password? (The hash never leaves the server.) */
+  has_password: boolean;
 };
 
 export async function getMe(): Promise<User> {
@@ -105,13 +107,30 @@ export async function updateWorkspace(patch: {
   if (!res.ok) throw await toApiError(res);
 }
 
-export async function inviteMember(email: string, role: Role): Promise<void> {
+/** Result of an invitation. `emailed` false = no SMTP relay configured, and
+ * `invite_link` then carries a link to hand over out-of-band (null when the
+ * address already has an account — that link would open THEIR session). */
+export type InviteResult = { emailed: boolean; invite_link: string | null };
+
+export async function inviteMember(email: string, role: Role): Promise<InviteResult> {
   const res = await fetch("/api/v1/workspaces/current/invites", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, role }),
   });
   if (!res.ok) throw await toApiError(res);
+  const body = (await res.json()) as Partial<InviteResult>;
+  return { emailed: !!body.emailed, invite_link: body.invite_link ?? null };
+}
+
+/** Clears a member's password (admin reset): they fall back to the magic link,
+ * mailed to them when a relay is configured. Returns whether a mail went out. */
+export async function clearMemberPassword(id: string): Promise<{ emailed: boolean }> {
+  const res = await fetch(`/api/v1/workspaces/current/members/${id}/password`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as { emailed: boolean };
 }
 
 export async function revokeInvite(email: string): Promise<void> {
@@ -162,6 +181,67 @@ export async function transferOwnership(user_id: string): Promise<void> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id }),
+  });
+  if (!res.ok) throw await toApiError(res);
+}
+
+/** What the sign-in screen needs before rendering: is this instance still
+ * unclaimed, can it send email at all, and the password length it enforces. */
+export type AuthConfig = { bootstrap: boolean; smtp: boolean; min_password: number };
+
+export async function getAuthConfig(): Promise<AuthConfig> {
+  const res = await fetch("/api/v1/auth/config");
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as AuthConfig;
+}
+
+/** Creates the FIRST account of the instance (owner) with a password, and signs
+ * it in. Refused by the server as soon as an account exists. */
+export async function signupOwner(
+  email: string,
+  password: string,
+  display_name?: string,
+): Promise<User> {
+  const res = await fetch("/api/v1/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, display_name }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as User;
+}
+
+export async function loginWithPassword(email: string, password: string): Promise<User> {
+  const res = await fetch("/api/v1/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as User;
+}
+
+/** Sets or changes one's own password. `current_password` is required by the
+ * server when the account already has one; other sessions are revoked. */
+export async function setMyPassword(
+  new_password: string,
+  current_password?: string,
+): Promise<void> {
+  const res = await fetch("/api/v1/auth/password", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ new_password, current_password }),
+  });
+  if (!res.ok) throw await toApiError(res);
+}
+
+/** Drops one's own password (magic link only). Server-refused while no SMTP
+ * relay is configured — it would leave the account with no way in. */
+export async function removeMyPassword(current_password: string): Promise<void> {
+  const res = await fetch("/api/v1/auth/password", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password }),
   });
   if (!res.ok) throw await toApiError(res);
 }

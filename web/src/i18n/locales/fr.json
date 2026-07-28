@@ -51,13 +51,27 @@
     "failed": "Échec de l'import."
   },
   "auth": {
-    "brandSubtitle": "Connexion sans mot de passe — reçois un lien par email.",
+    "brandSubtitle": "Connectez-vous avec votre mot de passe, ou un lien par email.",
     "verifying": "Connexion…",
     "linkInvalid": "Lien invalide ou expiré.",
     "sendFailed": "Impossible d'envoyer le lien. Réessaie.",
     "sent": "Lien envoyé à {{email}}. Ouvre-le pour te connecter.",
     "emailPlaceholder": "toi@exemple.com",
-    "getLink": "Recevoir le lien"
+    "getLink": "Recevoir le lien",
+    "setupIntro": "Cette instance n'a encore aucun compte : celui que vous créez devient propriétaire. Un mot de passe fonctionne sans aucune configuration email.",
+    "passwordPlaceholder": "Mot de passe ({{min}} caractères minimum)",
+    "confirmPlaceholder": "Confirmez le mot de passe",
+    "passwordTooShort": "Au moins {{min}} caractères.",
+    "passwordMismatch": "Les deux mots de passe diffèrent.",
+    "createAccount": "Créer le compte",
+    "signIn": "Se connecter",
+    "passwordOnly": "Mot de passe",
+    "usePassword": "Se connecter avec un mot de passe",
+    "useLink": "Recevoir un lien de connexion par email",
+    "badCredentials": "Email ou mot de passe incorrect.",
+    "tooMany": "Trop de tentatives. Réessayez dans quelques minutes.",
+    "noSmtpConsole": "Aucun email configuré sur cette instance : le lien est affiché dans la console du serveur.",
+    "forgotNoSmtp": "Oublié ? Aucun email n'est configuré : la récupération passe par `bramblekeep set-password <email>` sur le serveur."
   },
   "search": {
     "placeholder": "Rechercher…",
@@ -655,7 +669,18 @@
       "removeBody": "{{name}} perdra immédiatement l'accès à l'espace et ses sessions seront fermées. Le compte pourra être réactivé plus tard.",
       "removeConfirm": "Désactiver",
       "removed": "Membre désactivé.",
-      "challenge": "Pour confirmer, recopiez {{value}} ci-dessous."
+      "challenge": "Pour confirmer, recopiez {{value}} ci-dessous.",
+      "noSmtp": "Aucun email configuré (SMTP) : les invitations ne peuvent pas être envoyées. Invitez quand même pour obtenir un lien à transmettre vous-même.",
+      "inviteLinkTitle": "Lien d'invitation pour {{email}}",
+      "inviteLinkHint": "Aucun email n'a été envoyé. Transmettez ce lien à la personne : valable 15 minutes, utilisable une seule fois.",
+      "copyLink": "Copier le lien",
+      "linkCopied": "Lien copié.",
+      "resetPassword": "Réinitialiser son mot de passe",
+      "resetTitle": "Réinitialiser le mot de passe de {{name}} ?",
+      "resetBody": "Son mot de passe est supprimé et ses sessions sont fermées. La personne se reconnecte avec un lien reçu par email. Aucun identifiant ne vous est communiqué.",
+      "resetConfirm": "Réinitialiser le mot de passe",
+      "resetDone": "Mot de passe réinitialisé.",
+      "resetDoneNoMail": "Mot de passe réinitialisé. Aucun email configuré : utilisez `bramblekeep set-password` ou transmettez un lien."
     },
     "level": {
       "read": "Lecture",
@@ -742,6 +767,25 @@
       "saved": "Clé Unsplash enregistrée.",
       "cleared": "Clé Unsplash retirée.",
       "failed": "Impossible d'enregistrer la clé."
+    },
+    "save": "Enregistrer",
+    "security": {
+      "password": "Mot de passe",
+      "isSet": "défini",
+      "notSet": "non défini",
+      "set": "Définir un mot de passe",
+      "change": "Changer le mot de passe",
+      "remove": "Supprimer",
+      "removeNeedsSmtp": "Configurez d'abord le SMTP : le mot de passe est actuellement le seul accès à ce compte.",
+      "onlyWayIn": "Aucun email configuré : ce mot de passe est votre seul accès. Conservez-le en sécurité.",
+      "changeHint": "12 caractères minimum. Vos autres sessions seront déconnectées.",
+      "currentPlaceholder": "Mot de passe actuel",
+      "revokeNote": "Vos autres sessions ouvertes seront déconnectées.",
+      "saved": "Mot de passe mis à jour.",
+      "removed": "Mot de passe supprimé : lien de connexion uniquement.",
+      "removeHint": "Vous ne pourrez plus vous connecter qu'avec un lien reçu par email.",
+      "wrongCurrent": "Mot de passe actuel incorrect.",
+      "failed": "Échec de la mise à jour."
     }
   },
   "formula": {

@@ -30,7 +30,7 @@ use axum::middleware::Next;
 use axum::response::Response;
 use axum::{
     Router, middleware,
-    routing::{get, patch, post},
+    routing::{get, patch, post, put},
 };
 use tower_http::compression::CompressionLayer;
 use tower_http::trace::TraceLayer;
@@ -65,6 +65,11 @@ pub struct AppState {
     pub login_rl_ip: RateLimiter,
     /// Login link request limiter, by target email (anti-bombardment).
     pub login_rl_email: RateLimiter,
+    /// Password attempt limiter, by target email. Separate from the magic-link
+    /// limiters on purpose: a brute-force attempt against an address must not
+    /// consume that address's link budget (which would lock the legitimate
+    /// owner out of the recovery path), nor the reverse.
+    pub password_rl: RateLimiter,
     /// Remote image mirroring limiter, by user: the only route that makes the
     /// server fetch a user-supplied URL.
     pub fetch_rl: RateLimiter,
@@ -72,7 +77,8 @@ pub struct AppState {
 
 impl AppState {
     /// Builds the state with the default login limiters (10 min window:
-    /// 20 requests/IP, 5/email). Tests and the binary go through here.
+    /// 20 requests/IP, 5 links/email, 10 password attempts/email). Tests and the
+    /// binary go through here.
     pub fn new(
         db: Db,
         sync: SyncHub,
@@ -88,6 +94,10 @@ impl AppState {
             cookie_secure,
             login_rl_ip: RateLimiter::new(LOGIN_RL_WINDOW_MS, 20),
             login_rl_email: RateLimiter::new(LOGIN_RL_WINDOW_MS, 5),
+            // 10 attempts / 10 min / email: room for a few typos, far below what
+            // an online guessing attempt needs (argon2id already costs ~50 ms
+            // per try, this bounds it regardless).
+            password_rl: RateLimiter::new(LOGIN_RL_WINDOW_MS, 10),
             fetch_rl: RateLimiter::new(FETCH_RL_WINDOW_MS, 60),
         }
     }
@@ -268,6 +278,18 @@ pub fn build_app(state: AppState) -> Router {
         .route("/api/v1/unsplash/thumb", get(routes::unsplash_thumb))
         .route("/api/v1/unsplash/pick", post(routes::unsplash_pick))
         .route("/api/files/{hash}", get(routes::serve_file))
+        // Own password: set/change (PUT) and drop it for magic-link-only
+        // (DELETE, refused while no SMTP relay is configured).
+        .route(
+            "/api/v1/auth/password",
+            put(auth::password::set_password).delete(auth::password::remove_password),
+        )
+        // Admin reset: clears a member's password and (with SMTP) mails them a
+        // fresh sign-in link. Never hands the caller a credential.
+        .route(
+            "/api/v1/workspaces/current/members/{id}/password",
+            axum::routing::delete(routes::clear_member_password),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_session,
@@ -277,6 +299,12 @@ pub fn build_app(state: AppState) -> Router {
         .route("/api/health", get(routes::health))
         .route("/api/v1/auth/request-link", post(auth::request_link))
         .route("/api/v1/auth/verify", post(auth::verify))
+        // Email + password (cf. `auth::password`): what the sign-in screen needs
+        // to know, first-account creation, and the password sign-in itself. All
+        // three are necessarily public — no session exists yet.
+        .route("/api/v1/auth/config", get(auth::password::config))
+        .route("/api/v1/auth/signup", post(auth::password::signup))
+        .route("/api/v1/auth/login", post(auth::password::login))
         .route("/api/v1/auth/me", get(auth::me).patch(auth::update_me))
         .route("/api/v1/auth/logout", post(auth::logout))
         // Invite info: public (the token IS the secret), for the /invite page.

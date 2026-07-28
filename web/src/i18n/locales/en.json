@@ -51,13 +51,27 @@
     "failed": "Import failed."
   },
   "auth": {
-    "brandSubtitle": "Passwordless sign-in — get a link by email.",
+    "brandSubtitle": "Sign in with your password, or a link by email.",
     "verifying": "Signing in…",
     "linkInvalid": "This link is invalid or expired.",
     "sendFailed": "Couldn't send the link. Please try again.",
     "sent": "Link sent to {{email}}. Open it to sign in.",
     "emailPlaceholder": "you@example.com",
-    "getLink": "Get the link"
+    "getLink": "Get the link",
+    "setupIntro": "This instance has no account yet: the one you create becomes the owner. A password works without any email setup.",
+    "passwordPlaceholder": "Password ({{min}} characters minimum)",
+    "confirmPlaceholder": "Confirm the password",
+    "passwordTooShort": "At least {{min}} characters.",
+    "passwordMismatch": "The two passwords differ.",
+    "createAccount": "Create the account",
+    "signIn": "Sign in",
+    "passwordOnly": "Password",
+    "usePassword": "Sign in with a password instead",
+    "useLink": "Email me a sign-in link instead",
+    "badCredentials": "Wrong email or password.",
+    "tooMany": "Too many attempts. Try again in a few minutes.",
+    "noSmtpConsole": "No email configured on this instance: the link is printed in the server console.",
+    "forgotNoSmtp": "Forgot it? No email is configured, so recovery goes through `bramblekeep set-password <email>` on the server."
   },
   "search": {
     "placeholder": "Search…",
@@ -655,7 +669,18 @@
       "removeBody": "{{name}} will immediately lose access to the space and their sessions will be closed. The account can be re-enabled later.",
       "removeConfirm": "Disable",
       "removed": "Member disabled.",
-      "challenge": "To confirm, retype {{value}} below."
+      "challenge": "To confirm, retype {{value}} below.",
+      "noSmtp": "No email configured (SMTP): invitations cannot be sent. Invite anyway to get a link to pass on yourself.",
+      "inviteLinkTitle": "Invitation link for {{email}}",
+      "inviteLinkHint": "Nothing was emailed. Send this link to the person — it is valid for 15 minutes and can only be used once.",
+      "copyLink": "Copy the link",
+      "linkCopied": "Link copied.",
+      "resetPassword": "Reset their password",
+      "resetTitle": "Reset {{name}}'s password?",
+      "resetBody": "Their password is removed and their sessions are closed. They sign in again with an emailed link. You are not given any credential.",
+      "resetConfirm": "Reset the password",
+      "resetDone": "Password reset.",
+      "resetDoneNoMail": "Password reset. No email configured: use `bramblekeep set-password` or give them a link."
     },
     "level": {
       "read": "Read",
@@ -742,6 +767,25 @@
       "saved": "Unsplash key saved.",
       "cleared": "Unsplash key removed.",
       "failed": "Could not save the key."
+    },
+    "save": "Save",
+    "security": {
+      "password": "Password",
+      "isSet": "set",
+      "notSet": "not set",
+      "set": "Set a password",
+      "change": "Change the password",
+      "remove": "Remove",
+      "removeNeedsSmtp": "Configure SMTP first: the password is currently the only way into this account.",
+      "onlyWayIn": "No email configured: this password is your only way in. Keep it somewhere safe.",
+      "changeHint": "At least 12 characters. Your other sessions will be signed out.",
+      "currentPlaceholder": "Current password",
+      "revokeNote": "Your other open sessions will be signed out.",
+      "saved": "Password updated.",
+      "removed": "Password removed: sign-in link only.",
+      "removeHint": "You will only be able to sign in with an emailed link.",
+      "wrongCurrent": "Wrong current password.",
+      "failed": "Update failed."
     }
   },
   "formula": {

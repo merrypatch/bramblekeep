@@ -656,16 +656,24 @@ pub struct InviteMemberInput {
 
 /// Invites an email into the workspace (creates authorization + sends magic
 /// link). Admin+; inviting as `admin` is reserved to owner.
+///
+/// With no SMTP relay configured, nothing can be delivered — the link would only
+/// be printed in the server console. Rather than answering `ok` on a mail that
+/// will never arrive (the previous behaviour: `issue_login_link` logs a warning
+/// and the admin never knows), the response carries the sign-in link so the
+/// admin can pass it on out-of-band.
+///
+/// That link is only ever returned for an address with **no** account: it opens
+/// a session as its holder, so handing it to the caller for an existing account
+/// would let an admin step into that person's session — including the owner's.
 pub async fn invite_member(
     State(app): State<AppState>,
     Extension(user): Extension<User>,
     Json(body): Json<InviteMemberInput>,
 ) -> Result<Json<Value>> {
     require_role(&user, "admin")?;
-    let email = body.email.trim().to_lowercase();
-    if email.is_empty() || !email.contains('@') {
-        return Err(Error::BadId("invalid email".into()));
-    }
+    let email = crate::core::credentials::normalize_email(&body.email)
+        .ok_or_else(|| Error::BadInput("this is not a valid email address".into()))?;
     let role = match body.role.as_deref() {
         Some("admin") => {
             require_role(&user, "owner")?;
@@ -675,9 +683,60 @@ pub async fn invite_member(
         Some(_) => return Err(Error::BadId("invalid role".into())),
     };
     crate::store::create_ws_invite(&app.db, &email, role, &user.id).await?;
-    crate::auth::issue_login_link(&app, &email).await?;
+
+    let token = crate::auth::issue_login_token(&app, &email).await?;
+    let has_account = crate::store::user_id_by_email(&app.db, &email).await?.is_some();
+    let mut sent = false;
+    if app.mailer.is_configured() {
+        crate::auth::send_login_token(&app, &email, &token).await;
+        sent = true;
+    }
     let invites = crate::store::list_ws_invites(&app.db).await?;
-    Ok(Json(json!({ "invites": invites })))
+    Ok(Json(json!({
+        "invites": invites,
+        "emailed": sent,
+        // Present only when nothing was sent AND the address has no account yet.
+        "invite_link": (!sent && !has_account).then(|| app.mailer.login_url(&token)),
+    })))
+}
+
+/// Clears a member's password (they fall back to the magic link) and, when a
+/// relay is configured, mails them a fresh sign-in link. Admin+; never the owner
+/// (unless the caller is the owner), never oneself — changing your own password
+/// goes through `PUT /auth/password`, which requires knowing the current one.
+///
+/// Deliberately returns no credential: an admin can unlock an account, not walk
+/// into it. On an instance with no relay, the way back in is the `set-password`
+/// CLI (shell access already means database access — no privilege gained).
+pub async fn clear_member_password(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>> {
+    require_role(&user, "admin")?;
+    if id == user.id {
+        return Err(Error::Forbidden);
+    }
+    let target = crate::store::get_user_role(&app.db, &id)
+        .await?
+        .ok_or_else(|| Error::BadId("unknown member".into()))?;
+    if target == "owner" {
+        return Err(Error::Forbidden);
+    }
+    if target == "admin" {
+        require_role(&user, "owner")?;
+    }
+    let email = crate::store::clear_user_password(&app.db, &id).await?;
+    // Their live WebSockets keep writing until natural disconnect otherwise
+    // (access is only checked at handshake) — same reasoning as `remove_member`.
+    app.sync.kick_user_everywhere(&id).await;
+    let mut emailed = false;
+    if app.mailer.is_configured() {
+        let token = crate::auth::issue_login_token(&app, &email).await?;
+        crate::auth::send_login_token(&app, &email, &token).await;
+        emailed = true;
+    }
+    Ok(Json(json!({ "emailed": emailed })))
 }
 
 /// Revokes a pending invitation. Admin+.

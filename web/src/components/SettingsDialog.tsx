@@ -9,6 +9,7 @@ import {
   Grid3x3,
   Grip,
   Info,
+  KeyRound,
   LogOut,
   Monitor,
   Moon,
@@ -47,12 +48,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ListRowsSkeleton, TextLinesSkeleton } from "@/components/ui/skeletons";
 import {
+  ApiError,
+  type AuthConfig,
   type Member,
   type MemberPage,
   type Role,
@@ -62,6 +72,9 @@ import {
   type UpdateConsent,
   type UnsplashStatus,
   type Workspace,
+  clearMemberPassword,
+  getAuthConfig,
+  getMe,
   getMemberPages,
   getTrash,
   getUnsplashStatus,
@@ -70,10 +83,12 @@ import {
   inviteMember,
   purgeItem,
   removeMember,
+  removeMyPassword,
   restoreItem,
   revokeInvite,
   checkForUpdates,
   setMemberRole,
+  setMyPassword,
   setUnsplashKey,
   setUpdateConsent,
   transferOwnership,
@@ -197,7 +212,9 @@ export function SettingsDialog({
               against the edge, where a phone's gesture bar can cover it. */}
           <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 pb-12 sm:px-8 sm:py-7 sm:pb-12">
             {section === "general" && <GeneralSection user={user} onUserChange={onUserChange} />}
-            {section === "account" && <AccountSection user={user} ws={ws} onLogout={onLogout} />}
+            {section === "account" && (
+              <AccountSection user={user} ws={ws} onLogout={onLogout} onUserChange={onUserChange} />
+            )}
             {section === "trash" && <TrashSection isAdmin={isAdmin} />}
             {section === "members" && (
               <MembersSection user={user} ws={ws} onChanged={reload} onOpenPage={openPage} />
@@ -610,7 +627,17 @@ function GeneralSection({ user, onUserChange }: { user: User; onUserChange: (u: 
   );
 }
 
-function AccountSection({ user, ws, onLogout }: { user: User; ws: Workspace | null; onLogout: () => void }) {
+function AccountSection({
+  user,
+  ws,
+  onLogout,
+  onUserChange,
+}: {
+  user: User;
+  ws: Workspace | null;
+  onLogout: () => void;
+  onUserChange: (u: User) => void;
+}) {
   const { t } = useTranslation();
   const me = ws?.members.find((m) => m.id === user.id);
   return (
@@ -629,12 +656,180 @@ function AccountSection({ user, ws, onLogout }: { user: User; ws: Workspace | nu
           </span>
         </Row>
       )}
+      <PasswordSettings user={user} onUserChange={onUserChange} />
       <div className="pt-6">
         <Button variant="outline" onClick={onLogout}>
           <LogOut className="size-4" /> {t("settings.account.logout")}
         </Button>
       </div>
     </div>
+  );
+}
+
+/** Password of the current account: set it, change it, or drop it for
+ * magic-link-only. Dropping is server-refused while no SMTP relay is configured
+ * (the account would have no way in), so the button says why instead of failing. */
+function PasswordSettings({
+  user,
+  onUserChange,
+}: {
+  user: User;
+  onUserChange: (u: User) => void;
+}) {
+  const { t } = useTranslation();
+  const [cfg, setCfg] = useState<AuthConfig | null>(null);
+  const [open, setOpen] = useState(false);
+  const [dropping, setDropping] = useState(false);
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getAuthConfig()
+      .then(setCfg)
+      .catch(() => {});
+  }, []);
+
+  const min = cfg?.min_password ?? 12;
+  const has = user.has_password;
+  const reset = () => {
+    setCurrent("");
+    setNext("");
+    setConfirm("");
+  };
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await setMyPassword(next, has ? current : undefined);
+      // `has_password` lives on the user: re-read it rather than guessing.
+      onUserChange(await getMe());
+      toast.success(t("settings.security.saved"));
+      setOpen(false);
+      reset();
+    } catch (e) {
+      toast.error(e instanceof ApiError && e.status === 401 ? t("settings.security.wrongCurrent") : t("settings.security.failed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const drop = async () => {
+    setBusy(true);
+    try {
+      await removeMyPassword(current);
+      onUserChange(await getMe());
+      toast.success(t("settings.security.removed"));
+      setDropping(false);
+      reset();
+    } catch (e) {
+      toast.error(e instanceof ApiError && e.status === 401 ? t("settings.security.wrongCurrent") : t("settings.security.failed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Row label={t("settings.security.password")}>
+        <span className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            {has ? t("settings.security.isSet") : t("settings.security.notSet")}
+          </span>
+          <Button size="sm" variant="outline" onClick={() => { reset(); setOpen(true); }}>
+            {has ? t("settings.security.change") : t("settings.security.set")}
+          </Button>
+          {has && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!cfg?.smtp}
+              title={cfg?.smtp ? undefined : t("settings.security.removeNeedsSmtp")}
+              onClick={() => { reset(); setDropping(true); }}
+            >
+              {t("settings.security.remove")}
+            </Button>
+          )}
+        </span>
+      </Row>
+      {has && !cfg?.smtp && (
+        <p className="px-1 pb-2 text-xs text-muted-foreground">{t("settings.security.onlyWayIn")}</p>
+      )}
+
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{has ? t("settings.security.change") : t("settings.security.set")}</DialogTitle>
+            <DialogDescription>{t("settings.security.changeHint")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {has && (
+              <Input
+                type="password"
+                autoComplete="current-password"
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+                placeholder={t("settings.security.currentPlaceholder")}
+              />
+            )}
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              placeholder={t("auth.passwordPlaceholder", { min })}
+            />
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder={t("auth.confirmPlaceholder")}
+            />
+            {confirm.length > 0 && confirm !== next && (
+              <p className="text-xs text-destructive">{t("auth.passwordMismatch")}</p>
+            )}
+            <p className="text-xs text-muted-foreground">{t("settings.security.revokeNote")}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>
+              {t("settings.cancel")}
+            </Button>
+            <Button
+              onClick={() => void save()}
+              disabled={busy || next.length < min || next !== confirm || (has && !current)}
+            >
+              {t("settings.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dropping} onOpenChange={(o) => { setDropping(o); if (!o) reset(); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("settings.security.remove")}</DialogTitle>
+            <DialogDescription>{t("settings.security.removeHint")}</DialogDescription>
+          </DialogHeader>
+          <Input
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            placeholder={t("settings.security.currentPlaceholder")}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDropping(false)} disabled={busy}>
+              {t("settings.cancel")}
+            </Button>
+            <Button variant="destructive" onClick={() => void drop()} disabled={busy || !current}>
+              {t("settings.security.remove")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -706,7 +901,16 @@ function MembersSection({
   const [role, setRole] = useState<Role>("member");
   const [busy, setBusy] = useState(false);
   const [viewing, setViewing] = useState<Member | null>(null);
+  const [cfg, setCfg] = useState<AuthConfig | null>(null);
+  // Link to hand over when nothing could be emailed (no SMTP relay).
+  const [handover, setHandover] = useState<{ email: string; link: string } | null>(null);
   const isOwner = user.role === "owner";
+
+  useEffect(() => {
+    getAuthConfig()
+      .then(setCfg)
+      .catch(() => {});
+  }, []);
 
   if (!ws) return <ListRowsSkeleton />;
 
@@ -720,9 +924,13 @@ function MembersSection({
     if (!e) return;
     setBusy(true);
     try {
-      await inviteMember(e, role);
+      const res = await inviteMember(e, role);
       setEmail("");
-      toast.success(t("settings.members.inviteSent", { email: e }));
+      // No relay: the invitation exists but nothing was sent — show the link
+      // instead of claiming success.
+      if (res.emailed) toast.success(t("settings.members.inviteSent", { email: e }));
+      else if (res.invite_link) setHandover({ email: e, link: res.invite_link });
+      else toast.success(t("settings.members.inviteSent", { email: e }));
       onChanged();
     } catch {
       toast.error(t("settings.members.inviteFailed"));
@@ -746,6 +954,13 @@ function MembersSection({
       <SectionTitle>{t("settings.members.title")}</SectionTitle>
 
       <RolePermissionsInfo />
+
+      {cfg && !cfg.smtp && (
+        <p className="mb-4 flex gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          <Info className="mt-0.5 size-4 shrink-0" />
+          {t("settings.members.noSmtp")}
+        </p>
+      )}
 
       <div className="mb-4 space-y-2">
         <Label className="text-sm">{t("settings.members.inviteByEmail")}</Label>
@@ -779,12 +994,36 @@ function MembersSection({
             me={user}
             isOwner={isOwner}
             act={act}
+            smtp={cfg?.smtp ?? true}
             onView={
               m.id !== user.id && canSupervise(user.role, m.role) ? () => setViewing(m) : undefined
             }
           />
         ))}
       </ul>
+
+      <Dialog open={handover !== null} onOpenChange={(o) => !o && setHandover(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {t("settings.members.inviteLinkTitle", { email: handover?.email ?? "" })}
+            </DialogTitle>
+            <DialogDescription>{t("settings.members.inviteLinkHint")}</DialogDescription>
+          </DialogHeader>
+          <Input readOnly value={handover?.link ?? ""} onFocus={(e) => e.currentTarget.select()} />
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(handover?.link ?? "")
+                  .then(() => toast.success(t("settings.members.linkCopied")));
+              }}
+            >
+              {t("settings.members.copyLink")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {ws.invites.length > 0 && (
         <>
@@ -830,12 +1069,15 @@ function MemberRow({
   me,
   isOwner,
   act,
+  smtp,
   onView,
 }: {
   m: Member;
   me: User;
   isOwner: boolean;
   act: (fn: () => Promise<void>, ok: string) => Promise<void>;
+  /** Is a relay configured? Decides whether the reset can mail them a link. */
+  smtp: boolean;
   /** Present if the current supervisor can see this member's pages. */
   onView?: () => void;
 }) {
@@ -878,6 +1120,20 @@ function MemberRow({
       challenge: m.email,
     });
   };
+
+  // Same eligibility as disabling: never oneself, never the owner, and an admin
+  // target requires owner. The server enforces exactly this.
+  const canResetPassword = canRemove && !disabled;
+
+  const confirmResetPassword = () =>
+    setPending({
+      title: t("settings.members.resetTitle", { name: m.display_name }),
+      body: t("settings.members.resetBody", { name: m.display_name }),
+      confirmLabel: t("settings.members.resetConfirm"),
+      destructive: true,
+      run: () => clearMemberPassword(m.id).then(() => undefined),
+      ok: smtp ? t("settings.members.resetDone") : t("settings.members.resetDoneNoMail"),
+    });
 
   const confirmRemove = () =>
     setPending({
@@ -945,6 +1201,17 @@ function MemberRow({
             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
             <Crown />
+          </Button>
+        )}
+        {canResetPassword && (
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            title={t("settings.members.resetPassword")}
+            aria-label={t("settings.members.resetPassword")}
+            onClick={confirmResetPassword}
+          >
+            <KeyRound />
           </Button>
         )}
         {canRemove && !disabled && (

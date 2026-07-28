@@ -21,10 +21,21 @@ const InvitePage = lazy(() =>
 const OnboardingFlow = lazy(() =>
   import("@/components/OnboardingFlow").then((m) => ({ default: m.OnboardingFlow })),
 );
-import { getMe, logout, requestLink, verifyToken, type User } from "@/lib/api";
+import {
+  ApiError,
+  type AuthConfig,
+  getAuthConfig,
+  getMe,
+  loginWithPassword,
+  logout,
+  requestLink,
+  signupOwner,
+  verifyToken,
+  type User,
+} from "@/lib/api";
 import { StaleClient } from "@/components/StaleClient";
 import { useFreshness } from "@/hooks/useFreshness";
-import { isLanguage, setLanguage } from "@/i18n";
+import i18n, { isLanguage, setLanguage } from "@/i18n";
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -53,24 +64,8 @@ function VerifyPage() {
   return <Centered>{failed ? t("auth.linkInvalid") : t("auth.verifying")}</Centered>;
 }
 
-/** Passwordless login screen: email → magic link. */
-function Login() {
+function AuthShell({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await requestLink(email);
-      setSent(true);
-    } catch {
-      setError(t("auth.sendFailed"));
-    }
-  }
-
   return (
     <div className="dot-grid flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-4">
@@ -78,30 +73,197 @@ function Login() {
           <h1 className="font-brand text-4xl font-bold tracking-tight">{APP_NAME}</h1>
           <p className="text-sm text-muted-foreground">{t("auth.brandSubtitle")}</p>
         </div>
-        {sent ? (
-          <p className="rounded-md border bg-muted/40 p-3 text-sm">
-            {t("auth.sent", { email })}
-            <br />
-            <span className="text-xs text-muted-foreground">{t("invite.devNote")}</span>
-          </p>
-        ) : (
-          <form onSubmit={submit} className="space-y-3">
-            <Input
-              type="email"
-              required
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={t("auth.emailPlaceholder")}
-            />
-            {error && <p className="text-xs text-destructive">{error}</p>}
-            <Button type="submit" className="w-full">
-              {t("auth.getLink")}
-            </Button>
-          </form>
-        )}
+        {children}
       </div>
     </div>
+  );
+}
+
+/** Maps an auth failure to a message. Every rejected sign-in gets the same
+ * wording on purpose: the server does not say whether the account exists, and
+ * the UI must not invent the distinction either. */
+function authErrorMessage(e: unknown): string {
+  const status = e instanceof ApiError ? e.status : 0;
+  if (status === 429) return i18n.t("auth.tooMany");
+  if (status === 401 || status === 403) return i18n.t("auth.badCredentials");
+  // 400 = a rule the server enforces (address shape, password policy); its
+  // English detail is more useful than a generic sentence.
+  if (status === 400 && e instanceof ApiError && e.message) return e.message;
+  return i18n.t("auth.sendFailed");
+}
+
+/** First run: the instance has no account yet, so this form creates the owner —
+ * with a password, which is what makes an install with no SMTP relay usable. */
+function SetupForm({ minPassword, onSignedIn }: { minPassword: number; onSignedIn: (u: User) => void }) {
+  const { t } = useTranslation();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const tooShort = password.length > 0 && password.length < minPassword;
+  const mismatch = confirm.length > 0 && confirm !== password;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      onSignedIn(await signupOwner(email, password));
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <p className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+        {t("auth.setupIntro")}
+      </p>
+      <Input
+        type="email"
+        required
+        autoFocus
+        autoComplete="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder={t("auth.emailPlaceholder")}
+      />
+      <Input
+        type="password"
+        required
+        autoComplete="new-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder={t("auth.passwordPlaceholder", { min: minPassword })}
+      />
+      <Input
+        type="password"
+        required
+        autoComplete="new-password"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        placeholder={t("auth.confirmPlaceholder")}
+      />
+      {tooShort && <p className="text-xs text-muted-foreground">{t("auth.passwordTooShort", { min: minPassword })}</p>}
+      {mismatch && <p className="text-xs text-destructive">{t("auth.passwordMismatch")}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <Button type="submit" className="w-full" disabled={busy || tooShort || mismatch || !password}>
+        {t("auth.createAccount")}
+      </Button>
+    </form>
+  );
+}
+
+/** Sign-in screen. Two ways in, and which one leads depends on the instance:
+ * with an SMTP relay the magic link is offered first (nothing to remember),
+ * without one it would be undeliverable, so the password leads. Both stay
+ * reachable — a password is the way in when the relay is down. */
+function SignInForm({ smtp, onSignedIn }: { smtp: boolean; onSignedIn: (u: User) => void }) {
+  const { t } = useTranslation();
+  const [mode, setMode] = useState<"password" | "link">(smtp ? "link" : "password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      if (mode === "link") {
+        await requestLink(email);
+        setSent(true);
+      } else {
+        onSignedIn(await loginWithPassword(email, password));
+      }
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (sent) {
+    return (
+      <p className="rounded-md border bg-muted/40 p-3 text-sm">
+        {t("auth.sent", { email })}
+        {!smtp && (
+          <>
+            <br />
+            <span className="text-xs text-muted-foreground">{t("auth.noSmtpConsole")}</span>
+          </>
+        )}
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <Input
+        type="email"
+        required
+        autoFocus
+        autoComplete="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder={t("auth.emailPlaceholder")}
+      />
+      {mode === "password" && (
+        <Input
+          type="password"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder={t("auth.passwordOnly")}
+        />
+      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <Button type="submit" className="w-full" disabled={busy}>
+        {mode === "link" ? t("auth.getLink") : t("auth.signIn")}
+      </Button>
+      <button
+        type="button"
+        className="w-full text-center text-xs text-muted-foreground underline-offset-2 hover:underline"
+        onClick={() => {
+          setError(null);
+          setMode((m) => (m === "link" ? "password" : "link"));
+        }}
+      >
+        {mode === "link" ? t("auth.usePassword") : t("auth.useLink")}
+      </button>
+      {mode === "password" && !smtp && (
+        <p className="text-center text-xs text-muted-foreground">{t("auth.forgotNoSmtp")}</p>
+      )}
+    </form>
+  );
+}
+
+/** Login screen: owner creation on a fresh instance, sign-in otherwise. */
+function Login({ onSignedIn }: { onSignedIn: (u: User) => void }) {
+  const [config, setConfig] = useState<AuthConfig | null>(null);
+  useEffect(() => {
+    getAuthConfig()
+      // A failing config call must not lock the screen: fall back to the most
+      // conservative shape (existing instance, mail available).
+      .catch(() => ({ bootstrap: false, smtp: true, min_password: 12 }) satisfies AuthConfig)
+      .then(setConfig);
+  }, []);
+
+  if (!config) return <AuthShell>{null}</AuthShell>;
+  return (
+    <AuthShell>
+      {config.bootstrap ? (
+        <SetupForm minPassword={config.min_password} onSignedIn={onSignedIn} />
+      ) : (
+        <SignInForm smtp={config.smtp} onSignedIn={onSignedIn} />
+      )}
+    </AuthShell>
   );
 }
 
@@ -143,7 +305,16 @@ export default function App() {
     );
   }
   if (user === undefined || freshness.state === "checking") return <AppShellSkeleton />;
-  if (!user) return <Login />;
+  if (!user) {
+    return (
+      <Login
+        onSignedIn={(u) => {
+          if (isLanguage(u.language)) setLanguage(u.language);
+          setUser(u);
+        }}
+      />
+    );
+  }
   // Before onboarding too: the welcome funnel writes pages through the CRDT.
   if (freshness.state === "stale") return <StaleClient serverVersion={freshness.serverVersion} />;
 

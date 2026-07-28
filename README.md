@@ -18,7 +18,8 @@ install it. Works on any Linux box — a Raspberry Pi (64-bit), a home server, a
 curl -fsSL https://raw.githubusercontent.com/merrypatch/bramblekeep/master/install.sh | sudo bash
 ```
 
-It prints the URL to open and where to find the sign-in link. The script is
+It prints the URL to open. The first visitor creates the owner account with an
+email and a password — no SMTP needed. The script is
 inspectable — read [`install.sh`](./install.sh) before piping it to a shell.
 
 Useful overrides:
@@ -40,8 +41,10 @@ docker run -d --name bramblekeep \
   ghcr.io/merrypatch/bramblekeep:latest
 ```
 
-Then open `http://localhost:8080`; sign-in links are printed to the logs
-(`docker logs -f bramblekeep`) until you configure SMTP.
+Then open `http://localhost:8080` and create the owner account (email +
+password — nothing to configure). Inviting other people needs SMTP: they sign in
+through an emailed link. Without SMTP you can still invite and hand over the link
+yourself, and sign-in links are printed to the logs (`docker logs -f bramblekeep`).
 
 Prefer Compose? A ready [`docker-compose.yml`](./docker-compose.yml) is in the
 repo (volume, ports, Watchtower one-click updates, commented SMTP / HTTPS):
@@ -100,13 +103,18 @@ them to `/opt/bramblekeep/.env`); bare-binary installs read a `.env` next to the
 binary (copy [`.env.example`](./.env.example)):
 
 - `PUBLIC_BASE_URL` — the URL users actually reach; sign-in and shared-page links are built from it.
-- `SMTP_*` — send sign-in / invitation emails. Without it, those links are logged.
+- `SMTP_*` — send sign-in / invitation emails. Without it, password sign-in still
+  works and invitation links must be passed on by hand.
 - `COOKIE_SECURE=true` — set when serving over HTTPS (reverse proxy / tunnel).
 - `PORT` (Docker) / `BIND_ADDR` (binary) — change the listen port.
 
+Locked out (forgotten password on an instance that cannot send email)?
+`bramblekeep set-password <email>` resets it from the server — the password is
+read on stdin, and on an instance with no account it creates the owner.
+
 ## Status
 
-Active development. Working today: rich pages edited in BlockNote synced over WebSocket (yrs CRDT), persisted in `yjs_updates` and projected to `blocks` (survives a binary restart), full-text search, file uploads (content-addressed), account/session auth with per-item sharing, and structured databases with multiple views. Signed static release binaries + a multi-arch Docker image, with one-click in-app updates (self-replace on bare metal, Watchtower on Docker).
+Active development. Working today: rich pages edited in BlockNote synced over WebSocket (yrs CRDT), persisted in `yjs_updates` and projected to `blocks` (survives a binary restart), full-text search, file uploads (content-addressed), email+password or magic-link auth with per-item sharing, and structured databases with multiple views. Signed static release binaries + a multi-arch Docker image, with one-click in-app updates (self-replace on bare metal, Watchtower on Docker).
 
 Not yet: public (login-free) pages, S3 file storage, email/AI integrations — reserved in the schema, built when their version arrives.
 

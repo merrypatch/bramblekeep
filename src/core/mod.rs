@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use uuid::Uuid;
 
+pub mod credentials;
+
 /// Declares a type-wrapped identifier over `Uuid`, with v7 generation
 /// (native chronological ordering) and TypeScript export.
 macro_rules! id_type {

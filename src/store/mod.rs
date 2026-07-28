@@ -977,6 +977,48 @@ pub async fn set_user_status(db: &Db, user_id: &str, status: &str) -> Result<()>
     Ok(())
 }
 
+/// Account id for an email, if any. Used by the invitation path to decide
+/// whether a copyable sign-in link may be handed to the caller (never for an
+/// address that already has an account — it would be an impersonation vector).
+pub async fn user_id_by_email(db: &Db, email: &str) -> Result<Option<String>> {
+    Ok(sqlx::query_scalar("SELECT id FROM users WHERE email = ?")
+        .bind(email)
+        .fetch_optional(db)
+        .await?)
+}
+
+/// Clears a member's password (admin reset) and drops their sessions, so a
+/// leaked password cannot be used through an already-open session. Returns the
+/// account's email, for the sign-in link that follows.
+pub async fn clear_user_password(db: &Db, user_id: &str) -> Result<String> {
+    let mut tx = db.begin().await?;
+    let email: Option<String> = sqlx::query_scalar("SELECT email FROM users WHERE id = ?")
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+    let email = email.ok_or(crate::error::Error::NotFound)?;
+    sqlx::query("UPDATE users SET password_hash = NULL, password_updated_ts = NULL WHERE id = ?")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM sessions WHERE user_id = ?")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(email)
+}
+
+/// Does this account have a password? Shown in Settings → Security (set vs change).
+pub async fn has_password(db: &Db, user_id: &str) -> Result<bool> {
+    let hash: Option<Option<String>> =
+        sqlx::query_scalar("SELECT password_hash FROM users WHERE id = ?")
+            .bind(user_id)
+            .fetch_optional(db)
+            .await?;
+    Ok(hash.flatten().is_some())
+}
+
 /// Transfers ownership: `to` becomes owner, `from` becomes admin.
 pub async fn transfer_ownership(db: &Db, from: &str, to: &str) -> Result<()> {
     let mut tx = db.begin().await?;

@@ -42,6 +42,27 @@ pub fn test_app(db: Db) -> Router {
     ))
 }
 
+/// Same app, with an explicit SMTP state — several behaviours depend on it
+/// (inviting members, dropping one's password). `smtp = true` points the relay at
+/// a closed local port: `Mailer::is_configured()` is true, sending fails
+/// instantly (no DNS wait), which is exactly a misconfigured relay in prod.
+///
+/// Built from an overridden `Config` rather than `from_env()`, so the developer's
+/// own `SMTP_*` variables cannot decide the outcome of a test.
+pub fn test_app_smtp(db: Db, smtp: bool) -> Router {
+    let mut cfg = Config::from_env();
+    cfg.smtp_host = smtp.then(|| "127.0.0.1".to_string());
+    cfg.smtp_port = 1;
+    cfg.public_base_url = "http://localhost:8080".to_string();
+    build_app(AppState::new(
+        db,
+        SyncHub::default(),
+        Arc::new(LocalStore::new(std::env::temp_dir().join("hub_test_files"))),
+        Arc::new(Mailer::from_config(&cfg)),
+        false,
+    ))
+}
+
 fn hash_token(token: &str) -> String {
     use sha2::{Digest, Sha256};
     hex::encode(Sha256::digest(token.as_bytes()))

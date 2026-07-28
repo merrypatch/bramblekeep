@@ -96,9 +96,23 @@ impl Mailer {
         }
     }
 
+    /// Is a real SMTP relay configured? `false` = dev mode, where links are
+    /// logged instead of sent. Drives what the product allows: inviting members
+    /// (they would never receive anything), and dropping one's password (the
+    /// magic link would become an unreachable single way in).
+    pub fn is_configured(&self) -> bool {
+        self.transport.is_some()
+    }
+
+    /// Absolute sign-in URL for a token. Exposed so an admin can hand an
+    /// invitation link over out-of-band when no relay is configured.
+    pub fn login_url(&self, token: &str) -> String {
+        format!("{}/auth/verify?token={}", self.public_base_url, token)
+    }
+
     /// Sends (or logs, in dev) a sign-in link to `to`, in `lang`.
     pub async fn send_login_link(&self, to: &str, token: &str, lang: &str) -> Result<()> {
-        let link = format!("{}/auth/verify?token={}", self.public_base_url, token);
+        let link = self.login_url(token);
         if self.transport.is_none() {
             tracing::info!("[mail dev] sign-in link for {to}: {link}");
             return Ok(());

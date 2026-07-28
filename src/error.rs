@@ -18,6 +18,13 @@ pub enum Error {
     #[error("invalid identifier: {0}")]
     BadId(String),
 
+    /// Rejected user input whose message is meant to be READ by the person who
+    /// typed it (password policy, address shape). Unlike `BadId`, it carries no
+    /// "invalid identifier:" prefix — the front-end shows this text as-is when
+    /// it has no translation for the case.
+    #[error("{0}")]
+    BadInput(String),
+
     #[error("CRDT decode: {0}")]
     CrdtDecode(String),
 
@@ -58,7 +65,7 @@ impl Error {
     /// upstream, so these cases are rare.
     fn code(&self) -> &'static str {
         match self {
-            Error::BadId(_) => "bad_request",
+            Error::BadId(_) | Error::BadInput(_) => "bad_request",
             Error::Upload(_) => "upload",
             Error::Unauthorized => "unauthorized",
             Error::Forbidden => "forbidden",
@@ -73,7 +80,7 @@ impl Error {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = match self {
-            Error::BadId(_) | Error::Upload(_) => StatusCode::BAD_REQUEST,
+            Error::BadId(_) | Error::BadInput(_) | Error::Upload(_) => StatusCode::BAD_REQUEST,
             Error::Unauthorized => StatusCode::UNAUTHORIZED,
             Error::Forbidden => StatusCode::FORBIDDEN,
             Error::NotFound => StatusCode::NOT_FOUND,
