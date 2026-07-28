@@ -50,10 +50,15 @@ export function DocsPage() {
   const current = pages.find((p) => p.slug === slug) ?? pages[0];
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:flex-row sm:p-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:flex-row sm:items-start sm:p-6">
       {/* Table of contents. Above the content on mobile (mobile-first), a column
-          on the side from `sm` up. */}
-      <nav className="shrink-0 sm:w-56">
+          on the side from `sm` up — and there it STAYS PUT while the chapter
+          scrolls: the page scrolls at document level (the shell has no inner
+          scroll container), so `sticky` is what pins it, not `overflow`.
+          `items-start` on the parent is required, otherwise the stretched flex
+          item has nothing to stick within. A table of contents taller than the
+          viewport scrolls on its own. */}
+      <nav className="shrink-0 sm:sticky sm:top-6 sm:max-h-[calc(100dvh-3rem)] sm:w-56 sm:overflow-y-auto sm:pb-4">
         <h2 className="mb-2 flex items-center gap-1.5 px-2 text-sm font-semibold">
           <BookOpen className="size-4" /> {t("docs.title")}
         </h2>
