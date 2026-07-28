@@ -1022,6 +1022,19 @@
       "upload": "Envoyer",
       "embed": "Intégrer",
       "unsplash": "Unsplash"
+    },
+    "turnInto": {
+      "label": "Transformer en",
+      "text": "Texte",
+      "h1": "Titre 1",
+      "h2": "Titre 2",
+      "h3": "Titre 3",
+      "bullet": "Liste à puces",
+      "numbered": "Liste numérotée",
+      "check": "Liste de cases",
+      "toggle": "Liste dépliante",
+      "quote": "Citation",
+      "code": "Bloc de code"
     }
   },
   "history": {

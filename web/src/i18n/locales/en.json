@@ -1022,6 +1022,19 @@
       "upload": "Upload",
       "embed": "Embed",
       "unsplash": "Unsplash"
+    },
+    "turnInto": {
+      "label": "Turn into",
+      "text": "Text",
+      "h1": "Heading 1",
+      "h2": "Heading 2",
+      "h3": "Heading 3",
+      "bullet": "Bulleted list",
+      "numbered": "Numbered list",
+      "check": "Check list",
+      "toggle": "Toggle list",
+      "quote": "Quote",
+      "code": "Code block"
     }
   },
   "history": {

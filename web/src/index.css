@@ -193,6 +193,64 @@ html[data-accent="rose"] {
   }
 }
 
+/* Block background colours.
+   BlockNote ships pastels in light mode and FULLY SATURATED fills in dark mode
+   (red = #be3434), painted edge to edge on the block row with square corners and
+   no padding — a solid slab across the page. Retinted here as a wash of the hue
+   over the page background, so the nine colours keep their identity, stay legible
+   in both themes and follow the accent/zinc palette instead of fighting it.
+   One definition for both themes: `var(--background)` already differs, only the
+   amount of hue changes. */
+.bk-editor {
+  --bk-highlight-mix: 16%;
+  --bn-colors-highlights-gray-background: color-mix(in oklab, #9b9a97 var(--bk-highlight-mix), var(--background));
+  --bn-colors-highlights-brown-background: color-mix(in oklab, #a1683a var(--bk-highlight-mix), var(--background));
+  --bn-colors-highlights-red-background: color-mix(in oklab, #e03e3e var(--bk-highlight-mix), var(--background));
+  --bn-colors-highlights-orange-background: color-mix(in oklab, #d9730d var(--bk-highlight-mix), var(--background));
+  --bn-colors-highlights-yellow-background: color-mix(in oklab, #dfab01 var(--bk-highlight-mix), var(--background));
+  --bn-colors-highlights-green-background: color-mix(in oklab, #0f9b86 var(--bk-highlight-mix), var(--background));
+  --bn-colors-highlights-blue-background: color-mix(in oklab, #2591c4 var(--bk-highlight-mix), var(--background));
+  --bn-colors-highlights-purple-background: color-mix(in oklab, #8a63d2 var(--bk-highlight-mix), var(--background));
+  --bn-colors-highlights-pink-background: color-mix(in oklab, #d5389a var(--bk-highlight-mix), var(--background));
+}
+/* Dark mode needs more hue to read as a colour at all against a near-black
+   background. */
+.dark .bk-editor {
+  --bk-highlight-mix: 26%;
+}
+
+/* Shape of a coloured block: rounded, padded, and pulled back by the same amount
+   so the text column stays aligned with the uncoloured blocks around it (the
+   tint grows outwards, the text does not move). `:has` targets the block whose
+   OWN content carries the colour — nested children keep inheriting the tint, as
+   BlockNote intends. */
+.bk-editor .bn-block:has(> .bn-block-content[data-background-color]):not(
+    :has(> .bn-block-content[data-background-color="default"])
+  ) {
+  border-radius: 0.5rem;
+  padding-block: 0.15rem;
+  padding-inline: 0.625rem;
+  margin-inline: -0.625rem;
+  /* Consecutive coloured blocks would otherwise touch and read as one slab. */
+  margin-block: 1px;
+}
+
+/* Palette swatches (colour picker) keep far more hue than the blocks: nine
+   barely-tinted squares side by side would be indistinguishable. Only the mix
+   amount is redefined — the nine colour variables above resolve it at the point
+   of use, so one rule covers the whole palette. */
+[data-style-type="backgroundColor"] {
+  --bk-highlight-mix: 60%;
+}
+
+/* Inline text highlight: same wash, just enough rounding to look intentional
+   without pushing the line height around. */
+.bk-editor .bn-inline-content [data-background-color]:not([data-background-color="default"]),
+.bk-editor span[data-background-color]:not([data-background-color="default"]) {
+  border-radius: 0.25rem;
+  padding: 0.05em 0.15em;
+}
+
 /* Cap the slash / @-mention suggestion menu height so a long list scrolls
    instead of overflowing the viewport. */
 .bn-suggestion-menu {

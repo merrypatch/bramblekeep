@@ -1022,6 +1022,19 @@
       "upload": "Subir",
       "embed": "Insertar",
       "unsplash": "Unsplash"
+    },
+    "turnInto": {
+      "label": "Convertir en",
+      "text": "Texto",
+      "h1": "Título 1",
+      "h2": "Título 2",
+      "h3": "Título 3",
+      "bullet": "Lista con viñetas",
+      "numbered": "Lista numerada",
+      "check": "Lista de casillas",
+      "toggle": "Lista plegable",
+      "quote": "Cita",
+      "code": "Bloque de código"
     }
   },
   "history": {

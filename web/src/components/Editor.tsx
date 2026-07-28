@@ -7,6 +7,8 @@ import { BlockNoteView } from "@blocknote/mantine";
 import {
   FilePanelController,
   getDefaultReactSlashMenuItems,
+  SideMenu,
+  SideMenuController,
   SuggestionMenuController,
   useCreateBlockNote,
 } from "@blocknote/react";
@@ -17,6 +19,7 @@ import { toast } from "sonner";
 import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
 
+import { BlockDragHandleMenu } from "@/components/EditorBlockMenu";
 import { InlineDbHostContext } from "@/components/db/hostContext";
 import { EditorFilePanel } from "@/components/EditorFilePanel";
 import { PageLinkDialog } from "@/components/PageLinkDialog";
@@ -236,8 +239,11 @@ export function Editor({
         slashMenu={false}
         // Replaced by our own panel: same Upload / Embed tabs + Unsplash.
         filePanel={false}
+        // Replaced below to add "Turn into" to the drag-handle menu.
+        sideMenu={false}
       >
         <FilePanelController filePanel={EditorFilePanel} />
+        <SideMenuController sideMenu={(props) => <SideMenu {...props} dragHandleMenu={BlockDragHandleMenu} />} />
         <SuggestionMenuController
           triggerCharacter="/"
           getItems={async (query) =>
