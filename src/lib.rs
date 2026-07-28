@@ -73,6 +73,10 @@ pub struct AppState {
     /// Remote image mirroring limiter, by user: the only route that makes the
     /// server fetch a user-supplied URL.
     pub fetch_rl: RateLimiter,
+    /// Secret required to create the first account (`SETUP_CODE`), if any.
+    /// Gates ONLY the bootstrap sign-up: once an account exists, that route is
+    /// closed to everyone regardless.
+    pub setup_code: Option<String>,
 }
 
 impl AppState {
@@ -99,7 +103,16 @@ impl AppState {
             // per try, this bounds it regardless).
             password_rl: RateLimiter::new(LOGIN_RL_WINDOW_MS, 10),
             fetch_rl: RateLimiter::new(FETCH_RL_WINDOW_MS, 60),
+            setup_code: None,
         }
+    }
+
+    /// Sets the bootstrap secret (`SETUP_CODE`). Builder rather than a seventh
+    /// constructor argument: every caller that does not care keeps working, and
+    /// the intent reads at the call site.
+    pub fn with_setup_code(mut self, code: Option<String>) -> Self {
+        self.setup_code = code;
+        self
     }
 }
 

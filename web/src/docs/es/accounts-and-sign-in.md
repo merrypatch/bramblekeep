@@ -15,6 +15,13 @@ Entre el primer arranque y ese momento, quien llegue a la instancia puede
 reclamarla. Crea el propietario justo después de arrancar el servidor, y no
 expongas el puerto públicamente antes.
 
+Si no puedes garantizarlo — un VPS con un puerto abierto, un contenedor arrancado
+por otra persona — arranca la instancia con **`SETUP_CODE`** definido con
+cualquier cadena secreta. Crear el propietario lo exigirá entonces, y la pantalla
+de acceso muestra un campo más. No protege nada más: en cuanto la cuenta existe,
+el código queda inerte, y la ruta de registro está cerrada para todos de todas
+formas.
+
 ## Iniciar sesión después
 
 - **con contraseña** — siempre disponible si la cuenta tiene una

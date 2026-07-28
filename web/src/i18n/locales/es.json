@@ -71,7 +71,9 @@
     "badCredentials": "Correo o contraseña incorrectos.",
     "tooMany": "Demasiados intentos. Inténtalo de nuevo en unos minutos.",
     "noSmtpConsole": "Sin correo configurado en esta instancia: el enlace se imprime en la consola del servidor.",
-    "forgotNoSmtp": "¿La olvidaste? No hay correo configurado: la recuperación pasa por `bramblekeep set-password <email>` en el servidor."
+    "forgotNoSmtp": "¿La olvidaste? No hay correo configurado: la recuperación pasa por `bramblekeep set-password <email>` en el servidor.",
+    "setupCodePlaceholder": "Código de instalación",
+    "setupCodeHint": "Esta instancia exige el SETUP_CODE que configuró su administrador."
   },
   "search": {
     "placeholder": "Buscar…",

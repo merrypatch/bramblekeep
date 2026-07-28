@@ -14,6 +14,12 @@ Between the first start and that moment, whoever reaches the instance can claim
 it. Create the owner right after starting the server, and do not expose the port
 publicly before that.
 
+If you cannot guarantee that — a VPS with an open port, a container started by
+someone else — start the instance with **`SETUP_CODE`** set to any secret string.
+Creating the owner then requires it, and the sign-in screen shows one extra field.
+It gates nothing else: once the account exists, the code is inert, and the
+sign-up route is closed to everyone anyway.
+
 ## Signing in afterwards
 
 - **with a password** — always available if the account has one

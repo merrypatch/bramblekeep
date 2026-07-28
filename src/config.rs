@@ -12,6 +12,11 @@ pub struct Config {
     pub public_base_url: String,
     /// Session cookie with `Secure` flag (enable behind HTTPS; off in dev http).
     pub cookie_secure: bool,
+    /// Optional secret required to create the FIRST account. Absent (the
+    /// default) = the first visitor claims the instance, which is fine when the
+    /// port is not publicly reachable before you have signed up. Set it when the
+    /// instance is exposed before you get to it.
+    pub setup_code: Option<String>,
     /// SMTP: if `smtp_host` is absent, the mailer logs links (dev mode).
     pub smtp_host: Option<String>,
     pub smtp_port: u16,
@@ -44,6 +49,8 @@ impl Config {
             }),
             bind_addr,
             cookie_secure: env_opt("COOKIE_SECURE").is_some_and(|v| v == "true" || v == "1"),
+            // Trimmed: a code pasted with a trailing space must still match.
+            setup_code: env_opt("SETUP_CODE").map(|v| v.trim().to_string()).filter(|v| !v.is_empty()),
             smtp_host: env_opt("SMTP_HOST"),
             smtp_port: env_opt("SMTP_PORT").and_then(|p| p.parse().ok()).unwrap_or(587),
             smtp_username: env_opt("SMTP_USERNAME"),

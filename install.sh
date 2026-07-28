@@ -11,6 +11,8 @@
 #
 # Environment overrides:
 #   PUBLIC_BASE_URL=https://notes.example.com   URL users reach (default: host IP)
+#   SETUP_CODE=a-long-secret                    require it to create the owner
+#                                               account (optional; see .env)
 #   PORT=8080                       host port to publish (default 8080)
 #   BRAMBLEKEEP_DIR=/opt/bramblekeep            install directory
 #   VERSION=v0.2.0                  pin an image/binary version (default: latest)
@@ -213,6 +215,9 @@ PUBLIC_BASE_URL=$PUBLIC_BASE_URL
 PORT=$PORT
 # Behind an HTTPS reverse proxy / tunnel, set this to true:
 COOKIE_SECURE=false
+# Optional: require this secret to create the OWNER account. Useful when the port
+# is reachable before you have signed up. Inert once the account exists.
+SETUP_CODE=${SETUP_CODE:-}
 # Secret shared with the Watchtower sidecar for one-click updates. Keep private.
 WATCHTOWER_TOKEN=$WATCHTOWER_TOKEN
 
@@ -244,6 +249,7 @@ services:
       COOKIE_SECURE: \${COOKIE_SECURE:-false}
       WATCHTOWER_URL: http://watchtower:8080/v1/update
       WATCHTOWER_TOKEN: \${WATCHTOWER_TOKEN}
+      SETUP_CODE: \${SETUP_CODE:-}
       SMTP_HOST: \${SMTP_HOST:-}
       SMTP_PORT: \${SMTP_PORT:-587}
       SMTP_USERNAME: \${SMTP_USERNAME:-}

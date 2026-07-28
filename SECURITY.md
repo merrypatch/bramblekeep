@@ -43,9 +43,12 @@ browser.
 
 Out of scope, and documented as deliberate:
 
-- **An instance with no account yet is unclaimed**: whoever reaches it first
-  creates the owner. Create that account right after the first start, and do not
-  expose the port publicly before you have.
+- **An instance with no account yet is unclaimed by default**: whoever reaches it
+  first creates the owner. Create that account right after the first start, and do
+  not expose the port publicly before you have. An instance started with
+  `SETUP_CODE` set requires that secret to create the owner, which closes the
+  window — reports about the window on an instance running WITHOUT it are
+  therefore out of scope.
 - **A public page link is a capability.** The token is stored in clear and anyone
   holding the link can read the published page — that is the feature.
 - **Owners and admins can see members' content** (owner over everyone, admin over

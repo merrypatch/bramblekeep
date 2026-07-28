@@ -29,7 +29,7 @@ Rust backend (Axum + SQLite) + embedded Vite/React/TypeScript frontend. The rele
 - **Charts.** Bars, line, area, pie, radar, radial — grouped by hour / day / week / month on a date axis, split into series by any column (a relation included), with cumulative, remaining and burndown transforms.
 - **A graph view**, in a database and across all your pages: relation links and page references, laid out by a force simulation computed in the browser.
 - **Sharing.** Per-page levels (read / edit / creator / admin) inherited by the subtree, workspace roles (owner / admin / member), and **public pages** — a token link readable without any account, optionally covering the subtree.
-- **Sign-in your way.** Email + password (no mail relay needed) or a magic link when SMTP is configured. Opaque sessions, no JWT.
+- **Sign-in your way.** Email + password (no mail relay needed) or a magic link when SMTP is configured. Opaque sessions, no JWT — and an optional `SETUP_CODE` if the instance is exposed before you claim it.
 - **Built-in documentation**, ten chapters shipped inside the binary, so it always matches the version you run. English, French and Spanish, like the rest of the interface.
 - **The small things that matter**: full-text search inside content, favourites, drag & drop of the page tree, 30-day trash, per-page change history, content-addressed uploads, Markdown / PDF / CSV export, CSV and relation-preserving ZIP import, light/dark themes, and installable as a PWA.
 
@@ -51,9 +51,14 @@ It prints the URL to open. The first visitor creates the owner account with an
 email and a password — no SMTP needed. The script is inspectable: read
 [`install.sh`](./install.sh) before piping it to a shell.
 
+If the port is reachable before you get to that first screen, add
+`SETUP_CODE=a-long-secret` to the command: creating the owner then requires it.
+Otherwise, whoever opens the instance first claims it.
+
 Useful overrides:
 
 - `PUBLIC_BASE_URL=https://notes.example.com` — the URL users actually reach (default: the host's IP).
+- `SETUP_CODE=a-long-secret` — require that secret to create the owner account.
 - `PORT=9000` — host port to publish (default `8080`).
 - `NO_DOCKER=1` — install the bare binary + a systemd service instead of Docker.
 - `VERSION=v0.11.0` — pin a version. `--uninstall` — remove it (your data is kept).
@@ -135,6 +140,10 @@ binary (copy [`.env.example`](./.env.example)):
 - `SMTP_*` — send sign-in / invitation emails. Without it, password sign-in still
   works and invitation links must be passed on by hand.
 - `COOKIE_SECURE=true` — set when serving over HTTPS (reverse proxy / tunnel).
+- `SETUP_CODE` — optional secret required to create the **owner** account. Set it
+  when the instance is reachable before you have signed up; leave it out and the
+  first visitor claims the instance. It gates nothing else and becomes inert once
+  the account exists.
 - `PORT` (Docker) / `BIND_ADDR` (binary) — change the listen port.
 
 Locked out (forgotten password on an instance that cannot send email)?

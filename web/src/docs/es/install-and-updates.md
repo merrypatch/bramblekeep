@@ -40,6 +40,9 @@ Todo son variables de entorno, leídas al arrancar:
   acceso y los de páginas públicas se construyen con ella, así que debe ser
   correcta detrás de un proxy inverso.
 - `COOKIE_SECURE=true` — actívalo cuando sirvas por HTTPS.
+- `SETUP_CODE` — secreto opcional exigido para crear la cuenta propietaria, para
+  una instancia alcanzable antes de que hayas podido registrarte. Inerte en cuanto
+  la cuenta existe.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` — el relé
   de correo. Sin él, el acceso por contraseña sigue funcionando y los enlaces de
   invitación hay que pasarlos a mano.

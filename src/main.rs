@@ -127,7 +127,8 @@ async fn main() -> anyhow::Result<()> {
     let files = Arc::new(LocalStore::new(&config.files_dir));
     let mailer = Arc::new(Mailer::from_config(&config));
 
-    let state = AppState::new(db, SyncHub::default(), files, mailer, config.cookie_secure);
+    let state = AppState::new(db, SyncHub::default(), files, mailer, config.cookie_secure)
+        .with_setup_code(config.setup_code.clone());
     // Periodically sweep CRDT docs with no active connection (bounds memory on
     // long-running instances — the doc is reloaded from the journal on the
     // next access, the source of truth remaining `yjs_updates`).
@@ -161,7 +162,12 @@ async fn main() -> anyhow::Result<()> {
         .await
         .unwrap_or(0);
     if accounts == 0 {
-        println!("  No account yet: the first visitor creates the owner account — do it now.");
+        if config.setup_code.is_some() {
+            println!("  No account yet: creating the owner requires the SETUP_CODE you configured.");
+        } else {
+            println!("  No account yet: the first visitor creates the owner account — do it now.");
+            println!("  Exposed before you get to it? Set SETUP_CODE (see .env.example).");
+        }
     }
     if config.smtp_host.is_none() {
         println!("  No email configured (SMTP): sign in with a password; invitations need SMTP.");

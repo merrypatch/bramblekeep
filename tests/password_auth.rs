@@ -167,6 +167,93 @@ async fn config_reports_bootstrap_and_smtp_state() {
     assert_eq!(r.json["smtp"], true);
 }
 
+// ── Bootstrap secret (SETUP_CODE) ────────────────────────────────────────────
+
+#[tokio::test]
+async fn without_a_setup_code_nothing_changes() {
+    let (db, _p) = test_db().await;
+    let app = test_app_smtp(db.clone(), false);
+    let cfg = send(&app, Method::GET, "/api/v1/auth/config", None, "").await;
+    assert_eq!(cfg.json["setup_code_required"], false);
+    // A code sent to an instance that expects none is simply ignored.
+    let r = send(
+        &app,
+        Method::POST,
+        "/api/v1/auth/signup",
+        None,
+        &serde_json::json!({ "email": "owner@example.com", "password": PW, "setup_code": "whatever" })
+            .to_string(),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_configured_setup_code_gates_the_first_account() {
+    let (db, _p) = test_db().await;
+    let app = common::test_app_setup_code(db.clone(), "open-sesame-42");
+
+    // The screen is told to ask for it.
+    let cfg = send(&app, Method::GET, "/api/v1/auth/config", None, "").await;
+    assert_eq!(cfg.json["bootstrap"], true);
+    assert_eq!(cfg.json["setup_code_required"], true);
+
+    let signup = |body: String| {
+        let app = app.clone();
+        async move { send(&app, Method::POST, "/api/v1/auth/signup", None, &body).await }
+    };
+
+    // Missing, then wrong: same refusal, and no account created.
+    for body in [
+        serde_json::json!({ "email": "owner@example.com", "password": PW }).to_string(),
+        serde_json::json!({ "email": "owner@example.com", "password": PW, "setup_code": "" }).to_string(),
+        serde_json::json!({ "email": "owner@example.com", "password": PW, "setup_code": "open-sesame-41" }).to_string(),
+    ] {
+        let r = signup(body.clone()).await;
+        assert_eq!(r.status, StatusCode::FORBIDDEN, "body: {body}");
+    }
+    let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users").fetch_one(&db).await.unwrap();
+    assert_eq!(users, 0, "no account created by a refused sign-up");
+
+    // The right code, with the stray whitespace a copy-paste adds.
+    let ok = signup(
+        serde_json::json!({ "email": "owner@example.com", "password": PW, "setup_code": " open-sesame-42 " })
+            .to_string(),
+    )
+    .await;
+    assert_eq!(ok.status, StatusCode::OK);
+    assert_eq!(ok.json["role"], "owner");
+
+    // Claimed: the code no longer means anything, the route is closed to all.
+    let after = send(&app, Method::GET, "/api/v1/auth/config", None, "").await;
+    assert_eq!(after.json["bootstrap"], false);
+    assert_eq!(after.json["setup_code_required"], false, "pointless once claimed");
+    let second = signup(
+        serde_json::json!({ "email": "other@example.com", "password": PW, "setup_code": "open-sesame-42" })
+            .to_string(),
+    )
+    .await;
+    assert_eq!(second.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn the_setup_code_does_not_gate_signing_in() {
+    // It guards the claim, not the door: an existing account signs in normally.
+    let (db, _p) = test_db().await;
+    let app = common::test_app_setup_code(db.clone(), "open-sesame-42");
+    send(
+        &app,
+        Method::POST,
+        "/api/v1/auth/signup",
+        None,
+        &serde_json::json!({ "email": "owner@example.com", "password": PW, "setup_code": "open-sesame-42" })
+            .to_string(),
+    )
+    .await;
+    let login = send(&app, Method::POST, "/api/v1/auth/login", None, &creds("owner@example.com", PW)).await;
+    assert_eq!(login.status, StatusCode::OK);
+}
+
 // ── Sign-in ──────────────────────────────────────────────────────────────────
 
 /// Instance with an owner holding `PW`, and no SMTP.

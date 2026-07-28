@@ -39,6 +39,8 @@ Everything is environment variables, read at startup:
 - `PUBLIC_BASE_URL` — the URL your users actually reach. Sign-in links and public
   page links are built from it, so it must be right behind a reverse proxy.
 - `COOKIE_SECURE=true` — set it when you serve over HTTPS.
+- `SETUP_CODE` — optional secret required to create the owner account, for an
+  instance reachable before you have signed up. Inert once the account exists.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` — the
   mail relay. Without it, password sign-in still works and invitation links have
   to be handed over by hand.

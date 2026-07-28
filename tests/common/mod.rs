@@ -63,6 +63,21 @@ pub fn test_app_smtp(db: Db, smtp: bool) -> Router {
     ))
 }
 
+/// Same app, with a bootstrap secret (`SETUP_CODE`) configured. Anything else is
+/// identical, mailer in dev mode included.
+pub fn test_app_setup_code(db: Db, code: &str) -> Router {
+    build_app(
+        AppState::new(
+            db,
+            SyncHub::default(),
+            Arc::new(LocalStore::new(std::env::temp_dir().join("hub_test_files"))),
+            Arc::new(Mailer::from_config(&Config::from_env())),
+            false,
+        )
+        .with_setup_code(Some(code.to_string())),
+    )
+}
+
 fn hash_token(token: &str) -> String {
     use sha2::{Digest, Sha256};
     hex::encode(Sha256::digest(token.as_bytes()))

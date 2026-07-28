@@ -120,6 +120,9 @@ pub async fn config(State(app): State<AppState>) -> Result<Json<Value>> {
         .await?;
     Ok(Json(json!({
         "bootstrap": users == 0,
+        // Only meaningful while the instance is unclaimed: the code gates the
+        // bootstrap sign-up and nothing else.
+        "setup_code_required": users == 0 && app.setup_code.is_some(),
         // Drives which path the UI puts forward, and whether "forgot my
         // password" can lead anywhere at all.
         "smtp": app.mailer.is_configured(),
@@ -133,6 +136,15 @@ pub struct SignupInput {
     password: String,
     /// Optional display name; defaults to the local part of the email.
     display_name: Option<String>,
+    /// Required only when the instance runs with `SETUP_CODE` set.
+    setup_code: Option<String>,
+}
+
+/// Compares two secrets without leaking their common prefix through timing.
+/// Compares the SHA-256 digests rather than the strings: equal-length inputs, and
+/// a mismatch reveals nothing about where the divergence is.
+fn secret_matches(expected: &str, given: &str) -> bool {
+    hash_token(expected) == hash_token(given)
 }
 
 /// Creates the **first** account of the instance (owner) with a password, and
@@ -147,6 +159,16 @@ pub async fn signup(
     let email =
         normalize_email(&input.email).ok_or_else(|| Error::BadInput("this is not a valid email address".into()))?;
     policy(&input.password)?;
+
+    // Bootstrap secret, when the operator configured one. Checked before the
+    // argon2 hashing below, so a wrong code costs nothing to reject; the IP rate
+    // limiter (just under) is what bounds guessing.
+    if let Some(expected) = app.setup_code.as_deref() {
+        let given = input.setup_code.as_deref().unwrap_or("").trim();
+        if !secret_matches(expected, given) {
+            return Err(Error::Forbidden);
+        }
+    }
 
     let now = now_ms();
     if let Some(addr) = ip

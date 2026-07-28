@@ -94,11 +94,22 @@ function authErrorMessage(e: unknown): string {
 
 /** First run: the instance has no account yet, so this form creates the owner —
  * with a password, which is what makes an install with no SMTP relay usable. */
-function SetupForm({ minPassword, onSignedIn }: { minPassword: number; onSignedIn: (u: User) => void }) {
+function SetupForm({
+  minPassword,
+  setupCodeRequired,
+  onSignedIn,
+}: {
+  minPassword: number;
+  /** The instance was started with `SETUP_CODE`: the owner cannot be created
+   * without it, so the field appears — and only then. */
+  setupCodeRequired: boolean;
+  onSignedIn: (u: User) => void;
+}) {
   const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [setupCode, setSetupCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tooShort = password.length > 0 && password.length < minPassword;
@@ -109,7 +120,7 @@ function SetupForm({ minPassword, onSignedIn }: { minPassword: number; onSignedI
     setError(null);
     setBusy(true);
     try {
-      onSignedIn(await signupOwner(email, password));
+      onSignedIn(await signupOwner(email, password, setupCodeRequired ? setupCode : undefined));
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
@@ -122,10 +133,23 @@ function SetupForm({ minPassword, onSignedIn }: { minPassword: number; onSignedI
       <p className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
         {t("auth.setupIntro")}
       </p>
+      {setupCodeRequired && (
+        <>
+          <Input
+            required
+            autoFocus
+            autoComplete="off"
+            value={setupCode}
+            onChange={(e) => setSetupCode(e.target.value)}
+            placeholder={t("auth.setupCodePlaceholder")}
+          />
+          <p className="text-xs text-muted-foreground">{t("auth.setupCodeHint")}</p>
+        </>
+      )}
       <Input
         type="email"
         required
-        autoFocus
+        autoFocus={!setupCodeRequired}
         autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -150,7 +174,11 @@ function SetupForm({ minPassword, onSignedIn }: { minPassword: number; onSignedI
       {tooShort && <p className="text-xs text-muted-foreground">{t("auth.passwordTooShort", { min: minPassword })}</p>}
       {mismatch && <p className="text-xs text-destructive">{t("auth.passwordMismatch")}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <Button type="submit" className="w-full" disabled={busy || tooShort || mismatch || !password}>
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={busy || tooShort || mismatch || !password || (setupCodeRequired && !setupCode.trim())}
+      >
         {t("auth.createAccount")}
       </Button>
     </form>
@@ -251,7 +279,15 @@ function Login({ onSignedIn }: { onSignedIn: (u: User) => void }) {
     getAuthConfig()
       // A failing config call must not lock the screen: fall back to the most
       // conservative shape (existing instance, mail available).
-      .catch(() => ({ bootstrap: false, smtp: true, min_password: 12 }) satisfies AuthConfig)
+      .catch(
+        () =>
+          ({
+            bootstrap: false,
+            smtp: true,
+            min_password: 12,
+            setup_code_required: false,
+          }) satisfies AuthConfig,
+      )
       .then(setConfig);
   }, []);
 
@@ -259,7 +295,11 @@ function Login({ onSignedIn }: { onSignedIn: (u: User) => void }) {
   return (
     <AuthShell>
       {config.bootstrap ? (
-        <SetupForm minPassword={config.min_password} onSignedIn={onSignedIn} />
+        <SetupForm
+          minPassword={config.min_password}
+          setupCodeRequired={config.setup_code_required}
+          onSignedIn={onSignedIn}
+        />
       ) : (
         <SignInForm smtp={config.smtp} onSignedIn={onSignedIn} />
       )}

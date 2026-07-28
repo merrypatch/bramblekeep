@@ -40,6 +40,9 @@ Tout passe par des variables d'environnement, lues au démarrage :
   de connexion et les liens de pages publiques sont construits dessus : elle doit
   être juste derrière un reverse proxy.
 - `COOKIE_SECURE=true` — à activer quand vous servez en HTTPS.
+- `SETUP_CODE` — secret optionnel exigé pour créer le compte propriétaire, pour
+  une instance joignable avant que vous ayez pu vous inscrire. Inerte dès que le
+  compte existe.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` — le
   relais mail. Sans lui, la connexion par mot de passe fonctionne toujours et les
   liens d'invitation doivent être transmis à la main.

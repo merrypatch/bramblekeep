@@ -209,7 +209,14 @@ export async function transferOwnership(user_id: string): Promise<void> {
 
 /** What the sign-in screen needs before rendering: is this instance still
  * unclaimed, can it send email at all, and the password length it enforces. */
-export type AuthConfig = { bootstrap: boolean; smtp: boolean; min_password: number };
+export type AuthConfig = {
+  bootstrap: boolean;
+  smtp: boolean;
+  min_password: number;
+  /** The instance runs with `SETUP_CODE` set and is still unclaimed: creating the
+   * owner requires that code. False once an account exists. */
+  setup_code_required: boolean;
+};
 
 export async function getAuthConfig(): Promise<AuthConfig> {
   const res = await fetch("/api/v1/auth/config");
@@ -222,12 +229,13 @@ export async function getAuthConfig(): Promise<AuthConfig> {
 export async function signupOwner(
   email: string,
   password: string,
+  setup_code?: string,
   display_name?: string,
 ): Promise<User> {
   const res = await fetch("/api/v1/auth/signup", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, display_name }),
+    body: JSON.stringify({ email, password, setup_code, display_name }),
   });
   if (!res.ok) throw await toApiError(res);
   return (await res.json()) as User;

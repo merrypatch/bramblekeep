@@ -15,6 +15,13 @@ Entre le premier démarrage et ce moment, quiconque atteint l'instance peut la
 revendiquer. Créez le propriétaire juste après avoir lancé le serveur, et
 n'exposez pas le port publiquement avant.
 
+Si vous ne pouvez pas le garantir — un VPS avec un port ouvert, un conteneur
+lancé par quelqu'un d'autre — démarrez l'instance avec **`SETUP_CODE`** défini à
+n'importe quelle chaîne secrète. Créer le propriétaire l'exige alors, et l'écran
+de connexion affiche un champ de plus. Ça ne protège rien d'autre : dès que le
+compte existe, le code devient inerte, et la route d'inscription est de toute
+façon fermée à tout le monde.
+
 ## Se connecter ensuite
 
 - **avec un mot de passe** — toujours disponible si le compte en a un

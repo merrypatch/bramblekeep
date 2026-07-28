@@ -42,6 +42,9 @@ services:
       # Set to "true" when served over HTTPS (e.g. behind a TLS reverse proxy)
       # so the session cookie carries the Secure flag.
       COOKIE_SECURE: "false"
+      # Optional: require this secret to create the OWNER account, for an instance
+      # reachable before you have signed up. Inert once the account exists.
+      # SETUP_CODE: "a-long-secret-you-choose"
 
       # In-app one-click updates: the "Update" button in Settings backs up the
       # database, then asks the Watchtower sidecar to pull the new image and
