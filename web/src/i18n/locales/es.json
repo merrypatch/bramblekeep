@@ -1307,5 +1307,10 @@
     "hint": "Si recargar no basta, cierra todas las pestañas y ventanas de la aplicación (incluida la aplicación instalada) y vuelve a abrirla.",
     "versions": "Cargado {{build}} · servidor {{server}}",
     "reload": "Recargar la aplicación"
+  },
+  "docs": {
+    "title": "Documentación",
+    "empty": "Ninguna documentación incluida en esta versión.",
+    "copyToWorkspace": "Copiar en mi espacio"
   }
 }

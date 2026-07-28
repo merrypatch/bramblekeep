@@ -9,6 +9,7 @@ import { ImportCsvDialog } from "@/components/ImportCsvDialog";
 import { APP_NAME } from "@/lib/brand";
 import { AllPages } from "@/components/AllPages";
 import { CreditsPage } from "@/components/CreditsPage";
+import { DocsPage } from "@/components/DocsPage";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Page } from "@/components/Page";
 import { PageBreadcrumb } from "@/components/PageBreadcrumb";
@@ -111,6 +112,9 @@ export function Shell({
   const navigate = useNavigate();
   const activeId = useMatch("/p/:id")?.params.id ?? null;
   const isAllPagesActive = !!useMatch("/pages");
+  // Splat pattern: matches /docs AND /docs/<chapter> in ONE hook call — two
+  // `useMatch` behind a `||` would be a conditional hook.
+  const isDocsActive = !!useMatch("/docs/*");
 
   const [items, setItems] = useState<ItemMeta[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -313,10 +317,12 @@ export function Shell({
         items={items}
         activeId={activeId}
         isAllPagesActive={isAllPagesActive}
+        isDocsActive={isDocsActive}
         currentUserId={user.id}
         onSelect={(id) => navigate(`/p/${id}`)}
         onHome={() => navigate("/")}
         onShowAll={() => navigate("/pages")}
+        onShowDocs={() => navigate("/docs")}
         onShowCredits={() => navigate("/credits")}
         onToggleFavorite={(id, fav) => void onToggleFavorite(id, fav)}
         onCreate={(kind) => void onCreate(kind)}
@@ -504,6 +510,10 @@ export function Shell({
                 />
               }
             />
+            {/* Built-in documentation: same content for every member, shipped
+                with the binary (cf. lib/docs). */}
+            <Route path="/docs" element={<DocsPage />} />
+            <Route path="/docs/:slug" element={<DocsPage />} />
             <Route path="/credits" element={<CreditsPage />} />
           </Routes>
         </div>

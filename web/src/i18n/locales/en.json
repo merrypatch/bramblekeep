@@ -1307,5 +1307,10 @@
     "hint": "If reloading is not enough, close every tab and window of the app (including the installed app), then reopen it.",
     "versions": "Loaded {{build}} · server {{server}}",
     "reload": "Reload the app"
+  },
+  "docs": {
+    "title": "Documentation",
+    "empty": "No documentation bundled in this build.",
+    "copyToWorkspace": "Copy into my workspace"
   }
 }

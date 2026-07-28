@@ -1307,5 +1307,10 @@
     "hint": "Si le rechargement ne suffit pas, fermez tous les onglets et fenêtres de l'application (y compris l'application installée), puis rouvrez-la.",
     "versions": "Chargé {{build}} · serveur {{server}}",
     "reload": "Recharger l'application"
+  },
+  "docs": {
+    "title": "Documentation",
+    "empty": "Aucune documentation embarquée dans cette version.",
+    "copyToWorkspace": "Copier dans mon espace"
   }
 }
