@@ -1518,22 +1518,8 @@ pub async fn download_backup(
     // swept on the next backup instead — hence the `.part` name.)
     let _ = tokio::fs::remove_file(&tmp).await;
 
-    let stream = futures_util::stream::unfold(Some(file), |state| async move {
-        let mut f = state?;
-        let mut buf = vec![0u8; 64 * 1024];
-        match tokio::io::AsyncReadExt::read(&mut f, &mut buf).await {
-            Ok(0) => None,
-            Ok(n) => {
-                buf.truncate(n);
-                Some((Ok(Bytes::from(buf)), Some(f)))
-            }
-            // Give up on the first read error rather than spin: the client sees a
-            // truncated body against the announced Content-Length and must retry.
-            Err(e) => Some((Err(e), None)),
-        }
-    });
-
     tracing::info!(actor = %user.id, bytes = len, "backup downloaded");
+    let stream = file_stream(file);
     Ok((
         [
             (header::CONTENT_TYPE, "application/octet-stream".to_string()),
@@ -1547,6 +1533,35 @@ pub async fn download_backup(
         axum::body::Body::from_stream(stream),
     )
         .into_response())
+}
+
+/// Streams a file in 64 KiB chunks, as an HTTP body.
+///
+/// **`.fuse()` is not decoration.** `stream::unfold` panics if it is polled once
+/// more after yielding `None`, and hyper does exactly that when finishing a
+/// response — the body ends, the server polls again for trailers, and a tokio
+/// worker thread dies mid-download. It never showed in the integration tests
+/// because `oneshot` + `BodyExt::collect` stops polling the moment the stream
+/// ends; only a real server reaches the extra poll. `Fuse` answers `None`
+/// forever instead of panicking.
+fn file_stream(
+    file: tokio::fs::File,
+) -> impl futures_util::Stream<Item = std::io::Result<Bytes>> {
+    futures_util::stream::unfold(Some(file), |state| async move {
+        let mut f = state?;
+        let mut buf = vec![0u8; 64 * 1024];
+        match tokio::io::AsyncReadExt::read(&mut f, &mut buf).await {
+            Ok(0) => None,
+            Ok(n) => {
+                buf.truncate(n);
+                Some((Ok(Bytes::from(buf)), Some(f)))
+            }
+            // Give up on the first read error rather than spin: the client sees a
+            // truncated body against the announced Content-Length and must retry.
+            Err(e) => Some((Err(e), None)),
+        }
+    })
+    .fuse()
 }
 
 /// Current version of the binary — used to detect restart completion after apply.
@@ -2399,5 +2414,51 @@ mod tests {
         ] {
             assert_eq!(parse_byte_range(h, 5000), ByteRange::Ignore, "{h}");
         }
+    }
+}
+
+#[cfg(test)]
+mod stream_tests {
+    use super::file_stream;
+    use futures_util::StreamExt;
+
+    /// Regression: the backup body used a bare `stream::unfold`, which panics
+    /// ("Unfold must not be polled after it returned `Poll::Ready(None)`") when
+    /// hyper polls one last time to finish the response. It killed a tokio worker
+    /// on every real download while the integration tests stayed green, because
+    /// `oneshot` stops polling as soon as the stream ends.
+    #[tokio::test]
+    async fn the_file_stream_survives_being_polled_past_the_end() {
+        let path = std::env::temp_dir().join(format!("hub_stream_{}.bin", std::process::id()));
+        std::fs::write(&path, vec![7u8; 100 * 1024]).expect("write"); // spans two chunks
+        let file = tokio::fs::File::open(&path).await.expect("open");
+
+        let mut s = Box::pin(file_stream(file));
+        let mut total = 0usize;
+        while let Some(chunk) = s.next().await {
+            total += chunk.expect("chunk").len();
+        }
+        assert_eq!(total, 100 * 1024, "the whole file came through");
+
+        // What hyper does, and what used to panic.
+        assert!(s.next().await.is_none(), "polling past the end yields None");
+        assert!(s.next().await.is_none(), "and keeps yielding None");
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// An empty file ends immediately — the boundary where the first poll is also
+    /// the one that returns `None`.
+    #[tokio::test]
+    async fn an_empty_file_ends_without_panicking() {
+        let path = std::env::temp_dir().join(format!("hub_stream_empty_{}.bin", std::process::id()));
+        std::fs::write(&path, b"").expect("write");
+        let file = tokio::fs::File::open(&path).await.expect("open");
+
+        let mut s = Box::pin(file_stream(file));
+        assert!(s.next().await.is_none());
+        assert!(s.next().await.is_none());
+
+        let _ = std::fs::remove_file(&path);
     }
 }
