@@ -208,6 +208,38 @@ async fn an_instance_with_no_uploads_still_backs_up() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// Two backups asked for at once must both work.
+///
+/// They did not: the working file was named from the millisecond, so requests
+/// landing in the same one chose the same path and the second died on
+/// `VACUUM INTO` refusing to overwrite. It surfaced as a flaky test before it
+/// could surface as a flaky instance.
+#[tokio::test]
+async fn concurrent_backups_do_not_collide() {
+    let (dbp, path) = test_db().await;
+    let files = path.with_extension("concurrent");
+    insert_user_role(&dbp, OWNER, "owner@x.com", "owner").await;
+    seed_page(&dbp, "content").await;
+    let tok = mk_session(&dbp, OWNER).await;
+    let app = app_with_files(dbp.clone(), &files);
+
+    // Same millisecond, as near as makes no difference.
+    let (a, b, c) = tokio::join!(
+        get_backup(&app, &tok),
+        get_backup(&app, &tok),
+        get_backup(&app, &tok)
+    );
+    for (n, (status, bytes, _)) in [a, b, c].into_iter().enumerate() {
+        assert_eq!(status, StatusCode::OK, "backup {n} succeeded");
+        let mut cur = Cursor::new(bytes);
+        let entries = zip::list(&mut cur).expect("readable archive");
+        assert!(entries.iter().any(|e| e.name == DB_ENTRY), "backup {n} holds a database");
+    }
+
+    let _ = std::fs::remove_dir_all(&files);
+    let _ = std::fs::remove_file(&path);
+}
+
 #[tokio::test]
 async fn admins_and_members_are_refused() {
     let (dbp, path) = test_db().await;

@@ -1500,7 +1500,14 @@ pub async fn download_backup(
     let dir = db_path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
     let stamp = crate::store::now_ms();
     let name = format!("bramblekeep-backup-{}-{stamp}.zip", crate::update::current_version());
-    let tmp = dir.join(format!(".{name}.part"));
+    // The working file needs more than the millisecond to be unique: two backups
+    // started inside the same one would pick the same path, and `VACUUM INTO`
+    // refuses to write onto an existing file — so the second request fails for a
+    // reason that has nothing to do with it. The counter is per process, which
+    // is the scope that shares this directory.
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = dir.join(format!(".{name}.{seq}.part"));
     let _ = tokio::fs::remove_file(&tmp).await;
 
     let manifest = crate::backup::create(&app.db, app.files.dir(), &tmp).await?;
