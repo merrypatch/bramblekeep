@@ -17,7 +17,7 @@ hex = "0.4"
 infer = "0.16"
 time = "0.3"
 tower-http = { version = "0.6", features = ["trace", "compression-gzip"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "sqlite", "migrate"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
