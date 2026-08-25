@@ -48,6 +48,13 @@ tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "handshake"] }
 
+# Cost of one content write, by stage and page size (`cargo bench`). No criterion:
+# the harness would add a dependency to the supply chain for a measurement whose
+# answer is a multiple, not a percentage.
+[[bench]]
+name = "projection"
+harness = false
+
 [profile.release]
 strip = true
 lto = true
