@@ -227,6 +227,11 @@ WATCHTOWER_TOKEN=$WATCHTOWER_TOKEN
 # SMTP_USERNAME=apikey
 # SMTP_PASSWORD=
 # SMTP_FROM=Bramblekeep <no-reply@example.com>
+
+# --- Unsplash (optional) --- lets you pick cover photos from inside the app.
+# Free key: https://unsplash.com/oauth/applications. Set here it applies to the
+# whole instance and takes precedence over a key entered in Settings.
+# UNSPLASH_ACCESS_KEY=
 EOF
 
 cat > "$DATA_DIR/docker-compose.yml" <<EOF
@@ -255,6 +260,7 @@ services:
       SMTP_USERNAME: \${SMTP_USERNAME:-}
       SMTP_PASSWORD: \${SMTP_PASSWORD:-}
       SMTP_FROM: \${SMTP_FROM:-Bramblekeep <no-reply@localhost>}
+      UNSPLASH_ACCESS_KEY: \${UNSPLASH_ACCESS_KEY:-}
 
   # Enables the in-app one-click "Update" button. Watchtower is the only
   # component with Docker socket access; here it acts on demand (HTTP API only,

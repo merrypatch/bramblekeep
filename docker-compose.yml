@@ -63,6 +63,13 @@ services:
       # SMTP_PASSWORD: ${SMTP_PASSWORD}
       # SMTP_FROM: Bramblekeep <no-reply@example.com>
 
+      # --- Unsplash (optional) ----------------------------------------------
+      # Cover photo picker. Free key: https://unsplash.com/oauth/applications.
+      # Compose only passes variables named here — a key sitting in .env without
+      # this line never reaches the container. Set, it applies instance-wide and
+      # takes precedence over a key entered in Settings.
+      # UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY:-}
+
   # Optional: enables the in-app one-click update for the container deployment.
   # Watchtower is the ONLY component with access to the Docker socket, and here
   # it acts on demand only (HTTP API), not on a timer. Delete this service to
