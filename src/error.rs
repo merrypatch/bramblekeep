@@ -88,7 +88,19 @@ impl IntoResponse for Error {
             Error::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        tracing::error!(error = %self, "request error");
+        // Log level follows the status class, not the fact that an `Error` exists.
+        // A 4xx is an ordinary client outcome — an expired session hitting
+        // `/api/v1/auth/me`, a stale link, a wrong id — and logging those at ERROR
+        // floods an operator's journal to the point of hiding real incidents.
+        // 429 keeps a level of its own: a rate limiter firing is worth seeing
+        // (it is either an attack or a limit set too low), without being a fault.
+        match status {
+            s if s.is_server_error() => tracing::error!(error = %self, "request error"),
+            StatusCode::TOO_MANY_REQUESTS => {
+                tracing::warn!(error = %self, "request rate-limited")
+            }
+            _ => tracing::debug!(error = %self, status = status.as_u16(), "request rejected"),
+        }
         let body = Json(json!({ "code": self.code(), "detail": self.to_string() }));
         (status, body).into_response()
     }
