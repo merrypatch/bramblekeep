@@ -1159,8 +1159,28 @@
       "newPageBody": "Empieza a escribir ya: una página en blanco, lista.",
       "allPagesBody": "Recorre todo lo accesible, y el grafo de sus enlaces.",
       "docsBody": "Cómo funciona todo, de la escritura a las bases. Viene con tu versión.",
-      "creditsBody": "Libre y abierto. Mira qué lo hace posible, y cómo ayudar."
+      "creditsBody": "Libre y abierto. Mira qué lo hace posible, y cómo ayudar.",
+      "notionBody": "Trae tus páginas de Notion, con su anidamiento."
     }
+  },
+  "notion": {
+    "title": "Importar desde Notion",
+    "intro": "Trae un export de Notion como páginas, conservando el anidamiento. No se modifica nada de tu espacio — todo llega como páginas nuevas.",
+    "choose": "Elegir un export…",
+    "reading": "Leyendo…",
+    "howTo": "En Notion: Ajustes → Exportar todo el contenido → Markdown & CSV. Importa el .zip resultante.",
+    "notAnExport": "Esto no parece un export de Notion.",
+    "noPages": "No se han encontrado páginas en ese archivo.",
+    "unreadable": "No se ha podido leer ese archivo.",
+    "pages": "Páginas",
+    "topLevel": "Primer nivel",
+    "skipped": "Aún no importado: {{databases}} base(s), {{attachments}} adjunto(s).",
+    "back": "Elegir otro",
+    "import": "Importar {{count}} páginas",
+    "progress": "Importando {{done}} de {{total}}…",
+    "done": "{{count}} páginas importadas.",
+    "donePartial": "{{count}} páginas importadas, {{failed}} sin su contenido.",
+    "failed": "La importación se ha detenido."
   },
   "allPages": {
     "title": "Todas las páginas",

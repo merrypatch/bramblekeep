@@ -1159,8 +1159,28 @@
       "newPageBody": "Écrivez tout de suite — une page vierge, prête.",
       "allPagesBody": "Parcourez tout ce qui vous est accessible, et le graphe de leurs liens.",
       "docsBody": "Comment tout ça marche, de l'écriture aux bases. Livrée avec votre version.",
-      "creditsBody": "Libre et ouvert. Voyez ce qui le rend possible, et comment aider."
+      "creditsBody": "Libre et ouvert. Voyez ce qui le rend possible, et comment aider.",
+      "notionBody": "Reprenez vos pages Notion, imbrication comprise."
     }
+  },
+  "notion": {
+    "title": "Importer depuis Notion",
+    "intro": "Reprend un export Notion sous forme de pages, en conservant l'imbrication. Rien n'est modifié dans votre espace — tout arrive en pages nouvelles.",
+    "choose": "Choisir un export…",
+    "reading": "Lecture…",
+    "howTo": "Dans Notion : Paramètres → Exporter tout le contenu → Markdown & CSV. Importez le .zip obtenu.",
+    "notAnExport": "Cela ne ressemble pas à un export Notion.",
+    "noPages": "Aucune page trouvée dans cette archive.",
+    "unreadable": "Cette archive n'a pas pu être lue.",
+    "pages": "Pages",
+    "topLevel": "Premier niveau",
+    "skipped": "Pas encore importé : {{databases}} base(s), {{attachments}} pièce(s) jointe(s).",
+    "back": "En choisir un autre",
+    "import": "Importer {{count}} pages",
+    "progress": "Import {{done}} sur {{total}}…",
+    "done": "{{count}} pages importées.",
+    "donePartial": "{{count}} pages importées, {{failed}} sans leur contenu.",
+    "failed": "L'import s'est arrêté."
   },
   "allPages": {
     "title": "Toutes les pages",

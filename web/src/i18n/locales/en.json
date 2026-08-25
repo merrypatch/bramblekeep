@@ -1159,8 +1159,28 @@
       "newPageBody": "Start writing right away — a blank page, ready.",
       "allPagesBody": "Browse everything you can reach, and the graph of their links.",
       "docsBody": "How this works, from writing to databases. Ships with your version.",
-      "creditsBody": "Free and open. See what makes it possible, and how to help."
+      "creditsBody": "Free and open. See what makes it possible, and how to help.",
+      "notionBody": "Bring your Notion pages over, nesting and all."
     }
+  },
+  "notion": {
+    "title": "Import from Notion",
+    "intro": "Brings a Notion export in as pages, keeping the nesting. Nothing in your workspace is changed — everything arrives as new pages.",
+    "choose": "Choose an export…",
+    "reading": "Reading…",
+    "howTo": "In Notion: Settings → Export all workspace content → Markdown & CSV. Import the .zip you get.",
+    "notAnExport": "That does not look like a Notion export.",
+    "noPages": "No pages found in that archive.",
+    "unreadable": "That archive could not be read.",
+    "pages": "Pages",
+    "topLevel": "Top level",
+    "skipped": "Not imported yet: {{databases}} database(s), {{attachments}} attachment(s).",
+    "back": "Choose another",
+    "import": "Import {{count}} pages",
+    "progress": "Importing {{done}} of {{total}}…",
+    "done": "{{count}} pages imported.",
+    "donePartial": "{{count}} pages imported, {{failed}} without their content.",
+    "failed": "The import stopped."
   },
   "allPages": {
     "title": "All pages",

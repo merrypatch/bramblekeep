@@ -41,6 +41,7 @@ import { acquireRoom, releaseRoom } from "@/lib/room";
 import { exportCsv, exportMarkdown } from "@/lib/export";
 import { exportDbBundle } from "@/lib/bundle";
 import { ImportBundleDialog } from "@/components/ImportBundleDialog";
+import { ImportNotionDialog } from "@/components/ImportNotionDialog";
 import { usePresence } from "@/lib/presence";
 import { cn } from "@/lib/utils";
 import type { Awareness } from "y-protocols/awareness";
@@ -95,12 +96,14 @@ function HomeEmpty({
   onShowAll,
   onShowDocs,
   onShowCredits,
+  onImportNotion,
 }: {
   user: User;
   onCreate: (kind: "page" | "database") => void;
   onShowAll: () => void;
   onShowDocs: () => void;
   onShowCredits: () => void;
+  onImportNotion: () => void;
 }) {
   // Random avatar, stable for the duration of display (new on each visit).
   const { t } = useTranslation();
@@ -128,6 +131,13 @@ function HomeEmpty({
       title: t("sidebar.allPages"),
       body: t("home.action.allPagesBody"),
       run: onShowAll,
+    },
+    {
+      key: "notion",
+      icon: Upload,
+      title: t("notion.title"),
+      body: t("home.action.notionBody"),
+      run: onImportNotion,
     },
     {
       key: "docs",
@@ -270,6 +280,7 @@ export function Shell({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [bundleImportOpen, setBundleImportOpen] = useState(false);
+  const [notionOpen, setNotionOpen] = useState(false);
   // Bumped after a CSV import to remount the active page (reloads its rows).
   const [refreshKey, setRefreshKey] = useState(0);
   const confirmPublicChild = useConfirmPublicChild();
@@ -538,6 +549,14 @@ export function Shell({
             </AlertDialogContent>
           </AlertDialog>
         )}
+        <ImportNotionDialog
+          open={notionOpen}
+          onOpenChange={setNotionOpen}
+          onImported={() => {
+            setRefreshKey((k) => k + 1);
+            void refresh();
+          }}
+        />
         {activeId && <ShareDialog itemId={activeId} open={shareOpen} onOpenChange={setShareOpen} />}
         {activeId && activeMeta?.db_schema != null && (
           <>
@@ -578,6 +597,7 @@ export function Shell({
                   onShowAll={() => navigate("/pages")}
                   onShowDocs={() => navigate("/docs")}
                   onShowCredits={() => navigate("/credits")}
+                  onImportNotion={() => setNotionOpen(true)}
                 />
               }
             />
