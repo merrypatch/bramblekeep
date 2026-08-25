@@ -754,7 +754,12 @@
       "download": "Télécharger une sauvegarde",
       "desc": "Une archive avec tout : la base entière et tous les fichiers envoyés. Prise sans arrêter l'instance.",
       "filesNote": "Rangez-la ailleurs que sur la machine d'origine — une sauvegarde sur le disque qui lâche n'en est pas une.",
-      "action": "Télécharger"
+      "action": "Télécharger",
+      "restore": "Restaurer depuis une sauvegarde",
+      "restoreDesc": "Remplace tout ce que contient cette instance par le contenu d'une archive. La base actuelle est conservée.",
+      "restoreAction": "Choisir un fichier…",
+      "checking": "Vérification…",
+      "restoreFailed": "Cette archive n'a pas pu être lue."
     },
     "updates": {
       "title": "Mises à jour",
@@ -1288,6 +1293,25 @@
       "swapping": "Installation…",
       "restarting": "Redémarrage…"
     }
+  },
+  "restore": {
+    "confirmTitle": "Restaurer cette sauvegarde ?",
+    "confirmBody": "Toutes les pages, bases et comptes de cette instance sont remplacés par le contenu de l'archive. Tout ce qui a été écrit depuis sa création est perdu.",
+    "taken": "Prise le",
+    "version": "Créée par",
+    "contents": "Contient",
+    "contentsValue": "une base de {{size}} et {{count}} fichier(s)",
+    "keptNote": "La base actuelle est conservée à côté de la nouvelle : l'opération reste annulable depuis le serveur.",
+    "cancel": "Annuler",
+    "apply": "Restaurer",
+    "restarting": "Restauration…",
+    "restartingBody": "L'instance redémarre : la base ne peut être remplacée que si rien ne l'utilise. Quelques secondes.",
+    "done": "Restaurée",
+    "doneBody": "L'instance est revenue avec le contenu de l'archive.",
+    "reload": "Recharger",
+    "stuck": "L'instance n'est pas revenue",
+    "stuckBody": "La restauration a été lancée mais le serveur ne répond pas. Regardez ses journaux — si elle n'est pas remontée, `bramblekeep restore` depuis le serveur remet les choses en ordre.",
+    "applyFailed": "La restauration n'a pas pu démarrer."
   },
   "backlinks": {
     "title": "Références liées ({{count}})"

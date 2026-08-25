@@ -990,3 +990,37 @@ export async function unpublishItem(itemId: string): Promise<void> {
   const res = await fetch(`/api/v1/items/${itemId}/publication`, { method: "DELETE" });
   if (!res.ok) throw await toApiError(res);
 }
+
+/** What a staged backup archive says about itself (`backup.json`). */
+export type BackupManifest = {
+  format: number;
+  app_version: string;
+  schema_version: number;
+  created_ts: number;
+  db_bytes: number;
+  file_count: number;
+};
+
+/** Uploads a backup archive and has the server vet it. Restores NOTHING: it
+ * returns what the archive holds so the owner can look before committing. */
+export async function stageRestore(file: File): Promise<BackupManifest> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/v1/restore", { method: "POST", body: fd });
+  if (!res.ok) throw await toApiError(res);
+  return ((await res.json()) as { manifest: BackupManifest }).manifest;
+}
+
+/** Drops a staged archive. The way back out before anything is replaced. */
+export async function cancelRestore(): Promise<void> {
+  const res = await fetch("/api/v1/restore", { method: "DELETE" });
+  if (!res.ok) throw await toApiError(res);
+}
+
+/** Confirms the staged restore. The server restarts and does the swap on the way
+ * back up — it cannot happen in place, since the database being replaced is the
+ * one serving this request. */
+export async function applyRestore(): Promise<void> {
+  const res = await fetch("/api/v1/restore/apply", { method: "POST" });
+  if (!res.ok) throw await toApiError(res);
+}

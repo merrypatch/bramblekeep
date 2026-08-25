@@ -25,7 +25,7 @@ import {
   User as UserIcon,
   Users,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type AvatarFullConfig as AvatarConfig, genConfig } from "react-nice-avatar";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import i18n, { LANGUAGES, LANGUAGE_FLAGS, LANGUAGE_NAMES, setLanguage, type Language } from "@/i18n";
 
 import { Avatar, avatarConfig } from "@/components/Avatar";
+import { RestoreDialog } from "@/components/RestoreDialog";
 import { UpdateApplyDialog } from "@/components/UpdateApplyDialog";
 import { ItemIcon } from "@/components/ItemIcon";
 import {
@@ -94,6 +95,8 @@ import {
   transferOwnership,
   updateMe,
   updateWorkspace,
+  type BackupManifest,
+  stageRestore,
 } from "@/lib/api";
 import {
   type Accent,
@@ -1676,6 +1679,25 @@ function WorkspaceSection({
  * is hidden for everybody else so the refusal is never something a user meets. */
 function BackupSetting() {
   const { t } = useTranslation();
+  const [staged, setStaged] = useState<BackupManifest | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      // The server vets the archive and answers with what it holds; nothing is
+      // replaced until the dialog is confirmed.
+      setStaged(await stageRestore(file));
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("settings.backup.restoreFailed"));
+    } finally {
+      setUploading(false);
+      if (picker.current) picker.current.value = ""; // same file can be re-picked
+    }
+  };
+
   return (
     <>
       <h3 className="mt-6 mb-2 text-sm font-semibold text-muted-foreground">
@@ -1693,6 +1715,32 @@ function BackupSetting() {
           </a>
         </Button>
       </div>
+
+      <div className="mt-2 flex items-center justify-between gap-3 rounded-md border p-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{t("settings.backup.restore")}</p>
+          <p className="text-xs text-muted-foreground">{t("settings.backup.restoreDesc")}</p>
+        </div>
+        <input
+          ref={picker}
+          type="file"
+          accept=".zip,application/zip"
+          className="hidden"
+          onChange={(e) => void pick(e.target.files?.[0])}
+        />
+        <Button
+          variant="outline"
+          className="shrink-0"
+          disabled={uploading}
+          onClick={() => picker.current?.click()}
+        >
+          {uploading ? t("settings.backup.checking") : t("settings.backup.restoreAction")}
+        </Button>
+      </div>
+
+      {staged && (
+        <RestoreDialog manifest={staged} open onCancelled={() => setStaged(null)} />
+      )}
     </>
   );
 }

@@ -589,6 +589,12 @@ fn trigger_watchtower(url: &str, token: Option<&str>) -> std::result::Result<(),
 }
 
 /// Restarts the process on the new binary (same path, already replaced).
+/// Restarts this process in place. Used by the update swap and by the restore
+/// path, which can only replace the database before the pool is opened.
+pub fn restart_now() -> ! {
+    reexec()
+}
+
 fn reexec() -> ! {
     let exe = match std::env::current_exe() {
         Ok(e) => e,

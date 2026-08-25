@@ -116,7 +116,18 @@ async fn restores_the_database_and_the_uploads() {
         b"an image",
         "byte for byte"
     );
-    assert!(outcome.previous_db.is_some_and(|p| p.exists()), "the replaced database is kept");
+    // Not "the file exists" — that assertion passed for a while against a file
+    // that could not be opened at all, because the restore set the database aside
+    // without folding its write-ahead log in first. Found by drilling a restore
+    // on a killed instance, not here: every in-process route tried ends up
+    // checkpointing before the swap, so this asserts the property but does not
+    // reproduce the failure. Treat it as a statement of intent, not a guard.
+    let previous = outcome.previous_db.expect("the replaced database is kept");
+    assert_eq!(
+        titles(&previous).await,
+        ["AFTER", "BEFORE"],
+        "and it still holds what the instance had before the restore"
+    );
 
     inst.cleanup();
 }

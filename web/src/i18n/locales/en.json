@@ -754,7 +754,12 @@
       "download": "Download a backup",
       "desc": "One archive with everything: the whole database and every uploaded file. Taken while the instance keeps running.",
       "filesNote": "Keep it somewhere other than the machine it came from — a backup on the failed disk is not a backup.",
-      "action": "Download"
+      "action": "Download",
+      "restore": "Restore from a backup",
+      "restoreDesc": "Replaces everything this instance holds with the contents of an archive. The current database is kept.",
+      "restoreAction": "Choose a file…",
+      "checking": "Checking…",
+      "restoreFailed": "That archive could not be read."
     },
     "updates": {
       "title": "Updates",
@@ -1288,6 +1293,25 @@
       "swapping": "Installing…",
       "restarting": "Restarting…"
     }
+  },
+  "restore": {
+    "confirmTitle": "Restore this backup?",
+    "confirmBody": "Every page, database and account in this instance is replaced by what the archive holds. Anything written since it was taken is lost.",
+    "taken": "Taken",
+    "version": "Made by",
+    "contents": "Holds",
+    "contentsValue": "a {{size}} database and {{count}} file(s)",
+    "keptNote": "The current database is kept beside the new one, so this can be undone from the server.",
+    "cancel": "Cancel",
+    "apply": "Restore",
+    "restarting": "Restoring…",
+    "restartingBody": "The instance is restarting: the database can only be replaced while nothing is using it. This takes a few seconds.",
+    "done": "Restored",
+    "doneBody": "The instance is back up with the contents of the archive.",
+    "reload": "Reload",
+    "stuck": "The instance has not come back",
+    "stuckBody": "The restore was started but the server is not answering. Check its logs — if it did not come back up, `bramblekeep restore` from the server puts things right.",
+    "applyFailed": "The restore could not be started."
   },
   "backlinks": {
     "title": "Linked references ({{count}})"

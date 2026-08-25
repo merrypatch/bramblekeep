@@ -77,7 +77,16 @@ posée sur le disque qui lâche n'en est pas une.
 
 ## Restauration
 
-Arrêtez l'instance, lancez la commande, redémarrez.
+**Depuis l'interface.** Réglages → Espace de travail → Sauvegarde → *Restaurer
+depuis une sauvegarde*. Choisir une archive l'envoie et la vérifie — la base
+qu'elle contient est extraite et ouverte sur-le-champ, donc une archive abîmée
+est refusée pendant que vous avez encore l'écran sous les yeux. Rien n'est
+remplacé avant confirmation ; ensuite l'instance redémarre et fait l'échange en
+remontant, parce qu'une base ne peut pas être remplacée sous la connexion qui
+sert la requête.
+
+**Depuis le serveur**, qui est le chemin qui marche encore quand l'instance ne
+démarre plus :
 
 ```
 docker compose down                 # dans /opt/bramblekeep
@@ -96,12 +105,11 @@ docker run --rm -v bramblekeep-data:/data -v "$PWD":/backup \
   restore /backup/bramblekeep-backup-0.12.0-1234567890.zip --yes
 ```
 
-La commande vérifie l'archive avant de toucher à quoi que ce soit, refuse celle
-que ce binaire est trop ancien pour lire, refuse de s'exécuter tant que l'instance
-tourne, conserve la base qu'elle remplace sous
-`bramblekeep.db.before-restore-<horodatage>`, et affiche la commande unique qui
-annule l'opération. Les envois sont fusionnés : un fichier déjà présent est déjà
-le bon, puisque son nom est l'empreinte de son contenu.
+Dans les deux cas : l'archive est vérifiée avant qu'on touche à quoi que ce soit,
+celle que ce binaire est trop ancien pour lire est refusée, la base remplacée est
+conservée sous `bramblekeep.db.before-restore-<horodatage>`, et les envois sont
+fusionnés — un fichier déjà présent est déjà le bon, puisque son nom est
+l'empreinte de son contenu.
 
 `--yes` saute la confirmation, pour une reprise scriptée.
 

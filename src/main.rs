@@ -157,6 +157,10 @@ async fn main() -> anyhow::Result<()> {
         None => {}
     }
 
+    // Before ANY connection is opened: a restore staged from the interface can
+    // only swap the database while nothing holds it.
+    bramblekeep::backup::restore::apply_pending(&config).await;
+
     let db = db::init(&config.database_url).await?;
     let files = Arc::new(LocalStore::new(&config.files_dir));
     let mailer = Arc::new(Mailer::from_config(&config));

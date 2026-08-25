@@ -91,7 +91,11 @@ async fn database_is_in_use(db_path: &Path) -> bool {
 }
 
 /// Reads and checks the archive without touching anything on disk.
-fn inspect(archive: &Path) -> anyhow::Result<(Manifest, Vec<zip::Entry>)> {
+///
+/// Public because the upload route validates with exactly this — a restore
+/// accepted by the button and refused by the command (or the reverse) would be a
+/// bug waiting for the worst possible day.
+pub fn inspect(archive: &Path) -> anyhow::Result<(Manifest, Vec<zip::Entry>)> {
     let mut f = fs::File::open(archive)
         .map_err(|e| anyhow::anyhow!("cannot open {}: {e}", archive.display()))?;
     let entries = zip::list(&mut f)
@@ -130,6 +134,23 @@ fn inspect(archive: &Path) -> anyhow::Result<(Manifest, Vec<zip::Entry>)> {
         return err(format!("archive has no {DB_ENTRY}"));
     }
     Ok((manifest, entries))
+}
+
+/// Checks an archive all the way down, and throws the result away.
+///
+/// [`inspect`] only reads the manifest and the table of contents; it never
+/// touches the database entry, so an archive whose database is corrupt passes
+/// it. That is fine for the command, which extracts moments later and stops on
+/// the checksum — but not for the interface, where "staged" is an answer the
+/// owner acts on, and the extraction would not happen until the restart. So the
+/// upload pays for a full extraction and an `integrity_check` up front: the
+/// slow answer is the useful one here.
+pub async fn verify(archive: &Path, scratch_dir: &Path) -> anyhow::Result<Manifest> {
+    let (manifest, entries) = inspect(archive)?;
+    let scratch = scratch_dir.join(format!(".verify-{}.db", crate::store::now_ms()));
+    let staged = stage_database(archive, &entries, &scratch).await?;
+    let _ = fs::remove_file(&staged);
+    Ok(manifest)
 }
 
 /// Extracts the archived database beside its destination and satisfies itself
@@ -248,12 +269,44 @@ fn inherit_permissions(from: &Path, to: &Path) {
     }
 }
 
+/// Folds the write-ahead log back into the database file.
+///
+/// Without this the file set aside as the rollback copy is not the database: in
+/// WAL mode the most recent writes live in `-wal`, and the swap deletes that
+/// file moments later. The copy would open, and be missing everything the
+/// instance did since its last checkpoint — a rollback that quietly loses the
+/// very data someone is rolling back to recover.
+///
+/// Best effort by design: if the file cannot be opened there is nothing to fold,
+/// and refusing the restore over it would be worse than proceeding.
+async fn checkpoint(db_path: &Path) {
+    use sqlx::{ConnectOptions, Connection};
+    use std::str::FromStr;
+
+    if !db_path.exists() {
+        return;
+    }
+    let Ok(opts) =
+        sqlx::sqlite::SqliteConnectOptions::from_str(&format!("sqlite://{}", db_path.display()))
+    else {
+        return;
+    };
+    let Ok(mut conn) = opts.create_if_missing(false).connect().await else {
+        return;
+    };
+    if let Err(e) = sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)").execute(&mut conn).await {
+        tracing::warn!(error = %e, "restore: could not checkpoint the database being replaced");
+    }
+    let _ = conn.close().await;
+}
+
 /// Swaps the staged database in, keeping the one it replaces.
 ///
 /// The `-wal` and `-shm` files belong to the database being replaced. Left
 /// behind, SQLite replays them onto the new file and the instance comes up
 /// serving a mixture of the two, without an error anywhere — the single most
-/// important line in this module.
+/// important line in this module. Which is also why the file being set aside has
+/// to be checkpointed first: see [`checkpoint`].
 fn swap_in(staged: &Path, db_path: &Path, stamp: i64) -> anyhow::Result<Option<PathBuf>> {
     let previous = if db_path.exists() {
         let kept = db_path.with_extension(format!("db.before-restore-{stamp}"));
@@ -289,17 +342,9 @@ pub async fn run(
     archive: &Path,
     assume_yes: bool,
 ) -> anyhow::Result<Outcome> {
-    let db_path = config
-        .database_url
-        .strip_prefix("sqlite://")
-        .unwrap_or(&config.database_url)
-        .split('?')
-        .next()
-        .unwrap_or_default();
-    if db_path.is_empty() || db_path == ":memory:" {
+    let Some(db_path) = db_file_of(config) else {
         return err("DATABASE_URL does not name a file to restore into");
-    }
-    let db_path = PathBuf::from(db_path);
+    };
     let files_dir = PathBuf::from(&config.files_dir);
 
     // 1. Everything that can be known before touching anything.
@@ -336,13 +381,28 @@ pub async fn run(
         }
     }
 
-    // 2. Stage and verify the database. Nothing is replaced yet.
-    let staged = stage_database(archive, &entries, &db_path).await?;
+    apply_checked(archive, &entries, manifest, &db_path, &files_dir).await
+}
 
-    // 3. Blobs first: writing content-addressed files adds, never overwrites, so
-    // a failure here leaves the instance exactly as it was.
-    let (blobs_written, blobs_already_present) = match restore_blobs(archive, &entries, &files_dir)
-    {
+/// The work itself, once the archive has been vetted.
+///
+/// Shared by the command and by the boot-time path, so a restore behaves
+/// identically whichever asked for it. Takes no view on whether the instance is
+/// running: the command checks that, and at startup nothing has opened the
+/// database yet.
+async fn apply_checked(
+    archive: &Path,
+    entries: &[zip::Entry],
+    manifest: Manifest,
+    db_path: &Path,
+    files_dir: &Path,
+) -> anyhow::Result<Outcome> {
+    // Stage and verify the database. Nothing is replaced yet.
+    let staged = stage_database(archive, entries, db_path).await?;
+
+    // Blobs first: writing content-addressed files adds, never overwrites, so a
+    // failure here leaves the instance exactly as it was.
+    let (blobs_written, blobs_already_present) = match restore_blobs(archive, entries, files_dir) {
         Ok(counts) => counts,
         Err(e) => {
             let _ = fs::remove_file(&staged);
@@ -350,14 +410,78 @@ pub async fn run(
         }
     };
 
-    // 4. The one destructive step, last.
-    let previous_db = swap_in(&staged, &db_path, crate::store::now_ms())?;
+    // The one destructive step, last — and before it, fold the write-ahead log
+    // into the file about to become the rollback copy, or that copy is missing
+    // everything written since the last checkpoint.
+    checkpoint(db_path).await;
+    let previous_db = swap_in(&staged, db_path, crate::store::now_ms())?;
 
     Ok(Outcome {
         manifest,
-        db_path,
+        db_path: db_path.to_path_buf(),
         previous_db,
         blobs_written,
         blobs_already_present,
     })
+}
+
+/// Where an archive waits between "the owner confirmed it in the interface" and
+/// "the process restarted and can safely swap the database".
+///
+/// Beside the database on purpose: same filesystem, same volume, and an operator
+/// looking at the data directory can see that a restore is pending.
+pub fn pending_path(config: &crate::config::Config) -> Option<PathBuf> {
+    let db_path = db_file_of(config)?;
+    Some(db_path.with_file_name("restore-pending.zip"))
+}
+
+/// Filesystem path of the database named by the configuration.
+fn db_file_of(config: &crate::config::Config) -> Option<PathBuf> {
+    let p = config
+        .database_url
+        .strip_prefix("sqlite://")
+        .unwrap_or(&config.database_url)
+        .split('?')
+        .next()
+        .unwrap_or_default();
+    (!p.is_empty() && p != ":memory:").then(|| PathBuf::from(p))
+}
+
+/// Applies a restore staged by the interface, if one is waiting.
+///
+/// Runs at startup, BEFORE the pool is opened — which is the whole reason the
+/// interface route cannot do the work itself: SQLite will not have its file
+/// swapped underneath a live connection.
+///
+/// Never fatal. The archive is consumed either way: a staged file that survived
+/// its own failure would retry on every boot, and an instance that cannot start
+/// is worse than one that starts without having restored.
+pub async fn apply_pending(config: &crate::config::Config) {
+    let (Some(pending), Some(db_path)) = (pending_path(config), db_file_of(config)) else {
+        return;
+    };
+    if !pending.exists() {
+        return;
+    }
+    tracing::info!(archive = %pending.display(), "restore: staged archive found, applying");
+
+    let files_dir = PathBuf::from(&config.files_dir);
+    let result = match inspect(&pending) {
+        Ok((manifest, entries)) => {
+            apply_checked(&pending, &entries, manifest, &db_path, &files_dir).await
+        }
+        Err(e) => Err(e),
+    };
+    let _ = fs::remove_file(&pending);
+
+    match result {
+        Ok(outcome) => tracing::info!(
+            files = outcome.blobs_written,
+            previous = outcome.previous_db.as_ref().map(|p| p.display().to_string()),
+            "restore: applied"
+        ),
+        // Loud, and then carry on: the database was only replaced as the very
+        // last step, so a failure here left the instance as it was.
+        Err(e) => tracing::error!(error = %e, "restore: FAILED, instance left untouched"),
+    }
 }

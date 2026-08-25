@@ -754,7 +754,12 @@
       "download": "Descargar una copia de seguridad",
       "desc": "Un archivo con todo: la base entera y todos los archivos subidos. Se toma sin detener la instancia.",
       "filesNote": "Guárdalo en otro sitio que la máquina de origen — una copia en el disco que falla no es una copia.",
-      "action": "Descargar"
+      "action": "Descargar",
+      "restore": "Restaurar desde una copia",
+      "restoreDesc": "Reemplaza todo lo que contiene esta instancia por el contenido de un archivo. La base actual se conserva.",
+      "restoreAction": "Elegir un archivo…",
+      "checking": "Comprobando…",
+      "restoreFailed": "No se ha podido leer ese archivo."
     },
     "updates": {
       "title": "Actualizaciones",
@@ -1288,6 +1293,25 @@
       "swapping": "Instalando…",
       "restarting": "Reiniciando…"
     }
+  },
+  "restore": {
+    "confirmTitle": "¿Restaurar esta copia?",
+    "confirmBody": "Todas las páginas, bases y cuentas de esta instancia se reemplazan por lo que contiene el archivo. Se pierde todo lo escrito desde que se hizo.",
+    "taken": "Hecha el",
+    "version": "Creada por",
+    "contents": "Contiene",
+    "contentsValue": "una base de {{size}} y {{count}} archivo(s)",
+    "keptNote": "La base actual se conserva junto a la nueva: la operación sigue siendo reversible desde el servidor.",
+    "cancel": "Cancelar",
+    "apply": "Restaurar",
+    "restarting": "Restaurando…",
+    "restartingBody": "La instancia se está reiniciando: la base solo puede reemplazarse mientras nada la use. Unos segundos.",
+    "done": "Restaurada",
+    "doneBody": "La instancia ha vuelto con el contenido del archivo.",
+    "reload": "Recargar",
+    "stuck": "La instancia no ha vuelto",
+    "stuckBody": "La restauración se lanzó pero el servidor no responde. Mira sus registros — si no ha vuelto, `bramblekeep restore` desde el servidor lo arregla.",
+    "applyFailed": "No se ha podido iniciar la restauración."
   },
   "backlinks": {
     "title": "Referencias vinculadas ({{count}})"

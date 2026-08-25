@@ -75,7 +75,15 @@ sitting on the disk that failed is not a backup.
 
 ## Restore
 
-Stop the instance, run the command, start it again.
+**From the interface.** Settings → Workspace → Backup → *Restore from a backup*.
+Choosing an archive uploads it and checks it — the database inside is extracted
+and opened right there, so a damaged archive is refused while you are still
+looking at the screen. Nothing is replaced until you confirm; then the instance
+restarts and does the swap on the way back up, because a database cannot be
+replaced underneath the connection serving the request.
+
+**From the server**, which is the one that still works when the instance does
+not start:
 
 ```
 docker compose down                 # in /opt/bramblekeep
@@ -94,11 +102,10 @@ docker run --rm -v bramblekeep-data:/data -v "$PWD":/backup \
   restore /backup/bramblekeep-backup-0.12.0-1234567890.zip --yes
 ```
 
-The command checks the archive before touching anything, refuses one this binary
-is too old to read, refuses to run while the instance is still up, keeps the
-database it replaces as `bramblekeep.db.before-restore-<timestamp>`, and prints
-the one command that undoes it. Uploads are merged in: a file already on disk is
-already correct, because its name is the hash of its content.
+Either way: the archive is checked before anything is touched, one this binary
+is too old to read is refused, the database being replaced is kept as
+`bramblekeep.db.before-restore-<timestamp>`, and uploads are merged in — a file
+already on disk is already correct, because its name is the hash of its content.
 
 `--yes` skips the confirmation prompt, for scripted recovery.
 

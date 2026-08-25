@@ -77,7 +77,15 @@ el disco que falla no es una copia.
 
 ## Restauración
 
-Para la instancia, ejecuta el comando, arranca de nuevo.
+**Desde la interfaz.** Ajustes → Espacio de trabajo → Copia de seguridad →
+*Restaurar desde una copia*. Al elegir un archivo se sube y se comprueba — la
+base que contiene se extrae y se abre allí mismo, así que un archivo dañado se
+rechaza mientras aún tienes la pantalla delante. No se reemplaza nada hasta que
+confirmas; entonces la instancia se reinicia y hace el cambio al volver, porque
+una base no puede reemplazarse bajo la conexión que atiende la petición.
+
+**Desde el servidor**, que es el camino que sigue funcionando cuando la instancia
+no arranca:
 
 ```
 docker compose down                 # en /opt/bramblekeep
@@ -96,12 +104,11 @@ docker run --rm -v bramblekeep-data:/data -v "$PWD":/backup \
   restore /backup/bramblekeep-backup-0.12.0-1234567890.zip --yes
 ```
 
-El comando comprueba el archivo antes de tocar nada, rechaza el que este binario
-es demasiado antiguo para leer, se niega a ejecutarse mientras la instancia siga
-en marcha, conserva la base que reemplaza como
-`bramblekeep.db.before-restore-<marca de tiempo>`, e imprime el único comando que
-lo deshace. Las subidas se fusionan: un archivo que ya está en disco ya es el
-correcto, porque su nombre es la huella de su contenido.
+En ambos casos: el archivo se comprueba antes de tocar nada, el que este binario
+es demasiado antiguo para leer se rechaza, la base reemplazada se conserva como
+`bramblekeep.db.before-restore-<marca de tiempo>`, y las subidas se fusionan — un
+archivo que ya está en disco ya es el correcto, porque su nombre es la huella de
+su contenido.
 
 `--yes` se salta la confirmación, para una recuperación con scripts.
 

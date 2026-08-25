@@ -31,7 +31,7 @@ Rust backend (Axum + SQLite) + embedded Vite/React/TypeScript frontend. The rele
 - **Sharing.** Per-page levels (read / edit / creator / admin) inherited by the subtree, workspace roles (owner / admin / member), and **public pages** — a token link readable without any account, optionally covering the subtree.
 - **Sign-in your way.** Email + password (no mail relay needed) or a magic link when SMTP is configured. Opaque sessions, no JWT — and an optional `SETUP_CODE` if the instance is exposed before you claim it.
 - **Built-in documentation**, ten chapters shipped inside the binary, so it always matches the version you run. English, French and Spanish, like the rest of the interface.
-- **Backups you can actually restore.** One archive, from Settings, with the instance running: the database *and* every uploaded file. The database inside it is taken through SQLite itself, not copied off a live file, so it is consistent even mid-edit. A snapshot is also written automatically before a one-click update, so a bad migration is one file away from being undone.
+- **Backups you can actually restore** — and restore *from the interface*, or from the server when it will not start. One archive, taken from Settings with the instance running: the database *and* every uploaded file. The database inside it is taken through SQLite itself, not copied off a live file, so it is consistent even mid-edit. A snapshot is also written automatically before a one-click update, so a bad migration is one file away from being undone.
 - **The small things that matter**: full-text search inside content, favourites, drag & drop of the page tree, 30-day trash, per-page change history, content-addressed uploads, Markdown / PDF / CSV export, CSV and relation-preserving ZIP import, light/dark themes, and installable as a PWA.
 
 Zero telemetry, and no outbound network call unless you ask for one — update checking is opt-in.
@@ -169,7 +169,15 @@ migrations, named `bramblekeep.db.bak-<version>`.
 > missing its last transactions, or one that will not open. Use the button, or
 > stop the server first.
 
-To restore, stop the instance and hand the archive to the binary:
+To restore **from the interface**: Settings → Workspace → Backup → *Restore from
+a backup*. The archive is uploaded and checked — its database is extracted and
+opened on the spot, so a damaged one is refused there and then — and nothing is
+replaced until you confirm. The instance then restarts and does the swap on the
+way back up, because a database cannot be replaced underneath the connection
+serving the request.
+
+To restore **from the server**, which still works when the instance will not
+start:
 
 ```bash
 docker compose down                 # or: sudo systemctl stop bramblekeep

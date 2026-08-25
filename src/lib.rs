@@ -42,6 +42,12 @@ use mail::Mailer;
 use ratelimit::RateLimiter;
 use sync::SyncHub;
 
+/// Max size of a backup archive accepted for restore. An archive is as big as
+/// the instance it came from, so this cannot share the media limit — and the
+/// archive writer refuses past 4 GiB anyway, which makes a larger upload
+/// something no Bramblekeep produced.
+const MAX_ARCHIVE_UPLOAD: usize = 4 * 1024 * 1024 * 1024;
+
 /// Max upload size (covers, images, short videos). Generous but bounded: the
 /// upload handler and `LocalStore` handle whole buffers, so this size is also
 /// the RAM cost of one upload in flight.
@@ -258,6 +264,17 @@ pub fn build_app(state: AppState) -> Router {
         // Consistent database snapshot (VACUUM INTO). Owner only — the file
         // contains every secret and every page the instance holds.
         .route("/api/v1/backup", get(routes::download_backup))
+        // Restore is two steps on purpose: staging vets the archive and shows
+        // the owner what it holds; applying restarts, because the database
+        // cannot be swapped under a live pool. The body limit is the archive's,
+        // not an upload's — it is streamed to disk, never buffered.
+        .route(
+            "/api/v1/restore",
+            post(routes::upload_restore)
+                .delete(routes::cancel_restore)
+                .layer(DefaultBodyLimit::max(MAX_ARCHIVE_UPLOAD)),
+        )
+        .route("/api/v1/restore/apply", post(routes::apply_restore))
         .route(
             "/api/v1/items/{id}/publication",
             get(routes::get_publication)

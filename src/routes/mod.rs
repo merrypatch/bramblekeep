@@ -1541,6 +1541,120 @@ pub async fn download_backup(
         .into_response())
 }
 
+/// Stages an uploaded backup archive for restore. **Owner only.**
+///
+/// Uploading does NOT restore anything: the archive is written beside the
+/// database, checked with the same code the `restore` command uses, and its
+/// manifest is returned so the owner can see what they are about to replace
+/// their instance with. Nothing is applied until `apply_restore`.
+///
+/// Streamed to disk rather than buffered — an archive is the size of the whole
+/// instance, and a Raspberry Pi does not have that twice.
+pub async fn upload_restore(
+    State(_app): State<AppState>,
+    Extension(user): Extension<User>,
+    mut mp: Multipart,
+) -> Result<Json<Value>> {
+    require_role(&user, "owner")?;
+    let config = crate::config::Config::from_env();
+    let pending = crate::backup::restore::pending_path(&config)
+        .ok_or_else(|| Error::Io("restore needs a file-backed database".into()))?;
+
+    let part = pending.with_extension("zip.part");
+    let _ = tokio::fs::remove_file(&part).await;
+    let mut file = tokio::fs::File::create(&part)
+        .await
+        .map_err(|e| Error::Io(format!("cannot stage the archive: {e}")))?;
+
+    let mut bytes: u64 = 0;
+    while let Some(mut field) = mp.next_field().await.map_err(|e| Error::Upload(e.to_string()))? {
+        if field.name() != Some("file") {
+            continue;
+        }
+        while let Some(chunk) = field.chunk().await.map_err(|e| Error::Upload(e.to_string()))? {
+            bytes += chunk.len() as u64;
+            tokio::io::AsyncWriteExt::write_all(&mut file, &chunk)
+                .await
+                .map_err(|e| Error::Io(format!("cannot stage the archive: {e}")))?;
+        }
+    }
+    tokio::io::AsyncWriteExt::flush(&mut file)
+        .await
+        .map_err(|e| Error::Io(e.to_string()))?;
+    drop(file);
+
+    if bytes == 0 {
+        let _ = tokio::fs::remove_file(&part).await;
+        return Err(Error::Upload("no file received".into()));
+    }
+
+    // Vetted all the way down before it is allowed to become the pending archive:
+    // the database is extracted and opened here and now, so a corrupt one is
+    // refused while the owner is still looking at the screen, rather than at the
+    // restart where the only evidence would be a line in the log.
+    let scratch = pending.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+    let manifest = match crate::backup::restore::verify(&part, &scratch).await {
+        Ok(manifest) => manifest,
+        Err(e) => {
+            let _ = tokio::fs::remove_file(&part).await;
+            return Err(Error::BadInput(e.to_string()));
+        }
+    };
+
+    let _ = tokio::fs::remove_file(&pending).await;
+    tokio::fs::rename(&part, &pending)
+        .await
+        .map_err(|e| Error::Io(format!("cannot stage the archive: {e}")))?;
+
+    tracing::warn!(
+        actor = %user.id,
+        bytes,
+        from_version = %manifest.app_version,
+        "restore: archive staged, awaiting confirmation"
+    );
+    Ok(Json(json!({ "staged": true, "manifest": manifest })))
+}
+
+/// Discards a staged archive. **Owner only.** The way out of a restore the owner
+/// has changed their mind about, without restarting anything.
+pub async fn cancel_restore(
+    State(_app): State<AppState>,
+    Extension(user): Extension<User>,
+) -> Result<Json<Value>> {
+    require_role(&user, "owner")?;
+    let config = crate::config::Config::from_env();
+    if let Some(pending) = crate::backup::restore::pending_path(&config) {
+        let _ = tokio::fs::remove_file(&pending).await;
+    }
+    Ok(Json(json!({ "staged": false })))
+}
+
+/// Applies the staged archive by restarting. **Owner only.**
+///
+/// The swap itself happens at startup, before the pool is opened: SQLite will
+/// not have its file replaced under a live connection, and the session making
+/// this request lives in the database being replaced. So the honest thing is to
+/// restart and do it where it is safe, rather than pretend it can happen here.
+pub async fn apply_restore(
+    State(_app): State<AppState>,
+    Extension(user): Extension<User>,
+) -> Result<Json<Value>> {
+    require_role(&user, "owner")?;
+    let config = crate::config::Config::from_env();
+    let pending = crate::backup::restore::pending_path(&config)
+        .filter(|p| p.exists())
+        .ok_or_else(|| Error::BadInput("no archive is staged for restore".into()))?;
+
+    tracing::warn!(actor = %user.id, archive = %pending.display(), "restore: confirmed, restarting");
+    // Let the response reach the browser before the process goes away, so the UI
+    // can start waiting for the instance to come back.
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
+        crate::update::restart_now();
+    });
+    Ok(Json(json!({ "applying": true })))
+}
+
 /// Streams a file in 64 KiB chunks, as an HTTP body.
 ///
 /// **`.fuse()` is not decoration.** `stream::unfold` panics if it is polled once
