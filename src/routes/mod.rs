@@ -1451,13 +1451,13 @@ pub async fn check_updates(
 /// Starts update application (admin, after UI confirmation). Returns
 /// `{started, version}` or `{started:false, error}` — UI then tracks via status.
 pub async fn apply_update(
-    State(_app): State<AppState>,
+    State(app): State<AppState>,
     Extension(user): Extension<User>,
 ) -> Result<Json<Value>> {
     if role_rank(&user.role) < role_rank("admin") {
         return Err(Error::Forbidden);
     }
-    match crate::update::start_apply(crate::update::manifest_url()).await {
+    match crate::update::start_apply(app.db.clone(), crate::update::manifest_url()).await {
         Ok(version) => Ok(Json(json!({ "started": true, "version": version }))),
         Err(e) => Ok(Json(json!({ "started": false, "error": e }))),
     }
@@ -1472,6 +1472,81 @@ pub async fn apply_status(
         return Err(Error::Forbidden);
     }
     Ok(Json(crate::update::apply_progress()))
+}
+
+/// Downloads a consistent snapshot of the whole database. **Owner only.**
+///
+/// The file carries everything the instance knows — password hashes, live
+/// session tokens, the Unsplash key, every page of every member — so this is a
+/// full-instance exfiltration by design, and admins are deliberately not enough:
+/// only the single account that owns the workspace can take one.
+///
+/// It does NOT include `files/` (uploads are content-addressed blobs on disk,
+/// outside SQLite); restoring a complete instance means this file *and* that
+/// directory, which the documentation states next to the button.
+pub async fn download_backup(
+    State(app): State<AppState>,
+    Extension(user): Extension<User>,
+) -> Result<Response> {
+    require_role(&user, "owner")?;
+
+    // Written beside the live database on purpose: same filesystem, so the space
+    // needed is the space the operator can already see, and no surprise fill of a
+    // container's writable layer via /tmp.
+    let db_path = crate::store::main_db_path(&app.db)
+        .await?
+        .ok_or_else(|| Error::Io("backup needs a file-backed database".into()))?;
+    let dir = db_path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+    let stamp = crate::store::now_ms();
+    let name = format!("bramblekeep-backup-{}-{stamp}.db", crate::update::current_version());
+    let tmp = dir.join(format!(".{name}.part"));
+    let _ = tokio::fs::remove_file(&tmp).await;
+
+    crate::store::backup_to(&app.db, &tmp).await?;
+
+    let file = tokio::fs::File::open(&tmp)
+        .await
+        .map_err(|e| Error::Io(format!("backup open failed: {e}")))?;
+    let len = file
+        .metadata()
+        .await
+        .map_err(|e| Error::Io(format!("backup stat failed: {e}")))?
+        .len();
+    // Unlink now, while the handle stays valid: the bytes keep streaming from the
+    // open descriptor, and an aborted download cannot leave a copy of the whole
+    // database lying next to it. (On Windows the unlink fails and the file is
+    // swept on the next backup instead — hence the `.part` name.)
+    let _ = tokio::fs::remove_file(&tmp).await;
+
+    let stream = futures_util::stream::unfold(Some(file), |state| async move {
+        let mut f = state?;
+        let mut buf = vec![0u8; 64 * 1024];
+        match tokio::io::AsyncReadExt::read(&mut f, &mut buf).await {
+            Ok(0) => None,
+            Ok(n) => {
+                buf.truncate(n);
+                Some((Ok(Bytes::from(buf)), Some(f)))
+            }
+            // Give up on the first read error rather than spin: the client sees a
+            // truncated body against the announced Content-Length and must retry.
+            Err(e) => Some((Err(e), None)),
+        }
+    });
+
+    tracing::info!(actor = %user.id, bytes = len, "backup downloaded");
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/octet-stream".to_string()),
+            (header::CONTENT_LENGTH, len.to_string()),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{name}\""),
+            ),
+            (header::CACHE_CONTROL, "no-store".to_string()),
+        ],
+        axum::body::Body::from_stream(stream),
+    )
+        .into_response())
 }
 
 /// Current version of the binary — used to detect restart completion after apply.

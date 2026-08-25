@@ -749,6 +749,13 @@
       "open": "Abierto",
       "openDesc": "Cualquiera puede crear una cuenta y ser miembro."
     },
+    "backup": {
+      "title": "Copia de seguridad",
+      "download": "Descargar una copia de seguridad",
+      "desc": "Una instantánea coherente de toda la base de datos: páginas, miembros, ajustes. Se toma sin detener la instancia.",
+      "filesNote": "Los archivos subidos viven fuera de la base de datos: copia también la carpeta files/.",
+      "action": "Descargar"
+    },
     "updates": {
       "title": "Actualizaciones",
       "check": "Buscar actualizaciones",

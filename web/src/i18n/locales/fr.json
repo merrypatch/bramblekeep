@@ -749,6 +749,13 @@
       "open": "Ouverte",
       "openDesc": "N'importe qui peut créer un compte et devenir membre."
     },
+    "backup": {
+      "title": "Sauvegarde",
+      "download": "Télécharger une sauvegarde",
+      "desc": "Un instantané cohérent de toute la base — pages, membres, réglages. Pris sans arrêter l'instance.",
+      "filesNote": "Les fichiers envoyés vivent hors de la base : sauvegardez le dossier files/ en même temps.",
+      "action": "Télécharger"
+    },
     "updates": {
       "title": "Mises à jour",
       "check": "Vérifier les mises à jour",

@@ -749,6 +749,13 @@
       "open": "Open",
       "openDesc": "Anyone can create an account and become a member."
     },
+    "backup": {
+      "title": "Backup",
+      "download": "Download a backup",
+      "desc": "A consistent snapshot of the whole database — pages, members, settings. Taken while the instance keeps running.",
+      "filesNote": "Uploaded files live outside the database: back up the files/ directory alongside it.",
+      "action": "Download"
+    },
     "updates": {
       "title": "Updates",
       "check": "Check for updates",

@@ -31,6 +31,7 @@ Rust backend (Axum + SQLite) + embedded Vite/React/TypeScript frontend. The rele
 - **Sharing.** Per-page levels (read / edit / creator / admin) inherited by the subtree, workspace roles (owner / admin / member), and **public pages** — a token link readable without any account, optionally covering the subtree.
 - **Sign-in your way.** Email + password (no mail relay needed) or a magic link when SMTP is configured. Opaque sessions, no JWT — and an optional `SETUP_CODE` if the instance is exposed before you claim it.
 - **Built-in documentation**, ten chapters shipped inside the binary, so it always matches the version you run. English, French and Spanish, like the rest of the interface.
+- **Backups you can actually restore.** The owner downloads a consistent snapshot of the database from Settings while the instance keeps running — taken through SQLite itself, not a file copy of a live database. The same snapshot is written automatically before a one-click update, so a bad migration is one file away from being undone. (Uploads live in `files/`, next to the database: back the two up together.)
 - **The small things that matter**: full-text search inside content, favourites, drag & drop of the page tree, 30-day trash, per-page change history, content-addressed uploads, Markdown / PDF / CSV export, CSV and relation-preserving ZIP import, light/dark themes, and installable as a PWA.
 
 Zero telemetry, and no outbound network call unless you ask for one — update checking is opt-in.

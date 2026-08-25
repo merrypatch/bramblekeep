@@ -71,8 +71,11 @@ async fn detects_and_notifies_once_with_consent() {
 async fn apply_refuses_when_unconfigured() {
     // Without a public key (embedded empty + env unset) OR in a managed context,
     // apply must be refused BEFORE any network access (security safeguard).
-    let r = update::start_apply("http://127.0.0.1:9/latest.json".into()).await;
+    // The pool is only reached later, at the pre-upgrade backup step.
+    let (db, path) = test_db().await;
+    let r = update::start_apply(db, "http://127.0.0.1:9/latest.json".into()).await;
     assert!(r.is_err(), "apply refused while unconfigured");
+    let _ = std::fs::remove_file(&path);
 }
 
 #[test]

@@ -1938,6 +1938,42 @@ pub async fn journal_len(db: &Db, item_id: &ItemId) -> Result<i64> {
     Ok(n)
 }
 
+/// Filesystem path of the `main` database behind the pool, asked of SQLite
+/// itself rather than re-parsed out of `DATABASE_URL`.
+///
+/// The pool is the authority on what it opened: an embedded run, a test, or any
+/// caller that built the pool directly may never set that variable, and reading
+/// it would silently name a *different* file than the one being backed up.
+/// `None` for an in-memory database, where SQLite reports an empty path.
+pub async fn main_db_path(db: &Db) -> Result<Option<std::path::PathBuf>> {
+    let p = sqlx::query_scalar::<_, String>(
+        "SELECT file FROM pragma_database_list WHERE name = 'main'",
+    )
+    .fetch_optional(db)
+    .await?;
+    Ok(p.filter(|s| !s.is_empty()).map(std::path::PathBuf::from))
+}
+
+/// Writes a consistent snapshot of the whole database to `dest`, via
+/// `VACUUM INTO`.
+///
+/// This is the ONLY correct way to copy a live SQLite database here: the pool
+/// runs in WAL mode (cf. `db::init`), where recent commits live in the `-wal`
+/// file and a plain file copy captures a torn state — a backup that restores to
+/// a database missing its latest transactions, or refusing to open. `VACUUM
+/// INTO` goes through SQLite itself, takes a read transaction, and produces a
+/// self-contained, already-compacted file.
+///
+/// `dest` must NOT exist: SQLite refuses to overwrite, which is the behaviour we
+/// want (a backup never destroys another one).
+pub async fn backup_to(db: &Db, dest: &std::path::Path) -> Result<()> {
+    sqlx::query("VACUUM INTO ?")
+        .bind(dest.to_string_lossy().into_owned())
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
 /// Rewrites the `blocks` projection of an item (complete replacement), together
 /// with its `links` edges and FTS index — all in one transaction so the three
 /// derived views stay consistent. Called only by the `sync` engine after

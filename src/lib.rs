@@ -254,6 +254,9 @@ pub fn build_app(state: AppState) -> Router {
         .route("/api/v1/updates/apply", post(routes::apply_update))
         .route("/api/v1/updates/apply/status", get(routes::apply_status))
         .route("/api/v1/version", get(routes::version))
+        // Consistent database snapshot (VACUUM INTO). Owner only — the file
+        // contains every secret and every page the instance holds.
+        .route("/api/v1/backup", get(routes::download_backup))
         .route(
             "/api/v1/items/{id}/publication",
             get(routes::get_publication)

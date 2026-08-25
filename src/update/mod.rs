@@ -152,13 +152,27 @@ pub fn can_container_update() -> bool {
     is_managed() && container_update_url().is_some()
 }
 
-/// Path of the SQLite file (for pre-migration backup). `None` if in-memory
-/// database or URL without a file.
-fn db_file_path() -> Option<String> {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://bramblekeep.db".into());
-    let p = url.strip_prefix("sqlite://").unwrap_or(&url);
-    let p = p.split('?').next().unwrap_or(p);
-    (!p.is_empty() && p != ":memory:").then(|| p.to_string())
+/// Snapshots the database next to itself before an upgrade runs its migrations,
+/// so a bad migration can be rolled back by restoring the file.
+///
+/// Goes through `store::backup_to` (`VACUUM INTO`), never a file copy: the pool
+/// is in WAL mode and a copy taken while the process is live captures a torn
+/// state — precisely the moment this safety net exists for. A stale backup from
+/// an earlier attempt at the same version is removed first, since SQLite refuses
+/// to write onto an existing file.
+async fn backup_before_upgrade(db: &Db) -> std::result::Result<(), String> {
+    let db_path = match crate::store::main_db_path(db).await {
+        Ok(Some(p)) if p.exists() => p,
+        Ok(_) => return Ok(()), // in-memory: nothing to preserve
+        Err(e) => return Err(format!("backup failed: {e}")),
+    };
+    let bak = db_path.with_extension(format!("db.bak-{}", current_version()));
+    let _ = tokio::fs::remove_file(&bak).await;
+    crate::store::backup_to(db, &bak)
+        .await
+        .map_err(|e| format!("backup failed: {e}"))?;
+    tracing::info!(path = %bak.display(), "update: database backed up");
+    Ok(())
 }
 
 /// Parses a `MAJOR.MINOR.PATCH` version (tolerates `v` prefix) into a comparable tuple.
@@ -406,12 +420,12 @@ pub fn verify(bytes: &[u8], expected_sha256: &str, sig: &str, pubkey: &str) -> s
 /// Starts applying the update. Checks preconditions **synchronously** (returns
 /// an error to the handler if KO), then launches the process in a background task.
 /// Returns the target version.
-pub async fn start_apply(manifest_url: String) -> std::result::Result<String, String> {
+pub async fn start_apply(db: Db, manifest_url: String) -> std::result::Result<String, String> {
     if is_managed() {
         // In a container we cannot self-replace the binary. If a Watchtower
         // endpoint is configured, delegate: pull the new image + recreate.
         if container_update_url().is_some() {
-            return start_container_update(manifest_url).await;
+            return start_container_update(db, manifest_url).await;
         }
         return Err("managed".into());
     }
@@ -441,7 +455,7 @@ pub async fn start_apply(manifest_url: String) -> std::result::Result<String, St
     let version = manifest.version.clone();
     set_progress("downloading", None, Some(version.clone()));
     tokio::spawn(async move {
-        if let Err(e) = run_apply(artifact, pubkey).await {
+        if let Err(e) = run_apply(db, artifact, pubkey).await {
             tracing::error!(error = %e, "update apply failed");
             set_progress("failed", Some(e), None);
         }
@@ -451,7 +465,7 @@ pub async fn start_apply(manifest_url: String) -> std::result::Result<String, St
 
 /// The apply process itself (background task). Each step updates `PROGRESS`.
 /// Signature+hash verification gates ALL replacement.
-async fn run_apply(artifact: Artifact, pubkey: String) -> std::result::Result<(), String> {
+async fn run_apply(db: Db, artifact: Artifact, pubkey: String) -> std::result::Result<(), String> {
     // 1. Download the binary + its detached signature (`.minisig`).
     let bin_url = artifact.url.clone();
     let sig_url = format!("{}.minisig", artifact.url);
@@ -469,12 +483,7 @@ async fn run_apply(artifact: Artifact, pubkey: String) -> std::result::Result<()
 
     // 3. Database backup before migration (rollback possible).
     set_progress("backing_up", None, None);
-    if let Some(db_path) = db_file_path()
-        && Path::new(&db_path).exists()
-    {
-        let bak = format!("{db_path}.bak-{}", current_version());
-        std::fs::copy(&db_path, &bak).map_err(|e| format!("backup failed: {e}"))?;
-    }
+    backup_before_upgrade(&db).await?;
 
     // 4. Write the binary to a temp file (executable) then replace the current exe.
     set_progress("swapping", None, None);
@@ -504,7 +513,7 @@ async fn run_apply(artifact: Artifact, pubkey: String) -> std::result::Result<()
 /// (in the background) to pull the new image and recreate this container. The DB
 /// is backed up first — same safety net as the binary path. Returns the target
 /// version. The image swap itself is done by Watchtower, not by this process.
-async fn start_container_update(manifest_url: String) -> std::result::Result<String, String> {
+async fn start_container_update(db: Db, manifest_url: String) -> std::result::Result<String, String> {
     if matches!(
         apply_progress().step.as_str(),
         "downloading" | "verifying" | "backing_up" | "pulling" | "swapping" | "restarting"
@@ -522,7 +531,7 @@ async fn start_container_update(manifest_url: String) -> std::result::Result<Str
     let version = manifest.version.clone();
     set_progress("backing_up", None, Some(version.clone()));
     tokio::spawn(async move {
-        if let Err(e) = run_container_update().await {
+        if let Err(e) = run_container_update(db).await {
             tracing::error!(error = %e, "container update failed");
             set_progress("failed", Some(e), None);
         }
@@ -533,14 +542,9 @@ async fn start_container_update(manifest_url: String) -> std::result::Result<Str
 /// Backs up the DB, then triggers Watchtower. On success Watchtower recreates
 /// this container, which terminates the process — the frontend detects the
 /// restart via `/version` polling.
-async fn run_container_update() -> std::result::Result<(), String> {
+async fn run_container_update(db: Db) -> std::result::Result<(), String> {
     // Backup before the new image runs its migrations (recover from a bad one).
-    if let Some(db_path) = db_file_path()
-        && Path::new(&db_path).exists()
-    {
-        let bak = format!("{db_path}.bak-{}", current_version());
-        std::fs::copy(&db_path, &bak).map_err(|e| format!("backup failed: {e}"))?;
-    }
+    backup_before_upgrade(&db).await?;
 
     set_progress("pulling", None, None);
     let url = container_update_url().ok_or("watchtower endpoint not configured")?;

@@ -219,7 +219,9 @@ export function SettingsDialog({
             {section === "members" && (
               <MembersSection user={user} ws={ws} onChanged={reload} onOpenPage={openPage} />
             )}
-            {section === "workspace" && <WorkspaceSection ws={ws} onChanged={reload} />}
+            {section === "workspace" && (
+                <WorkspaceSection ws={ws} onChanged={reload} isOwner={user.role === "owner"} />
+              )}
           </div>
         </div>
       </DialogContent>
@@ -1584,7 +1586,15 @@ function TrashSection({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-function WorkspaceSection({ ws, onChanged }: { ws: Workspace | null; onChanged: () => void }) {
+function WorkspaceSection({
+  ws,
+  onChanged,
+  isOwner,
+}: {
+  ws: Workspace | null;
+  onChanged: () => void;
+  isOwner: boolean;
+}) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
   useEffect(() => setName(ws?.name ?? ""), [ws?.name]);
@@ -1652,8 +1662,38 @@ function WorkspaceSection({ ws, onChanged }: { ws: Workspace | null; onChanged: 
       </div>
 
       <UnsplashSetting />
+      {isOwner && <BackupSetting />}
       <UpdateCheckSetting />
     </div>
+  );
+}
+
+/** Setting (owner only): download a consistent snapshot of the database.
+ *
+ * A plain link rather than a fetch: the response streams straight to disk, so a
+ * large instance never has to fit in the tab's memory, and the session cookie
+ * rides along on its own. The endpoint refuses anyone but the owner — the button
+ * is hidden for everybody else so the refusal is never something a user meets. */
+function BackupSetting() {
+  const { t } = useTranslation();
+  return (
+    <>
+      <h3 className="mt-6 mb-2 text-sm font-semibold text-muted-foreground">
+        {t("settings.backup.title")}
+      </h3>
+      <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{t("settings.backup.download")}</p>
+          <p className="text-xs text-muted-foreground">{t("settings.backup.desc")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("settings.backup.filesNote")}</p>
+        </div>
+        <Button asChild variant="outline" className="shrink-0">
+          <a href="/api/v1/backup" download>
+            {t("settings.backup.action")}
+          </a>
+        </Button>
+      </div>
+    </>
   );
 }
 
