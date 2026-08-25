@@ -54,8 +54,81 @@ Three things, and nothing else:
 - the `files/` folder (uploads, addressed by content hash)
 - your `.env`
 
-Copy them while the server is stopped, or use SQLite's own backup mechanism on a
-running instance. There is no external service to restore, no queue to drain.
+The owner can download the database from **Settings → Workspace → Backup**,
+without stopping anything. It goes through SQLite itself, so the copy is
+consistent even while people are typing.
+
+**Do not `cp` a running database.** Recent writes live in `bramblekeep.db-wal`
+next to it, and a plain copy catches the file mid-write — you get a backup that
+is missing its last transactions, or refuses to open at all. Either use the
+download button, or stop the server first.
+
+The `files/` folder is not inside the database. Back it up separately, or your
+pages come back without their images.
+
+## Restore
+
+**1. Stop the instance.**
+
+```
+docker compose down          # in /opt/bramblekeep
+sudo systemctl stop bramblekeep   # bare binary
+```
+
+**2. Put the database back — and delete the two side files.**
+
+`bramblekeep.db-wal` and `bramblekeep.db-shm` belong to the database you are
+replacing. Skip this and SQLite replays them onto the file you just restored:
+the server starts without a word of complaint, and you are left with a mixture
+of both — the pages you meant to roll back, still there. It is the quietest way
+to believe you have restored something you have not.
+
+Bare binary:
+
+```
+rm -f bramblekeep.db-wal bramblekeep.db-shm
+cp bramblekeep-backup-0.12.0-1234567890.db bramblekeep.db
+```
+
+Docker — the data lives in a volume, and the service runs as uid `10001`, so the
+restored file has to belong to it or the app cannot write:
+
+```
+docker run --rm -v bramblekeep-data:/data -v "$PWD":/restore alpine sh -c '
+  rm -f /data/bramblekeep.db-wal /data/bramblekeep.db-shm &&
+  cp /restore/bramblekeep-backup-0.12.0-1234567890.db /data/bramblekeep.db &&
+  chown 10001:10001 /data/bramblekeep.db'
+```
+
+**3. Restore `files/` too**, if you are recovering uploads. A page whose image is
+missing still opens — the image just shows as unavailable.
+
+**4. Start it back up.** Migrations run at startup, so a backup taken on an older
+version opens fine on a newer binary. The reverse does not: migrations only go
+forward, so do not restore a newer backup into an older binary.
+
+## Checking a backup before you need it
+
+A backup you have never opened is a guess. This takes ten seconds:
+
+```
+sqlite3 bramblekeep-backup-0.12.0-1234567890.db "PRAGMA integrity_check;"
+sqlite3 bramblekeep-backup-0.12.0-1234567890.db "SELECT COUNT(*) FROM items;"
+```
+
+The first must print `ok`. The second must look like your instance.
+
+## Undoing a bad update
+
+Before an update applies its migrations, it writes a snapshot beside the
+database, named after the version it is leaving:
+
+```
+bramblekeep.db.bak-0.12.0
+```
+
+Restoring it is the procedure above, with that file. Reinstall the matching
+binary version too — that database has not been through the newer migrations.
 
 ## Updates
 

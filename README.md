@@ -151,12 +151,53 @@ Locked out (forgotten password on an instance that cannot send email)?
 `bramblekeep set-password <email>` resets it from the server — the password is
 read on stdin, and on an instance with no account it creates the owner.
 
-### Backup
+### Backup and restore
 
 Three things, and nothing else: the SQLite database (`bramblekeep.db`), the
-`files/` folder (uploads, addressed by content hash), and your `.env`. Copy them
-with the server stopped, or use SQLite's own backup mechanism on a running
-instance. There is no external service to restore and no queue to drain.
+`files/` folder (uploads, addressed by content hash), and your `.env`. No external
+service to restore, no queue to drain.
+
+The owner downloads the database from **Settings → Workspace → Backup**, with the
+instance running. It goes through SQLite itself (`VACUUM INTO`), so the copy is
+consistent even mid-edit. The same snapshot is written automatically beside the
+database before a one-click update applies its migrations, named
+`bramblekeep.db.bak-<version>`.
+
+> **Do not `cp` a running database.** It runs in WAL mode: recent commits live in
+> `bramblekeep.db-wal`, and a plain copy catches the file mid-write — a backup
+> missing its last transactions, or one that will not open. Use the button, or
+> stop the server first.
+
+To restore, with the instance **stopped**:
+
+```bash
+# Bare binary. Deleting -wal/-shm is not optional: they belong to the database
+# you are replacing, and SQLite will happily replay them onto the restored file —
+# the server starts fine and you get a silent mixture of both.
+rm -f bramblekeep.db-wal bramblekeep.db-shm
+cp bramblekeep-backup-0.12.0-1234567890.db bramblekeep.db
+
+# Docker — data lives in a volume, and the service runs as uid 10001.
+docker run --rm -v bramblekeep-data:/data -v "$PWD":/restore alpine sh -c '
+  rm -f /data/bramblekeep.db-wal /data/bramblekeep.db-shm &&
+  cp /restore/bramblekeep-backup-0.12.0-1234567890.db /data/bramblekeep.db &&
+  chown 10001:10001 /data/bramblekeep.db'
+```
+
+Put `files/` back too if you are recovering uploads — a page whose image is
+missing still opens, the image just shows as unavailable. Then start up again:
+migrations run at startup, so an older backup opens on a newer binary. Not the
+reverse — migrations only go forward.
+
+Worth doing once, before you ever need it:
+
+```bash
+sqlite3 your-backup.db "PRAGMA integrity_check;"   # must print: ok
+sqlite3 your-backup.db "SELECT COUNT(*) FROM items;"
+```
+
+The full procedure, including rolling back a bad update, is in the built-in
+documentation under *Installing and updating*.
 
 ## Status
 

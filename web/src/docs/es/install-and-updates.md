@@ -56,9 +56,84 @@ Tres cosas, y nada más:
 - la carpeta `files/` (las subidas, direccionadas por huella de contenido)
 - tu `.env`
 
-Cópialas con el servidor parado, o usa el mecanismo de copia propio de SQLite en una
-instancia en marcha. No hay ningún servicio externo que restaurar, ninguna cola que
-vaciar.
+El propietario puede descargar la base desde **Ajustes → Espacio de trabajo →
+Copia de seguridad**, sin parar nada. Pasa por el propio SQLite: la copia es
+coherente incluso mientras la gente escribe.
+
+**Nunca copies con `cp` una base en marcha.** Las escrituras recientes viven en
+`bramblekeep.db-wal`, al lado, y una copia sin más atrapa el archivo a medias —
+obtienes una copia a la que le faltan sus últimas transacciones, o que
+directamente se niega a abrir. Usa el botón, o para el servidor.
+
+La carpeta `files/` no está dentro de la base. Cópiala aparte, o tus páginas
+vuelven sin sus imágenes.
+
+## Restauración
+
+**1. Para la instancia.**
+
+```
+docker compose down                 # en /opt/bramblekeep
+sudo systemctl stop bramblekeep     # binario suelto
+```
+
+**2. Vuelve a poner la base — y borra los dos archivos anexos.**
+
+`bramblekeep.db-wal` y `bramblekeep.db-shm` pertenecen a la base que estás
+reemplazando. Sáltate este paso y SQLite los reproduce sobre el archivo que
+acabas de restaurar: el servidor arranca sin quejarse, y te quedas con una mezcla
+de las dos — las páginas que querías deshacer, ahí siguen. Es la forma más
+silenciosa de creer que has restaurado algo que no.
+
+Binario suelto:
+
+```
+rm -f bramblekeep.db-wal bramblekeep.db-shm
+cp bramblekeep-backup-0.12.0-1234567890.db bramblekeep.db
+```
+
+Docker — los datos viven en un volumen, y el servicio corre con el uid `10001`:
+el archivo restaurado tiene que pertenecerle o la aplicación no podrá escribir.
+
+```
+docker run --rm -v bramblekeep-data:/data -v "$PWD":/restore alpine sh -c '
+  rm -f /data/bramblekeep.db-wal /data/bramblekeep.db-shm &&
+  cp /restore/bramblekeep-backup-0.12.0-1234567890.db /data/bramblekeep.db &&
+  chown 10001:10001 /data/bramblekeep.db'
+```
+
+**3. Restaura también `files/`** si estás recuperando las subidas. Una página cuya
+imagen falta se abre igualmente — la imagen aparece simplemente como no
+disponible.
+
+**4. Arranca de nuevo.** Las migraciones se aplican al arrancar: una copia hecha
+en una versión anterior abre sin problema en un binario más nuevo. Al revés no:
+las migraciones solo van hacia delante, así que no restaures una copia más
+reciente en un binario más antiguo.
+
+## Comprobar una copia antes de necesitarla
+
+Una copia que nunca has abierto es una apuesta. Esto lleva diez segundos:
+
+```
+sqlite3 bramblekeep-backup-0.12.0-1234567890.db "PRAGMA integrity_check;"
+sqlite3 bramblekeep-backup-0.12.0-1234567890.db "SELECT COUNT(*) FROM items;"
+```
+
+La primera debe imprimir `ok`. La segunda debe parecerse a tu instancia.
+
+## Deshacer una actualización fallida
+
+Antes de aplicar sus migraciones, una actualización escribe una instantánea junto
+a la base, con el nombre de la versión que abandona:
+
+```
+bramblekeep.db.bak-0.12.0
+```
+
+Restaurarla es el procedimiento de arriba con ese archivo. Reinstala también la
+versión correspondiente del binario: esa base no ha pasado por las migraciones
+más nuevas.
 
 ## Actualizaciones
 
