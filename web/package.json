@@ -61,11 +61,16 @@
     "vitest": "^4.1.10"
   },
   "pnpm": {
-    "//": "Security overrides: force patched versions of transitive deps flagged by the OSV audit (all build/tooling-only, no API change). Re-check on dep bumps.",
+    "//": "Security overrides: force patched versions of transitive deps flagged by the OSV audit. Every entry below is DEV-ONLY (pnpm why: vite/postcss toolchain, or the shadcn CLI and its MCP SDK) — none reaches the built bundle or the release binary. Pins are exact so an audit failure names a version we chose; re-check them on every dep bump, since a pin that was patched can itself become the flagged version.",
     "overrides": {
-      "brace-expansion": "5.0.8",
-      "fast-uri": "3.1.4",
-      "postcss": "8.5.18"
+      "brace-expansion": "5.0.9",
+      "fast-uri": "3.1.5",
+      "hono": "4.12.34",
+      "ip-address": "10.3.1",
+      "js-yaml": "4.3.1",
+      "nanoid": "3.3.18",
+      "postcss": "8.5.23",
+      "undici": "7.29.0"
     }
   }
 }
