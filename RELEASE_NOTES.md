@@ -1,64 +1,85 @@
-## Bramblekeep v0.12.0
+## Bramblekeep v0.13.0
 
-An instance you cannot reach before the internet can is no longer claimable by
-whoever gets there first — if you want it that way.
+Two things you could not do before: get your data out in a form you can put
+back, and bring your existing notes in. Plus a page that keeps working when the
+network does not.
 
 ### Added
 
-- **`SETUP_CODE`, an optional secret to claim the instance.** Until now, a brand-new
-  instance was claimed by its first visitor: fine on a laptop, uncomfortable on a
-  VPS whose port answers before you have signed up. Start the instance with
-  `SETUP_CODE=a-long-secret` and creating the **owner** account requires it — the
-  sign-in screen shows one extra field, and nothing else changes.
-  - **Leaving it out keeps today's behaviour exactly.** No migration, no new
-    mandatory step, and no code to read from the logs — which is what the previous
-    release set out to remove.
-  - It gates **only** the first account. Once that account exists the code is
-    inert, and the sign-up route is closed to everyone anyway, code or not.
-  - Available everywhere the rest of the configuration is: `.env`,
-    `docker-compose.yml`, and `SETUP_CODE=… | sudo bash` on the one-line installer.
-  - Whitespace around the value is ignored, because a pasted secret carries some.
-    The comparison is made on digests, so a wrong code reveals nothing through
-    timing, and the sign-up route was already rate-limited per IP.
-- **`bramblekeep --version`.** The bug-report template asked reporters for its
-  output; it did not exist. It now prints the version and exits without starting a
-  server.
-- **A security policy** (`SECURITY.md`): private reporting through GitHub
-  advisories, a 7-day first answer, and an explicit list of what is deliberate
-  rather than a vulnerability — an unclaimed instance without `SETUP_CODE`, a
-  public link being a capability, admins supervising members' content, sign-in
-  links landing in the log with no SMTP relay.
-- **A code of conduct**, and a Dependabot configuration (monthly version updates,
-  grouped; security updates are not throttled by that schedule).
-
-### Fixed
-
-- **French strings in an English interface.** "Sans titre" was the fallback title
-  in the sidebar — so on every untitled page — on **public pages**, in the database
-  row peek and in the Markdown export. A checkbox read "oui"/"non" in search, in
-  filters, in chart labels and in the CSV export, and a chart legend read "Somme
-  de X". All of them now go through the interface's own translations.
+- **Backups that are one file and actually restore.** The owner downloads a
+  single `.zip` from **Settings → Workspace → Backup**, with the instance
+  running — `bramblekeep.db`, every uploaded file, and a `backup.json` saying
+  which version and schema it came from.
+  - The database inside is taken through SQLite itself (`VACUUM INTO`), so it is
+    consistent even while people are typing. **Do not `cp` a running database**:
+    it runs in WAL mode, recent commits live in `bramblekeep.db-wal`, and a plain
+    copy catches the file mid-write.
+  - Uploads used to be left out with a note saying to copy `files/` as well. A
+    backup whose completeness depends on having read a sentence is not a backup.
+- **Three ways to restore, all checking the archive before touching anything.**
+  - **From the interface**: the archive is uploaded, its database extracted and
+    opened on the spot — a damaged one is refused while you are still looking at
+    the screen — and nothing is replaced until you confirm. The instance then
+    restarts and swaps on the way back up, because a database cannot be replaced
+    underneath the connection serving the request.
+  - **`bramblekeep restore <archive.zip>`**, which is the one that still works
+    when the instance will not start. It refuses to run while the instance is up,
+    refuses an archive from a newer schema, keeps the database it replaces as
+    `bramblekeep.db.before-restore-<timestamp>`, and prints the command that
+    undoes it.
+  - **By hand**, documented in the built-in *Installing and updating* chapter —
+    including the step that silently ruins a restore: deleting `bramblekeep.db-wal`
+    and `-shm`. Leave them and SQLite replays the old writes onto the file you
+    just restored; the server starts without a word and serves a mixture of both.
+- **Working offline.** A page is mirrored to IndexedDB, so it opens from what the
+  browser already holds instead of waiting for a server that may not answer, and
+  editing continues while disconnected. The sync reconnects on its own, backing
+  off to thirty seconds and staying there, and the first frame of the next
+  connection carries the whole document — so offline edits merge rather than
+  queue. The mirror is named per account and erased on sign-out.
+- **Importing notes.** *Import…* now takes a `.zip` of Markdown files: a vault, a
+  folder of notes, an export from another tool. Nesting is kept — a `.md` is a
+  page, a folder beside it of the same name holds its children — attachments are
+  uploaded with the pages, and a plan showing what will be created is displayed
+  before anything is.
 
 ### Changed
 
-- The README describes what the tool actually does, with screenshots, and no
-  longer claims public pages are unimplemented — they shipped several releases
-  ago. The validation command it documents now includes the frontend test suite.
+- **One *Export…* and one *Import…*, with the options inside.** The page menu
+  carried six entries on a database, each firing on click, so clicking was the
+  confirmation. The formats are the same; they now sit side by side with a line
+  saying what each is for, and nothing happens until the button at the bottom.
+- **Pages open in a fraction of the time, and stay that way.** The CRDT journal
+  is compacted past 200 updates instead of being replayed in full on every cold
+  load, and a content write updates the rows that changed instead of rewriting
+  the page. Measured on a 2000-block page: **61 ms → 8 ms** per keystroke batch;
+  on a 5000-block one, 162 ms → 20 ms. `cargo bench` reproduces it.
+- **4xx are no longer logged as errors.** An unauthenticated visitor loading the
+  sign-in page produced two ERROR lines per load, which buried the failures an
+  operator needs to see. Rate-limit hits stay visible as warnings.
+
+### Fixed
+
+- **Downloading a backup killed a worker thread.** The response body panicked on
+  the last poll hyper makes to finish a response, which left the browser with
+  nothing while `curl` appeared to work.
+- **A rollback copy that could not be opened.** The database set aside before a
+  restore was not checkpointed first, so in WAL mode it kept only what had
+  already been folded in — the one file whose purpose is undoing a bad restore.
+- **Two backups started in the same millisecond** picked the same working file
+  and the second failed.
+- **A long page title was cut off on screen** while the whole of it sat in the
+  record — an `<input>` cannot wrap.
+- **`UNSPLASH_ACCESS_KEY` never reached the container.** Compose only forwards
+  variables named in a service's `environment:` block, and it was not there.
+- Eighteen npm advisories across the build toolchain, all dev-only, all patched.
 
 ### Upgrading
 
-- **Docker:** `docker compose pull && docker compose up -d` — or the in-app Update
-  button. **Bare metal:** re-run the installer, or the Update button.
-- **No migration**, and nothing to reconfigure. `SETUP_CODE` is opt-in; an instance
-  that already has an owner is unaffected by it either way.
-- If you serve behind a CDN, **purge `/sw.js`** after upgrading, or browsers keep
-  running the previous bundle from the service worker cache.
+Nothing to do. Migrations run at startup as usual, and one runs here: the
+full-text index is rebuilt so it can be updated per block. On twenty thousand
+blocks it takes about 140 ms.
 
-### Security notes
-
-- Setting `SETUP_CODE` closes the unclaimed-instance window described in the
-  previous release. Without it, that window is unchanged: create the owner right
-  after the first start, and do not expose the port publicly before you have. The
-  startup banner now says which of the two situations you are in.
-- The code protects the claim, not the door. It is not a second factor, it does not
-  gate sign-in, and it is not a substitute for a strong owner password.
+The backup download now returns a `.zip` rather than a bare `.db`. Archives
+taken with 0.12 are plain databases — restore them with the manual procedure,
+skipping the unzip step.
