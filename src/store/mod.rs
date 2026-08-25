@@ -41,7 +41,7 @@ pub struct BlockRow {
     pub props: String,
 }
 
-fn now_ms() -> i64 {
+pub fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
@@ -1896,6 +1896,46 @@ pub async fn append_update(db: &Db, item_id: &ItemId, seq: i64, update: &[u8]) -
         .execute(db)
         .await?;
     Ok(())
+}
+
+/// Collapses an item's journal into the single `merged` update, atomically.
+///
+/// The journal stays the source of truth (invariant #1) — compaction only
+/// changes how many rows express the same state. `merged` must be the full doc
+/// state encoded as one update (`encode_state_as_update_v1` from an empty state
+/// vector), which by CRDT semantics replays to exactly what the deleted rows
+/// replayed to, tombstones included. Callers therefore MUST hold the item's doc
+/// lock: computing `merged` and swapping the rows has to be indivisible with
+/// respect to concurrent writers, or an update appended in between would be
+/// dropped.
+///
+/// The new row takes `seq = 0`, so `next_seq` keeps counting from there and the
+/// sequence number doubles as "updates written since the last compaction".
+pub async fn compact_updates(db: &Db, item_id: &ItemId, merged: &[u8]) -> Result<()> {
+    let id = item_id.to_string();
+    let mut tx = db.begin().await?;
+    sqlx::query("DELETE FROM yjs_updates WHERE item_id = ?")
+        .bind(&id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("INSERT INTO yjs_updates (item_id, seq, \"update\", ts) VALUES (?, 0, ?, ?)")
+        .bind(&id)
+        .bind(merged)
+        .bind(now_ms())
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Number of rows in an item's journal. Read path for tests and diagnostics —
+/// the write path derives the same figure from `seq` at no extra cost.
+pub async fn journal_len(db: &Db, item_id: &ItemId) -> Result<i64> {
+    let n = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM yjs_updates WHERE item_id = ?")
+        .bind(item_id.to_string())
+        .fetch_one(db)
+        .await?;
+    Ok(n)
 }
 
 /// Rewrites the `blocks` projection of an item (complete replacement), together

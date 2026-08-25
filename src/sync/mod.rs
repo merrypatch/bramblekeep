@@ -19,6 +19,19 @@ use crate::db::Db;
 use crate::error::{Error, Result};
 use crate::store;
 
+/// Journal length past which the update log is collapsed into one equivalent
+/// update (cf. `store::compact_updates`).
+///
+/// The journal is append-only and fully replayed on every cold load, so without
+/// compaction a page's open cost grows with its lifetime edit count — a page
+/// edited for months would replay tens of thousands of updates before showing.
+/// 200 keeps that replay short while making compaction rare enough that its cost
+/// (one full-state encode, one small transaction) is amortised over 200 writes.
+///
+/// This bounds the journal, not the history: the timeline lives in `page_events`,
+/// which compaction never touches.
+pub const COMPACT_THRESHOLD: usize = 200;
+
 /// Live document for an item: the yrs doc rebuilt from the journal, plus a
 /// broadcast channel for real-time update distribution to connected clients.
 pub struct ItemDoc {
@@ -41,6 +54,19 @@ impl ItemDoc {
                 txn.apply_update(update)
                     .map_err(|e| Error::CrdtApply(e.to_string()))?;
             }
+        }
+        // An over-long journal is compacted here rather than only on the write
+        // path: a page loaded but never edited again would otherwise keep paying
+        // its full replay on every cold load, and an instance upgrading into this
+        // version would never collapse the backlog it already accumulated. We
+        // have just replayed, so the merged state costs nothing more to encode.
+        if updates.len() > COMPACT_THRESHOLD {
+            let merged = {
+                let txn = doc.transact();
+                txn.encode_state_as_update_v1(&StateVector::default())
+            };
+            store::compact_updates(db, item_id, &merged).await?;
+            tracing::info!(item = %item_id, was = updates.len(), "sync: journal compacted on load");
         }
         let (tx, _rx) = broadcast::channel(256);
         Ok(Self { doc, tx })
@@ -138,6 +164,16 @@ impl SyncHub {
 
         let seq = store::next_seq(db, &item_id).await?;
         store::append_update(db, &item_id, seq, &payload).await?;
+
+        // `seq` counts from 0 since the last compaction, so it IS the number of
+        // rows now in the journal minus one — no extra query needed to decide.
+        // Done under the same `guard` as the append: compaction must not be able
+        // to interleave with another writer (cf. `store::compact_updates`).
+        if seq >= COMPACT_THRESHOLD as i64 {
+            let merged = guard.state_update();
+            store::compact_updates(db, &item_id, &merged).await?;
+            tracing::debug!(item = %item_id, was = seq + 1, "sync: journal compacted");
+        }
 
         let blocks = projection::project(&guard.doc, &item_id.to_string());
         let links = projection::project_links(&guard.doc);
