@@ -10,8 +10,6 @@ const LOCAL_SIG = 0x04034b50;
 const CENTRAL_SIG = 0x02014b50;
 const EOCD_SIG = 0x06054b50;
 const UTF8_FLAG = 0x0800; // filename is UTF-8 (general purpose bit 11)
-const STORE = 0;
-const DEFLATE = 8;
 
 // CRC-32 (IEEE) lookup table, built once.
 const CRC_TABLE = (() => {
@@ -109,13 +107,8 @@ export function zipStore(entries: ZipEntry[]): Blob {
   return new Blob([buf], { type: "application/zip" });
 }
 
-/** A located entry: where its bytes are and how they were stored. */
-type RawEntry = { name: string; method: number; start: number; size: number };
-
-/** Walks the central directory. The authority on what an archive contains — the
- * local headers repeat the same information and are allowed to lie about sizes
- * when an entry carries a trailing data descriptor. */
-function listEntries(bytes: Uint8Array): RawEntry[] {
+/** Reads a ZIP (STORE) archive into text entries. Non-STORE entries throw. */
+export function unzip(bytes: Uint8Array): ZipEntry[] {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const dec = new TextDecoder();
 
@@ -132,7 +125,7 @@ function listEntries(bytes: Uint8Array): RawEntry[] {
 
   const count = view.getUint16(eocd + 10, true);
   let off = view.getUint32(eocd + 16, true); // central dir offset
-  const out: RawEntry[] = [];
+  const entries: ZipEntry[] = [];
 
   for (let i = 0; i < count; i++) {
     if (view.getUint32(off, true) !== CENTRAL_SIG) throw new Error("invalid zip: bad central header");
@@ -143,57 +136,16 @@ function listEntries(bytes: Uint8Array): RawEntry[] {
     const commentLen = view.getUint16(off + 32, true);
     const localOff = view.getUint32(off + 42, true);
     const name = dec.decode(bytes.subarray(off + 46, off + 46 + nameLen));
+    if (method !== 0) throw new Error(`unsupported zip method ${method} for ${name}`);
 
     // Data starts after the local header (whose extra field length may differ).
     const localNameLen = view.getUint16(localOff + 26, true);
     const localExtraLen = view.getUint16(localOff + 28, true);
-    const start = localOff + 30 + localNameLen + localExtraLen;
-    out.push({ name, method, start, size: compSize });
+    const dataStart = localOff + 30 + localNameLen + localExtraLen;
+    const text = dec.decode(bytes.subarray(dataStart, dataStart + compSize));
+    entries.push({ name, text });
 
     off += 46 + nameLen + extraLen + commentLen;
   }
-  return out;
-}
-
-/** Reads a ZIP (STORE) archive into text entries. Non-STORE entries throw.
- * Used for bundles this app wrote itself, which are always STORE. */
-export function unzip(bytes: Uint8Array): ZipEntry[] {
-  const dec = new TextDecoder();
-  return listEntries(bytes).map((e) => {
-    if (e.method !== STORE) throw new Error(`unsupported zip method ${e.method} for ${e.name}`);
-    return { name: e.name, text: dec.decode(bytes.subarray(e.start, e.start + e.size)) };
-  });
-}
-
-/** Inflates a raw DEFLATE stream using the platform's own decompressor.
- *
- * No inflate implementation is bundled for this: `DecompressionStream` is in
- * every browser this app supports, and a compression codec is exactly the kind
- * of dependency worth not having. */
-async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
-  const stream = new Blob([data as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
-}
-
-/** Reads any ZIP this app is likely to be handed — STORE or DEFLATE — as raw
- * bytes, keyed by entry name.
- *
- * Bytes rather than text because an archive from elsewhere carries images
- * alongside its documents, and decoding a PNG as UTF-8 would quietly corrupt it.
- * Directory entries (trailing `/`) are dropped: the paths of the files say
- * everything about the tree. */
-export async function unzipAll(bytes: Uint8Array): Promise<Map<string, Uint8Array>> {
-  const out = new Map<string, Uint8Array>();
-  for (const e of listEntries(bytes)) {
-    if (e.name.endsWith("/")) continue;
-    const raw = bytes.subarray(e.start, e.start + e.size);
-    if (e.method === STORE) {
-      out.set(e.name, raw);
-    } else if (e.method === DEFLATE) {
-      out.set(e.name, await inflateRaw(raw));
-    } else {
-      throw new Error(`unsupported zip method ${e.method} for ${e.name}`);
-    }
-  }
-  return out;
+  return entries;
 }
