@@ -171,16 +171,19 @@ async fn run() {
     breakdown().await;
 }
 
-/// `save_projection` is one transaction doing three writes. Knowing which one
-/// costs is the difference between a useful optimisation and a rewrite that
-/// moves the time somewhere else.
+/// `save_projection` diffs, so its cost now depends on WHERE the edit lands, not
+/// only on how big the page is. Block ids are positional (`{item_id}:{seq}`), so
+/// an insertion near the top shifts the content of every id below it and most
+/// rows genuinely change. This measures the best case, the common case and that
+/// worst case side by side, because quoting only the first would be flattering
+/// and useless.
 async fn breakdown() {
-    println!("Inside save_projection(), by write\n");
+    println!("save_projection(), by where the edit lands\n");
     println!(
-        "{:>7} | {:>11} | {:>11} | {:>11} | {:>11}",
-        "blocks", "delete", "insert", "links", "fts reindex"
+        "{:>7} | {:>13} | {:>13} | {:>13}",
+        "blocks", "edit in place", "append at end", "insert at top"
     );
-    println!("{:->7}-+-{:->11}-+-{:->11}-+-{:->11}-+-{:->11}", "", "", "", "", "");
+    println!("{:->7}-+-{:->13}-+-{:->13}-+-{:->13}", "", "", "", "");
 
     for n in SIZES {
         let path = std::env::temp_dir().join(format!("hub_bench_bd_{}_{n}.db", std::process::id()));
@@ -189,72 +192,72 @@ async fn breakdown() {
         let item = ItemId::new();
         store::create_page(&pool, &item, "bench", None).await.expect("page");
         let id = item.to_string();
+
         let doc = doc_of(n);
-        let blocks = projection::project(&doc, &id);
+        let base = projection::project(&doc, &id);
         let links = projection::project_links(&doc);
-        // Prime it once so every measured round deletes a full table, as in prod.
-        store::save_projection(&pool, &item, &blocks, &links).await.expect("prime");
+        store::save_projection(&pool, &item, &base, &links).await.expect("prime");
 
-        let (mut d, mut i, mut l, mut f) = (vec![], vec![], vec![], vec![]);
-        for _ in 0..SAMPLES {
-            let mut tx = pool.begin().await.expect("begin");
-
+        // Edit in place: one block's text changes, every id keeps its meaning.
+        let mut t_edit = Vec::with_capacity(SAMPLES);
+        for k in 0..SAMPLES {
+            let mut blocks = base.clone();
+            let last = blocks.len() - 1;
+            blocks[last].props = format!(r#"{{"text":"edited {k}"}}"#);
             let start = Instant::now();
-            sqlx::query("DELETE FROM blocks WHERE item_id = ?")
-                .bind(&id)
-                .execute(&mut *tx)
-                .await
-                .expect("delete");
-            d.push(start.elapsed());
+            store::save_projection(&pool, &item, &blocks, &links).await.expect("edit");
+            t_edit.push(start.elapsed());
+        }
+        store::save_projection(&pool, &item, &base, &links).await.expect("reset");
 
+        // Append at end: one new id, nothing else moves.
+        let mut t_append = Vec::with_capacity(SAMPLES);
+        for k in 0..SAMPLES {
+            let mut blocks = base.clone();
+            blocks.push(store::BlockRow {
+                id: format!("{id}:{}", base.len()),
+                parent_id: None,
+                seq: base.len() as i64,
+                type_: "paragraph".into(),
+                props: format!(r#"{{"text":"appended {k}"}}"#),
+            });
             let start = Instant::now();
-            for b in &blocks {
-                sqlx::query(
-                    "INSERT INTO blocks (id, item_id, parent_id, seq, type, props) \
-                     VALUES (?, ?, ?, ?, ?, ?)",
-                )
-                .bind(&b.id)
-                .bind(&id)
-                .bind(&b.parent_id)
-                .bind(b.seq)
-                .bind(&b.type_)
-                .bind(&b.props)
-                .execute(&mut *tx)
-                .await
-                .expect("insert");
+            store::save_projection(&pool, &item, &blocks, &links).await.expect("append");
+            t_append.push(start.elapsed());
+        }
+        store::save_projection(&pool, &item, &base, &links).await.expect("reset");
+
+        // Insert at top: every id below shifts, so most rows really did change.
+        let mut t_insert = Vec::with_capacity(SAMPLES);
+        for k in 0..SAMPLES {
+            let mut blocks = Vec::with_capacity(base.len() + 1);
+            blocks.push(store::BlockRow {
+                id: format!("{id}:0"),
+                parent_id: None,
+                seq: 0,
+                type_: "paragraph".into(),
+                props: format!(r#"{{"text":"prepended {k}"}}"#),
+            });
+            for (i, b) in base.iter().enumerate() {
+                blocks.push(store::BlockRow {
+                    id: format!("{id}:{}", i + 1),
+                    parent_id: None,
+                    seq: (i + 1) as i64,
+                    type_: b.type_.clone(),
+                    props: b.props.clone(),
+                });
             }
-            i.push(start.elapsed());
-
             let start = Instant::now();
-            sqlx::query("DELETE FROM links WHERE src_item = ?")
-                .bind(&id)
-                .execute(&mut *tx)
-                .await
-                .expect("links delete");
-            for e in &links {
-                sqlx::query("INSERT INTO links (src_item, dst_item, kind) VALUES (?, ?, ?)")
-                    .bind(&id)
-                    .bind(&e.dst_item)
-                    .bind(&e.kind)
-                    .execute(&mut *tx)
-                    .await
-                    .expect("links insert");
-            }
-            l.push(start.elapsed());
-
-            let start = Instant::now();
-            bramblekeep::search::index_item(&mut tx, &id, &blocks).await.expect("fts");
-            f.push(start.elapsed());
-
-            tx.commit().await.expect("commit");
+            store::save_projection(&pool, &item, &blocks, &links).await.expect("insert");
+            t_insert.push(start.elapsed());
+            store::save_projection(&pool, &item, &base, &links).await.expect("reset");
         }
 
         println!(
-            "{n:>7} | {:>9.2}ms | {:>9.2}ms | {:>9.2}ms | {:>9.2}ms",
-            ms(median(d)),
-            ms(median(i)),
-            ms(median(l)),
-            ms(median(f)),
+            "{n:>7} | {:>11.2}ms | {:>11.2}ms | {:>11.2}ms",
+            ms(median(t_edit)),
+            ms(median(t_append)),
+            ms(median(t_insert)),
         );
 
         pool.close().await;
@@ -262,5 +265,12 @@ async fn breakdown() {
         let _ = std::fs::remove_file(path.with_extension("db-wal"));
         let _ = std::fs::remove_file(path.with_extension("db-shm"));
     }
-    println!();
+    println!(
+        "\nThe last column is the honest one: positional block ids mean a top\n\
+         insertion changes nearly every row, so the diff bails out to the bulk\n\
+         rewrite (store::REWRITE_WHEN_TOUCHED_ABOVE). It still costs ~15% more\n\
+         than the old unconditional rewrite, because the page has to be read\n\
+         before the path can be chosen — that is the price of the other two\n\
+         columns, which the old code charged on every single write.\n"
+    );
 }

@@ -16,7 +16,7 @@ use sqlx::SqliteConnection;
 
 use crate::db::Db;
 use crate::error::Result;
-use crate::store::{BlockRow, DEFAULT_WORKSPACE};
+use crate::store::DEFAULT_WORKSPACE;
 
 /// A search result: the page, its title, a highlighted excerpt.
 #[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
@@ -26,27 +26,52 @@ pub struct SearchHit {
     pub snippet: String,
 }
 
-/// (Re)indexes the text of an item's blocks — full replacement. Called within
-/// the `store::save_projection` transaction, after rewriting `blocks`.
-pub async fn index_item(conn: &mut SqliteConnection, item_id: &str, blocks: &[BlockRow]) -> Result<()> {
-    clear_item(conn, item_id).await?;
-    for b in blocks {
-        // Only index non-empty plain text (cf. projection: props.text).
-        if let Some(text) = block_text(&b.props)
-            && !text.is_empty()
-        {
-            sqlx::query("INSERT INTO blocks_fts (item_id, text) VALUES (?, ?)")
-                .bind(item_id)
-                .bind(text)
-                .execute(&mut *conn)
-                .await?;
-        }
-    }
+/// Indexes one block's text, returning the index rowid to store on the block
+/// (`blocks.fts_rowid`) — the only handle that addresses this row cheaply later.
+/// Called within the `store::save_projection` transaction.
+pub async fn insert_block(
+    conn: &mut SqliteConnection,
+    item_id: &str,
+    block_id: &str,
+    text: &str,
+) -> Result<i64> {
+    let res = sqlx::query("INSERT INTO blocks_fts (item_id, block_id, text) VALUES (?, ?, ?)")
+        .bind(item_id)
+        .bind(block_id)
+        .bind(text)
+        .execute(&mut *conn)
+        .await?;
+    Ok(res.last_insert_rowid())
+}
+
+/// Replaces the text of an already-indexed block, addressed by its stored rowid.
+pub async fn update_block(conn: &mut SqliteConnection, rowid: i64, text: &str) -> Result<()> {
+    sqlx::query("UPDATE blocks_fts SET text = ? WHERE rowid = ?")
+        .bind(text)
+        .bind(rowid)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Drops one block from the index, addressed by its stored rowid.
+pub async fn remove_block(conn: &mut SqliteConnection, rowid: i64) -> Result<()> {
+    sqlx::query("DELETE FROM blocks_fts WHERE rowid = ?")
+        .bind(rowid)
+        .execute(&mut *conn)
+        .await?;
     Ok(())
 }
 
 /// Removes an item from the index. Called within the purge/hard-delete
 /// transactions of the store, at the same boundaries as projection deletion.
+///
+/// Deliberately keyed on `item_id` rather than on the rowids recorded in
+/// `blocks`, even though that means a scan of an UNINDEXED column: it makes the
+/// call INDEPENDENT of whether the caller has already deleted the block rows.
+/// The alternative is faster and fails silently in the one way that matters —
+/// purged pages staying searchable — and a purge is rare enough that the scan is
+/// the right side to be wrong on.
 pub async fn clear_item(conn: &mut SqliteConnection, item_id: &str) -> Result<()> {
     sqlx::query("DELETE FROM blocks_fts WHERE item_id = ?")
         .bind(item_id)
@@ -55,13 +80,16 @@ pub async fn clear_item(conn: &mut SqliteConnection, item_id: &str) -> Result<()
     Ok(())
 }
 
-/// Extracts the plain text (`props.text`) from a block for FTS indexing.
-fn block_text(props: &str) -> Option<String> {
-    serde_json::from_str::<serde_json::Value>(props)
+/// Indexable text of a block: its plain text (`props.text`), absent when empty.
+/// `None` and `Some("")` mean the same thing here — no index row — so the empty
+/// case is collapsed once, at the source, rather than at each call site.
+pub fn block_text(props: &str) -> Option<String> {
+    let text = serde_json::from_str::<serde_json::Value>(props)
         .ok()?
         .get("text")?
-        .as_str()
-        .map(str::to_string)
+        .as_str()?
+        .to_string();
+    (!text.is_empty()).then_some(text)
 }
 
 /// Full-text search, scoped to pages accessible to `user_id` (owned or shared)
@@ -80,7 +108,7 @@ pub async fn search(db: &Db, user_id: &str, match_: &str) -> Result<Vec<SearchHi
              SELECT i.id FROM items i JOIN granted g ON i.parent_item_id = g.id \
          ) \
          SELECT i.id AS item_id, i.title AS title, \
-                snippet(blocks_fts, 1, '[', ']', '…', 12) AS snippet \
+                snippet(blocks_fts, 2, '[', ']', '…', 12) AS snippet \
          FROM blocks_fts \
          JOIN items i ON i.id = blocks_fts.item_id \
          WHERE blocks_fts MATCH ? \

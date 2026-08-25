@@ -1974,40 +1974,97 @@ pub async fn backup_to(db: &Db, dest: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-/// Rewrites the `blocks` projection of an item (complete replacement), together
-/// with its `links` edges and FTS index — all in one transaction so the three
-/// derived views stay consistent. Called only by the `sync` engine after
-/// reconstruction from the CRDT.
+/// A block as currently persisted, with the handle on its FTS row.
+#[derive(sqlx::FromRow)]
+struct StoredBlock {
+    id: String,
+    parent_id: Option<String>,
+    seq: i64,
+    #[sqlx(rename = "type")]
+    type_: String,
+    props: String,
+    fts_rowid: Option<i64>,
+}
+
+/// Rewrites the `blocks` projection of an item to match `blocks`, together with
+/// its `links` edges and FTS index — all in one transaction so the three derived
+/// views stay consistent. Called only by the `sync` engine after reconstruction
+/// from the CRDT.
+///
+/// Applies a DIFF rather than replacing the table. The projection is recomputed
+/// in full on every CRDT commit — roughly a keystroke batch — and writing all of
+/// it back made a write cost O(page size): `benches/projection.rs` measured 60 ms
+/// per commit on a 2000-block page, of which the inserts and the FTS reindex were
+/// ~78%, both per-row. Typing inside a block now touches one row and one index
+/// row instead of every one of them.
+///
+/// The gain is uneven by construction: block ids are positional
+/// (`{item_id}:{seq}`, cf. `sync::projection`), so inserting a block near the top
+/// of a page shifts the content of every id below it and almost every row really
+/// does change. Left alone, that case was not merely unhelped but ~2x SLOWER than
+/// the bulk rewrite it replaced (112 ms against 60 ms at 2000 blocks): a thousand
+/// single-row `UPDATE`s, each rewriting an FTS row, lose to one `DELETE` plus a
+/// straight run of inserts. A degenerate diff therefore falls back to exactly
+/// that — see `REWRITE_WHEN_TOUCHED_ABOVE`.
+///
+/// That fallback recovers most but not all of it: ~70 ms against the old 60 ms,
+/// because the diff has to read the page's current rows before it can know which
+/// path to take. So the trade is stated plainly — a top-of-page insertion into a
+/// very long page costs ~15% more than it used to, and every ordinary edit costs
+/// roughly an eighth. The residue is a symptom of positional block ids, not of
+/// the diff; ids derived from CRDT node identity would remove the whole case, and
+/// that is a larger change than this one.
+///
+/// What must not change is the observable result: this function's output is still
+/// exactly `projection(yjs_updates)`, which `tests/projection_invariant.rs`
+/// checks by full equality, whichever path runs.
 pub async fn save_projection(
     db: &Db,
     item_id: &ItemId,
     blocks: &[BlockRow],
     links: &[crate::sync::projection::LinkEdge],
 ) -> Result<()> {
+    use std::collections::HashMap;
+
     let id = item_id.to_string();
     let mut tx = db.begin().await?;
-    // Projection + FTS index rebuilt together (same transaction) to stay
-    // consistent: blocks = structured read, full-text index = search.
-    // Coupling to FTS5 is confined to the `search` module (DB swap seam).
-    sqlx::query("DELETE FROM blocks WHERE item_id = ?")
-        .bind(&id)
-        .execute(&mut *tx)
-        .await?;
+
+    // Current state, FTS handle included: the index is addressed by rowid, never
+    // by block_id (an UNINDEXED FTS5 column, so matching on it scans everything).
+    let stored: Vec<StoredBlock> = sqlx::query_as(
+        "SELECT id, parent_id, seq, type, props, fts_rowid FROM blocks WHERE item_id = ?",
+    )
+    .bind(&id)
+    .fetch_all(&mut *tx)
+    .await?;
+    let previous: HashMap<String, StoredBlock> =
+        stored.into_iter().map(|b| (b.id.clone(), b)).collect();
+
+    // Decide the strategy BEFORE writing anything: past a certain share of rows
+    // touched, per-row statements lose to a bulk rewrite (cf. the doc comment).
+    let mut kept = 0usize;
+    let mut edited = 0usize;
     for b in blocks {
-        sqlx::query(
-            "INSERT INTO blocks (id, item_id, parent_id, seq, type, props) \
-             VALUES (?, ?, ?, ?, ?, ?)",
-        )
-        .bind(&b.id)
-        .bind(&id)
-        .bind(&b.parent_id)
-        .bind(b.seq)
-        .bind(&b.type_)
-        .bind(&b.props)
-        .execute(&mut *tx)
-        .await?;
+        if let Some(prev) = previous.get(&b.id) {
+            kept += 1;
+            if differs(prev, b) {
+                edited += 1;
+            }
+        }
     }
-    // Reference edges (page/dbview → target): full replacement for this source.
+    let added = blocks.len() - kept;
+    let dropped = previous.len() - kept;
+    let touched = added + edited + dropped;
+    let widest = blocks.len().max(previous.len());
+    if touched * 100 > widest * REWRITE_WHEN_TOUCHED_ABOVE {
+        bulk_rewrite_blocks(&mut tx, &id, blocks).await?;
+    } else {
+        diff_blocks(&mut tx, &id, blocks, previous).await?;
+    }
+
+    // Reference edges (page/dbview → target): always a full replacement. The
+    // bench put this at ~0.01 ms whatever the page size — there are a handful of
+    // edges, not one per block, and diffing them would buy nothing.
     sqlx::query("DELETE FROM links WHERE src_item = ?")
         .bind(&id)
         .execute(&mut *tx)
@@ -2020,8 +2077,156 @@ pub async fn save_projection(
             .execute(&mut *tx)
             .await?;
     }
-    crate::search::index_item(&mut tx, &id, blocks).await?;
+
     tx.commit().await?;
+    Ok(())
+}
+
+/// Has anything about this block's persisted form changed?
+fn differs(prev: &StoredBlock, next: &BlockRow) -> bool {
+    prev.parent_id != next.parent_id
+        || prev.seq != next.seq
+        || prev.type_ != next.type_
+        || prev.props != next.props
+}
+
+/// Share of rows (percent of the larger of the two versions) above which the
+/// per-row diff is abandoned for a bulk rewrite.
+///
+/// Not a guess: `benches/projection.rs` measures a top-of-page insertion, which
+/// touches essentially every row, at ~112 ms against ~60 ms for the bulk path on
+/// a 2000-block page. Somewhere between "one block edited" and "all of them" the
+/// two cross; 40% sits below the crossing with room to spare, and the exact point
+/// matters little because the cost curves are far apart at both extremes.
+const REWRITE_WHEN_TOUCHED_ABOVE: usize = 40;
+
+/// Per-row path: touch only what changed. Cheap when the edit is local, which is
+/// what typing in a page looks like.
+async fn diff_blocks(
+    conn: &mut sqlx::SqliteConnection,
+    id: &str,
+    blocks: &[BlockRow],
+    mut previous: std::collections::HashMap<String, StoredBlock>,
+) -> Result<()> {
+    // Walk order is the projection's own (depth-first, parents before children),
+    // so a child never references a parent that has not been written yet —
+    // `blocks.parent_id` is a foreign key onto the same table.
+    for b in blocks {
+        match previous.remove(&b.id) {
+            // New block: index first, so the row can be written with its handle
+            // in a single statement.
+            None => {
+                let fts_rowid = match crate::search::block_text(&b.props) {
+                    Some(text) => {
+                        Some(crate::search::insert_block(&mut *conn, id, &b.id, &text).await?)
+                    }
+                    None => None,
+                };
+                sqlx::query(
+                    "INSERT INTO blocks (id, item_id, parent_id, seq, type, props, fts_rowid) \
+                     VALUES (?, ?, ?, ?, ?, ?, ?)",
+                )
+                .bind(&b.id)
+                .bind(id)
+                .bind(&b.parent_id)
+                .bind(b.seq)
+                .bind(&b.type_)
+                .bind(&b.props)
+                .bind(fts_rowid)
+                .execute(&mut *conn)
+                .await?;
+            }
+            Some(prev) => {
+                if !differs(&prev, b) {
+                    continue; // untouched — every block but one, in the common case
+                }
+                // The index only cares about the text, which most prop changes
+                // (a URL, an alignment) leave alone.
+                let mut fts_rowid = prev.fts_rowid;
+                let before = crate::search::block_text(&prev.props);
+                let after = crate::search::block_text(&b.props);
+                if before != after {
+                    fts_rowid = match (fts_rowid, after) {
+                        (Some(row), Some(text)) => {
+                            crate::search::update_block(&mut *conn, row, &text).await?;
+                            Some(row)
+                        }
+                        (Some(row), None) => {
+                            crate::search::remove_block(&mut *conn, row).await?;
+                            None
+                        }
+                        (None, Some(text)) => {
+                            Some(crate::search::insert_block(&mut *conn, id, &b.id, &text).await?)
+                        }
+                        (None, None) => None,
+                    };
+                }
+                sqlx::query(
+                    "UPDATE blocks SET parent_id = ?, seq = ?, type = ?, props = ?, \
+                     fts_rowid = ? WHERE id = ?",
+                )
+                .bind(&b.parent_id)
+                .bind(b.seq)
+                .bind(&b.type_)
+                .bind(&b.props)
+                .bind(fts_rowid)
+                .bind(&b.id)
+                .execute(&mut *conn)
+                .await?;
+            }
+        }
+    }
+
+    // Whatever the projection no longer contains. Deepest first: `seq` grows in
+    // depth-first order, so a descendant always sorts after its parent, and
+    // deleting in reverse never leaves a child pointing at a deleted parent
+    // (the foreign key is checked per statement, and these are one each).
+    let mut gone: Vec<StoredBlock> = previous.into_values().collect();
+    gone.sort_by_key(|b| std::cmp::Reverse(b.seq));
+    for prev in gone {
+        if let Some(row) = prev.fts_rowid {
+            crate::search::remove_block(&mut *conn, row).await?;
+        }
+        sqlx::query("DELETE FROM blocks WHERE id = ?")
+            .bind(&prev.id)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(())
+}
+
+/// Bulk path: drop the page's rows and index entries, write the new ones. One
+/// `DELETE` covering every row lets SQLite check the self-referencing foreign key
+/// once at the end of the statement, so no ordering is needed here.
+async fn bulk_rewrite_blocks(
+    conn: &mut sqlx::SqliteConnection,
+    id: &str,
+    blocks: &[BlockRow],
+) -> Result<()> {
+    sqlx::query("DELETE FROM blocks WHERE item_id = ?")
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    crate::search::clear_item(&mut *conn, id).await?;
+    for b in blocks {
+        let fts_rowid = match crate::search::block_text(&b.props) {
+            Some(text) => Some(crate::search::insert_block(&mut *conn, id, &b.id, &text).await?),
+            None => None,
+        };
+        sqlx::query(
+            "INSERT INTO blocks (id, item_id, parent_id, seq, type, props, fts_rowid) \
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&b.id)
+        .bind(id)
+        .bind(&b.parent_id)
+        .bind(b.seq)
+        .bind(&b.type_)
+        .bind(&b.props)
+        .bind(fts_rowid)
+        .execute(&mut *conn)
+        .await?;
+    }
     Ok(())
 }
 
