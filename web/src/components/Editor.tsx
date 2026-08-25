@@ -55,6 +55,7 @@ export function Editor({
   avatar,
   doc,
   awareness,
+  localLoaded,
   onTreeChange,
   host = null,
 }: {
@@ -64,6 +65,9 @@ export function Editor({
   avatar: string | null;
   doc: Y.Doc;
   awareness: Awareness;
+  /** Resolves when this page's local mirror has been read (cf. lib/room).
+   * Editing can start on that alone — the server is not required to be there. */
+  localLoaded?: Promise<void>;
   /** Called after creating a sub-page (refreshes the sidebar). */
   onTreeChange: () => void;
   /** Host page context (this page's own values), for dynamic filters in
@@ -85,12 +89,24 @@ export function Editor({
   const [synced, setSynced] = useState(false);
   const [failed, setFailed] = useState(false);
   const [lost, setLost] = useState(false);
+  /** The local mirror has been read; whatever was cached is in the document. */
+  const [localReady, setLocalReady] = useState(false);
   // Link selector to an existing page: open + "/" block to replace.
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkTarget, setLinkTarget] = useState<string | null>(null);
   // The selector is used for linking to a page (`page` block) or an inline database (`dbview` block).
   const [linkKind, setLinkKind] = useState<"page" | "db">("page");
   const columnRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLocalReady(false);
+    if (!localLoaded) return;
+    void localLoaded.then(() => alive && setLocalReady(true));
+    return () => {
+      alive = false;
+    };
+  }, [localLoaded, itemId]);
 
   useEffect(() => {
     setSynced(false);
@@ -108,7 +124,11 @@ export function Editor({
     // owns `user` and overwrites it as keystrokes occur; a separate field survives).
     awareness.setLocalState({ user: { name: userName, color: colorFromName(userName) }, avatar });
     const disconnect = connectSync(doc, awareness, itemId, {
-      onSynced: () => setSynced(true),
+      onSynced: () => {
+        setSynced(true);
+        setLost(false); // a reconnection took: the banner has nothing left to say
+        setFailed(false);
+      },
       onError: () => setFailed(true),
       onClosed: () => setLost(true),
     });
@@ -210,7 +230,10 @@ export function Editor({
     onTreeChange();
   }
 
-  if (failed) {
+  // Only when there is genuinely nothing to show. With a local mirror in hand the
+  // page opens and says it is offline, which is the difference between "the app
+  // is broken" and "you have no network".
+  if (failed && !localReady) {
     return (
       <p className="text-sm text-destructive">
         {t("editor.err.backendDown")}
@@ -218,7 +241,10 @@ export function Editor({
     );
   }
 
-  if (!synced) {
+  // Open as soon as EITHER side has produced content. Waiting for the server was
+  // right while nothing survived locally; now it would hide a page the browser
+  // already holds, for a network that may not come back.
+  if (!synced && !localReady) {
     return <PageSkeleton fill />;
   }
 
@@ -351,15 +377,9 @@ export function Editor({
       <PresenceCursors awareness={awareness} />
       {/* Connection cut after sync (network or access revoked): keystrokes
           are no longer synchronized → invite to reload. */}
-      {lost && (
+      {(lost || (failed && localReady)) && (
         <div className="sticky bottom-4 z-30 mx-auto w-fit rounded-full border bg-background/95 px-4 py-2 text-sm shadow-lg backdrop-blur">
-          {t("editor.err.disconnected")}{" "}
-          <button
-            className="font-medium underline underline-offset-2"
-            onClick={() => window.location.reload()}
-          >
-            {t("editor.reload")}
-          </button>
+          {t("editor.offline")}
         </div>
       )}
       <PageLinkDialog

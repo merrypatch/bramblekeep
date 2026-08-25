@@ -35,6 +35,7 @@ import {
 } from "@/lib/api";
 import { StaleClient } from "@/components/StaleClient";
 import { useFreshness } from "@/hooks/useFreshness";
+import { clearLocalMirrors, setLocalScope } from "@/lib/room";
 import i18n, { isLanguage, setLanguage } from "@/i18n";
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -322,6 +323,9 @@ export default function App() {
       .then((u) => {
         // Apply the account's language (source of truth) over the boot cache.
         if (isLanguage(u.language)) setLanguage(u.language);
+        // Pages may be mirrored locally from here on, under this account's name
+        // and no other's (cf. `lib/room`).
+        setLocalScope(u.id);
         setUser(u);
       })
       .catch(() => setUser(null));
@@ -373,7 +377,13 @@ export default function App() {
         <Shell
           user={user}
           onLogout={() => {
-            void logout().then(() => setUser(null));
+            // Stop mirroring first, then erase what was mirrored: the pages
+            // cached locally are readable without the server, so leaving them on
+            // a browser the next person may use would hand them the content.
+            setLocalScope(null);
+            void logout()
+              .then(clearLocalMirrors)
+              .then(() => setUser(null));
           }}
           onUserChange={setUser}
         />

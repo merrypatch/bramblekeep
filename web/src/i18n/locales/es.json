@@ -1051,7 +1051,8 @@
       "toggle": "Lista plegable",
       "quote": "Cita",
       "code": "Bloque de código"
-    }
+    },
+    "offline": "Sin conexión — tus cambios se guardan en este dispositivo y se sincronizarán cuando vuelva la conexión."
   },
   "history": {
     "title": "Historial",

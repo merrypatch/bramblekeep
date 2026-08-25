@@ -1051,7 +1051,8 @@
       "toggle": "Liste dépliante",
       "quote": "Citation",
       "code": "Bloc de code"
-    }
+    },
+    "offline": "Hors ligne — vos modifications sont enregistrées sur cet appareil et repartiront au retour de la connexion."
   },
   "history": {
     "title": "Historique",

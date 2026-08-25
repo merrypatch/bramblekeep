@@ -205,6 +205,7 @@ export function Page({
             avatar={currentUserAvatar}
             doc={rt.doc}
             awareness={rt.awareness}
+            localLoaded={rt.loaded}
             onTreeChange={onMetaChange}
             host={host}
           />

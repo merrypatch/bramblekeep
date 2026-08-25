@@ -1051,7 +1051,8 @@
       "toggle": "Toggle list",
       "quote": "Quote",
       "code": "Code block"
-    }
+    },
+    "offline": "Offline — your changes are saved on this device and will sync when the connection returns."
   },
   "history": {
     "title": "History",
