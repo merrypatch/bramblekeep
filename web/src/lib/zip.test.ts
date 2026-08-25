@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { unzip, zipStore, type ZipEntry } from "./zip";
+import { unzip, unzipAll, zipStore, type ZipEntry } from "./zip";
+import { MARKDOWN_VAULT_B64 } from "./__fixtures__/markdownVault.b64";
 
 async function roundtrip(entries: ZipEntry[]): Promise<ZipEntry[]> {
   const blob = zipStore(entries);
@@ -35,5 +36,33 @@ describe("zip — store roundtrip", () => {
 
   it("throws on a non-zip buffer", () => {
     expect(() => unzip(new Uint8Array([1, 2, 3, 4]))).toThrow();
+  });
+});
+
+describe("unzipAll (archives written elsewhere)", () => {
+  const bytes = () => Uint8Array.from(atob(MARKDOWN_VAULT_B64), (c) => c.charCodeAt(0));
+
+  it("inflates DEFLATE entries", async () => {
+    const files = await unzipAll(bytes());
+    const md = new TextDecoder().decode(files.get("Projets.md")!);
+    expect(md.startsWith("# Projets")).toBe(true);
+    // Longer than its compressed form: it really went through the inflater and
+    // was not simply copied at the stored size.
+    expect(md.length).toBeGreaterThan(1000);
+  });
+
+  it("keeps binary entries as bytes", async () => {
+    const png = (await unzipAll(bytes())).get("Projets/schema.png")!;
+    expect(Array.from(png.subarray(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(png.length).toBe(8 + 256 * 4); // not mangled by a UTF-8 round trip
+  });
+
+  it("does not report directory entries as files", async () => {
+    const files = await unzipAll(bytes());
+    expect([...files.keys()].some((k) => k.endsWith("/"))).toBe(false);
+  });
+
+  it("leaves the STORE-only reader refusing what it cannot honestly read", () => {
+    expect(() => unzip(bytes())).toThrow(/unsupported zip method 8/);
   });
 });

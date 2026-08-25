@@ -38,9 +38,9 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useConfirmMovePublic, useConfirmPublicChild } from "@/lib/publishConsent";
 import { acquireRoom, releaseRoom } from "@/lib/room";
-import { exportCsv, exportMarkdown } from "@/lib/export";
-import { exportDbBundle } from "@/lib/bundle";
+import { ExportDialog } from "@/components/ExportDialog";
 import { ImportBundleDialog } from "@/components/ImportBundleDialog";
+import { ImportDialog } from "@/components/ImportDialog";
 import { usePresence } from "@/lib/presence";
 import { cn } from "@/lib/utils";
 import type { Awareness } from "y-protocols/awareness";
@@ -270,6 +270,8 @@ export function Shell({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [bundleImportOpen, setBundleImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   // Bumped after a CSV import to remount the active page (reloads its rows).
   const [refreshKey, setRefreshKey] = useState(0);
   const confirmPublicChild = useConfirmPublicChild();
@@ -472,28 +474,12 @@ export function Shell({
                     <History className="size-3.5" /> {t("pageMenu.history")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => void exportMarkdown(activeId)}>
-                    <Download className="size-3.5" /> {t("pageMenu.exportMd")}
+                  <DropdownMenuItem onSelect={() => setExportOpen(true)}>
+                    <Download className="size-3.5" /> {t("pageMenu.export")}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setTimeout(() => window.print(), 0)}>
-                    <Download className="size-3.5" /> {t("pageMenu.exportPdf")}
+                  <DropdownMenuItem onSelect={() => setImportDialogOpen(true)}>
+                    <Upload className="size-3.5" /> {t("pageMenu.import")}
                   </DropdownMenuItem>
-                  {activeMeta?.db_schema != null && (
-                    <>
-                      <DropdownMenuItem onSelect={() => void exportCsv(activeId)}>
-                        <Download className="size-3.5" /> {t("pageMenu.exportCsv")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setImportOpen(true)}>
-                        <Upload className="size-3.5" /> {t("pageMenu.importCsv")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => void exportDbBundle(activeId)}>
-                        <Download className="size-3.5" /> {t("pageMenu.exportBundle")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setBundleImportOpen(true)}>
-                        <Upload className="size-3.5" /> {t("pageMenu.importBundle")}
-                      </DropdownMenuItem>
-                    </>
-                  )}
                   {canManageShares && (
                     <>
                       <DropdownMenuSeparator />
@@ -537,6 +523,28 @@ export function Shell({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+        )}
+        {activeId && (
+          <>
+            <ExportDialog
+              itemId={activeId}
+              isDatabase={activeMeta?.db_schema != null}
+              open={exportOpen}
+              onOpenChange={setExportOpen}
+            />
+            <ImportDialog
+              itemId={activeId}
+              isDatabase={activeMeta?.db_schema != null}
+              open={importDialogOpen}
+              onOpenChange={setImportDialogOpen}
+              onPickCsv={() => setImportOpen(true)}
+              onPickBundle={() => setBundleImportOpen(true)}
+              onImported={() => {
+                setRefreshKey((k) => k + 1);
+                void refresh();
+              }}
+            />
+          </>
         )}
         {activeId && <ShareDialog itemId={activeId} open={shareOpen} onOpenChange={setShareOpen} />}
         {activeId && activeMeta?.db_schema != null && (
