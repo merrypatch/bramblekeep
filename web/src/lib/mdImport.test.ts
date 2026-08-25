@@ -166,3 +166,39 @@ describe("a real archive, read end to end", () => {
     expect(stripLeadingTitle(projets.children[0].markdown, "Serveur")).toContain("monter le Pi");
   });
 });
+
+describe("titles come from the heading, not the filename", () => {
+  /// The bug this exists for: exporters cut filenames at ~50 characters, so the
+  /// name on disk is a prefix of the real title.
+  it("recovers a title the filename had truncated", () => {
+    const full = "Procès-verbal de remise de documents (À faire signer en double exemplaire)";
+    const plan = planMdImport(
+      archive({ "Procès-verbal de remise de documents (À faire sign.md": `# ${full}\n\nbody` }),
+    );
+    expect(plan.roots[0].title).toBe(full);
+  });
+
+  it("falls back to the filename when there is no heading", () => {
+    const plan = planMdImport(archive({ "Shopping list.md": "- milk\n- bread" }));
+    expect(plan.roots[0].title).toBe("Shopping list");
+  });
+
+  it("does not mistake a lower heading for the title", () => {
+    const plan = planMdImport(archive({ "Notes.md": "## A section\n\nbody" }));
+    expect(plan.roots[0].title).toBe("Notes");
+  });
+
+  it("ignores a heading that is not the first thing in the file", () => {
+    const plan = planMdImport(archive({ "Notes.md": "intro line\n\n# Later heading" }));
+    expect(plan.roots[0].title).toBe("Notes");
+  });
+
+  /// With the title now taken from the heading, the two match and the duplicate
+  /// goes away — which is what `stripLeadingTitle` is for.
+  it("removes the heading it took the title from", () => {
+    const plan = planMdImport(archive({ "Trip 1a2b3c4d5e6f.md": "# Trip planning\n\nplans" }));
+    const page = plan.roots[0];
+    expect(page.title).toBe("Trip planning");
+    expect(stripLeadingTitle(page.markdown, page.title)).toBe("plans");
+  });
+});

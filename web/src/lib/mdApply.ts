@@ -45,6 +45,10 @@ export type ImportResult = {
 async function writeBody(itemId: string, markdown: string): Promise<void> {
   const doc = new Y.Doc();
   const awareness = new Awareness(doc);
+  // Only what the cleanup needs: naming BlockNote's generic parameters here
+  // would pin this file to the editor schema for no benefit.
+  let editor: { unmount: () => void } | null = null;
+  let host: HTMLElement | null = null;
   // Held in an object: assigned inside a promise executor, which TypeScript
   // otherwise narrows to `never` at the point it is called.
   const socket: { stop: (() => void) | null } = { stop: null };
@@ -67,7 +71,7 @@ async function writeBody(itemId: string, markdown: string): Promise<void> {
       });
     });
 
-    const editor = BlockNoteEditor.create({
+    const ed = BlockNoteEditor.create({
       schema: editorSchema,
       collaboration: {
         fragment: doc.getXmlFragment(FRAGMENT),
@@ -76,9 +80,26 @@ async function writeBody(itemId: string, markdown: string): Promise<void> {
       },
     });
 
-    const blocks = await editor.tryParseMarkdownToBlocks(markdown);
-    if (blocks.length === 0) return;
-    editor.replaceBlocks(editor.document, blocks);
+    // The editor MUST be mounted, off screen but in the document. y-prosemirror
+    // creates its binding — and installs the update hook that pushes changes into
+    // the Yjs document — inside the sync plugin's `view()` lifecycle. An editor
+    // that is never mounted has no view, so no binding, so every block written
+    // into it stays in ProseMirror and reaches nothing. That produced exactly
+    // what it sounds like: pages created, titled, and empty.
+    host = document.createElement("div");
+    host.setAttribute("aria-hidden", "true");
+    host.style.cssText = "position:fixed;left:-99999px;top:0;width:1px;height:1px;overflow:hidden";
+    document.body.appendChild(host);
+    ed.mount(host);
+    editor = ed;
+
+    const blocks = await ed.tryParseMarkdownToBlocks(markdown);
+    if (blocks.length === 0) {
+      // Non-empty markdown that parses to nothing is a case worth hearing about,
+      // not one to pass over quietly.
+      throw new Error("nothing could be read from this page's Markdown");
+    }
+    ed.replaceBlocks(ed.document, blocks);
 
     // Confirm the write landed instead of assuming it did. Disconnecting after a
     // fixed pause would be a guess, and the failure it invites is the quiet kind:
@@ -87,6 +108,8 @@ async function writeBody(itemId: string, markdown: string): Promise<void> {
     // is proof the update was received and applied — not merely sent.
     await confirmLanded(itemId);
   } finally {
+    editor?.unmount();
+    host?.remove();
     socket.stop?.();
     doc.destroy();
   }

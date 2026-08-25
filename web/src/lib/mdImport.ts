@@ -114,10 +114,13 @@ export function planMdImport(files: Map<string, Uint8Array>): MdPlan {
       if (!prefix.every((p, i) => segs[i] === p)) continue;
 
       const leaf = segs[segs.length - 1];
+      const markdown = dec.decode(files.get(path) ?? new Uint8Array());
       here.push({
-        title: cleanTitle(leaf) || "Untitled",
+        // The heading first, the filename second: the filename may have been
+        // truncated on the way out of wherever this came from.
+        title: leadingHeading(markdown) || cleanTitle(leaf) || "Untitled",
         path,
-        markdown: dec.decode(files.get(path) ?? new Uint8Array()),
+        markdown,
         children: build([...prefix, leaf.replace(/\.md$/i, "")]),
       });
     }
@@ -146,10 +149,11 @@ export function planMdImport(files: Map<string, Uint8Array>): MdPlan {
     const leaf = segs[segs.length - 1];
     // Attach at the root rather than lose it: a page in the wrong place can be
     // moved, a page that never arrived cannot.
+    const markdown = dec.decode(files.get(path) ?? new Uint8Array());
     roots.push({
-      title: cleanTitle(leaf) || "Untitled",
+      title: leadingHeading(markdown) || cleanTitle(leaf) || "Untitled",
       path,
-      markdown: dec.decode(files.get(path) ?? new Uint8Array()),
+      markdown,
       children: [],
     });
   }
@@ -167,6 +171,23 @@ export function hasMarkdown(files: Map<string, Uint8Array>): boolean {
     if (/\.md$/i.test(name)) return true;
   }
   return false;
+}
+
+/** The `# H1` a file opens with, if it has one.
+ *
+ * This is the better source for a title than the filename: exporters truncate
+ * filenames — fifty characters is a common ceiling — while the heading inside
+ * carries the title whole. A page called "Procès-verbal de remise de documents
+ * (À faire signer en double exemplaire)" arrives as a file named
+ * "Procès-verbal de remise de documents (À faire sign.md", and only the heading
+ * still knows the rest. */
+export function leadingHeading(markdown: string): string | null {
+  for (const line of markdown.split(/\r?\n/)) {
+    if (line.trim() === "") continue;
+    const m = /^#\s+(.+?)\s*$/.exec(line);
+    return m ? m[1] : null; // the first non-blank line decides
+  }
+  return null;
 }
 
 /** Exported markdown usually opens with the page title as an `# H1`, which would
