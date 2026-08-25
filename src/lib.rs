@@ -7,6 +7,7 @@
 //! remains one-way — `core` depends on nothing internal.
 
 pub mod auth;
+pub mod backup;
 pub mod config;
 pub mod core;
 pub mod db;

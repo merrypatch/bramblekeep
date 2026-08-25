@@ -54,17 +54,24 @@ Three things, and nothing else:
 - the `files/` folder (uploads, addressed by content hash)
 - your `.env`
 
-The owner can download the database from **Settings → Workspace → Backup**,
-without stopping anything. It goes through SQLite itself, so the copy is
-consistent even while people are typing.
+The owner downloads all three as a single `.zip` from **Settings → Workspace →
+Backup**, without stopping anything. The database inside it goes through SQLite
+itself, so it is consistent even while people are typing, and the uploads travel
+with it.
+
+```
+backup.json      what the archive is: format, versions, counts
+bramblekeep.db   the database
+files/<hash>     one entry per upload
+```
 
 **Do not `cp` a running database.** Recent writes live in `bramblekeep.db-wal`
 next to it, and a plain copy catches the file mid-write — you get a backup that
 is missing its last transactions, or refuses to open at all. Either use the
 download button, or stop the server first.
 
-The `files/` folder is not inside the database. Back it up separately, or your
-pages come back without their images.
+Keep the archive somewhere other than the machine that produced it. A backup
+sitting on the disk that failed is not a backup.
 
 ## Restore
 
@@ -83,25 +90,30 @@ the server starts without a word of complaint, and you are left with a mixture
 of both — the pages you meant to roll back, still there. It is the quietest way
 to believe you have restored something you have not.
 
-Bare binary:
+Unpack the archive first, then put the database in place. Bare binary:
 
 ```
+unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
 rm -f bramblekeep.db-wal bramblekeep.db-shm
-cp bramblekeep-backup-0.12.0-1234567890.db bramblekeep.db
+cp restore/bramblekeep.db bramblekeep.db
+cp -r restore/files/. files/
 ```
 
 Docker — the data lives in a volume, and the service runs as uid `10001`, so the
 restored file has to belong to it or the app cannot write:
 
 ```
-docker run --rm -v bramblekeep-data:/data -v "$PWD":/restore alpine sh -c '
+unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
+docker run --rm -v bramblekeep-data:/data -v "$PWD/restore":/restore alpine sh -c '
   rm -f /data/bramblekeep.db-wal /data/bramblekeep.db-shm &&
-  cp /restore/bramblekeep-backup-0.12.0-1234567890.db /data/bramblekeep.db &&
-  chown 10001:10001 /data/bramblekeep.db'
+  cp /restore/bramblekeep.db /data/bramblekeep.db &&
+  mkdir -p /data/files && cp -r /restore/files/. /data/files/ &&
+  chown -R 10001:10001 /data/bramblekeep.db /data/files'
 ```
 
-**3. Restore `files/` too**, if you are recovering uploads. A page whose image is
-missing still opens — the image just shows as unavailable.
+**3. The uploads came out of the archive with the database.** A page whose image
+is missing still opens — the image just shows as unavailable — so a partial
+restore is survivable, but there is no reason to accept one.
 
 **4. Start it back up.** Migrations run at startup, so a backup taken on an older
 version opens fine on a newer binary. The reverse does not: migrations only go
@@ -112,11 +124,16 @@ forward, so do not restore a newer backup into an older binary.
 A backup you have never opened is a guess. This takes ten seconds:
 
 ```
-sqlite3 bramblekeep-backup-0.12.0-1234567890.db "PRAGMA integrity_check;"
-sqlite3 bramblekeep-backup-0.12.0-1234567890.db "SELECT COUNT(*) FROM items;"
+unzip -t bramblekeep-backup-0.12.0-1234567890.zip
+unzip -p bramblekeep-backup-0.12.0-1234567890.zip backup.json
+unzip -p bramblekeep-backup-0.12.0-1234567890.zip bramblekeep.db > /tmp/check.db
+sqlite3 /tmp/check.db "PRAGMA integrity_check;"
+sqlite3 /tmp/check.db "SELECT COUNT(*) FROM items;"
 ```
 
-The first must print `ok`. The second must look like your instance.
+`unzip -t` must report no errors, `integrity_check` must print `ok`, and the
+count must look like your instance. `backup.json` tells you which version and
+which schema the archive came from.
 
 ## Undoing a bad update
 
@@ -127,8 +144,10 @@ database, named after the version it is leaving:
 bramblekeep.db.bak-0.12.0
 ```
 
-Restoring it is the procedure above, with that file. Reinstall the matching
-binary version too — that database has not been through the newer migrations.
+That one is a plain database, not an archive — migrations touch the database and
+nothing else, and uploads are immutable, so there is nothing else to roll back.
+Skip the unzip step and put it in place exactly as above. Reinstall the matching
+binary version too: that database has not been through the newer migrations.
 
 ## Updates
 

@@ -1,25 +1,37 @@
-//! Database backup endpoint (`GET /api/v1/backup`).
+//! Backup archive endpoint (`GET /api/v1/backup`).
 //!
-//! Two things are under test, and the second matters more than the first.
+//! Three things are under test, in increasing order of what they cost to get
+//! wrong.
 //!
-//! Access: the file holds password hashes, live session tokens, integration
-//! keys and every page of every member — a full-instance exfiltration. Owner
-//! only, admins deliberately included in the refusal.
+//! Access: the archive holds password hashes, live session tokens, integration
+//! keys and every page and upload of every member — a full-instance
+//! exfiltration. Owner only, admins deliberately included in the refusal.
+//!
+//! Completeness: the database alone is not a backup. If the uploads are not in
+//! the archive, a restore returns every page with its images broken, and nobody
+//! finds out until the day it matters.
 //!
 //! Correctness: a backup that cannot be restored is worse than no backup, since
-//! it is only discovered on the day it is needed. So the test does not check
-//! that bytes came back — it opens the returned file as a real database and
-//! reads the content out of it.
+//! it is only discovered when it is needed. So the test does not check that
+//! bytes came back — it opens the archive, pulls the database out of it, and
+//! reads the content back.
 
 mod common;
+
+use std::io::Cursor;
+use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
+use bramblekeep::backup::{DB_ENTRY, FILES_PREFIX, MANIFEST_ENTRY, Manifest, zip};
+use bramblekeep::config::Config;
 use bramblekeep::core::ItemId;
 use bramblekeep::db::Db;
+use bramblekeep::files::LocalStore;
+use bramblekeep::mail::Mailer;
 use bramblekeep::sync::{SyncHub, projection};
-use bramblekeep::{db, store};
+use bramblekeep::{AppState, build_app, db, store};
 use common::{cookie, mk_session, test_app, test_db};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
@@ -61,7 +73,7 @@ async fn get_backup(app: &Router, tok: &str) -> (StatusCode, Vec<u8>, Option<Str
     (status, bytes, disposition)
 }
 
-/// A page with real CRDT content, so the backup has something to lose.
+/// A page with real CRDT content, so the archive has something to lose.
 async fn seed_page(db: &Db, text: &str) -> ItemId {
     let item = ItemId::new();
     store::create_page(db, &item, OWNER, None).await.expect("create page");
@@ -77,32 +89,81 @@ async fn seed_page(db: &Db, text: &str) -> ItemId {
     item
 }
 
+/// An app with a file store of its own — the shared one in `common::test_app` is
+/// reused across tests, and counting blobs in it would count other tests' work.
+fn app_with_files(db: Db, files: &std::path::Path) -> Router {
+    build_app(AppState::new(
+        db,
+        SyncHub::default(),
+        Arc::new(LocalStore::new(files)),
+        Arc::new(Mailer::from_config(&Config::from_env())),
+        false,
+    ))
+}
+
 #[tokio::test]
-async fn owner_gets_a_backup_that_actually_restores() {
+async fn the_archive_carries_the_database_and_the_uploads() {
     let (dbp, path) = test_db().await;
+    let files = path.with_extension("files");
+    let _ = std::fs::remove_dir_all(&files);
+    let store_ = LocalStore::new(&files);
+    let blob = store_.put(b"pretend this is a PNG").await.expect("put");
+    let hash = blob.strip_prefix("sha256:").expect("hash prefix").to_string();
+
     insert_user_role(&dbp, OWNER, "owner@x.com", "owner").await;
     let item = seed_page(&dbp, "content worth keeping").await;
     let tok = mk_session(&dbp, OWNER).await;
-    let app = test_app(dbp.clone());
+    let app = app_with_files(dbp.clone(), &files);
 
     let (status, bytes, disposition) = get_backup(&app, &tok).await;
     assert_eq!(status, StatusCode::OK);
     assert!(
-        disposition.as_deref().is_some_and(|d| d.contains("attachment; filename=\"bramblekeep-backup-")),
-        "served as a named download, got {disposition:?}"
+        disposition
+            .as_deref()
+            .is_some_and(|d| d.contains("bramblekeep-backup-") && d.ends_with(".zip\"")),
+        "served as a named .zip download, got {disposition:?}"
     );
-    assert_eq!(&bytes[..16], b"SQLite format 3\0", "the body is a SQLite file");
 
-    // The real test: open the returned bytes as a database and read the page
-    // back out of it. A torn WAL copy would fail here, not above.
+    let mut cur = Cursor::new(bytes);
+    let entries = zip::list(&mut cur).expect("the body is a readable archive");
+    let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
+    assert!(names.contains(&MANIFEST_ENTRY), "manifest present, got {names:?}");
+    assert!(names.contains(&DB_ENTRY), "database present, got {names:?}");
+
+    // The upload is in there, byte for byte.
+    let blob_entry = entries
+        .iter()
+        .find(|e| e.name == format!("{FILES_PREFIX}{hash}"))
+        .expect("the uploaded blob is in the archive");
+    assert_eq!(
+        zip::read_all(&mut cur, blob_entry).expect("blob"),
+        b"pretend this is a PNG",
+        "and its bytes are intact"
+    );
+
+    // The manifest describes what is actually inside.
+    let manifest: Manifest = serde_json::from_slice(
+        &zip::read_all(&mut cur, entries.iter().find(|e| e.name == MANIFEST_ENTRY).unwrap())
+            .expect("manifest"),
+    )
+    .expect("manifest parses");
+    assert_eq!(manifest.file_count, 1);
+    assert!(manifest.schema_version > 0);
+    assert_eq!(manifest.app_version, env!("CARGO_PKG_VERSION"));
+
+    // The real test: pull the database out and read the page back from it. A
+    // torn WAL copy would fail here, not above.
     let restored_path = path.with_extension("restored.db");
     let _ = std::fs::remove_file(&restored_path);
-    std::fs::write(&restored_path, &bytes).expect("write restored file");
+    let db_entry = entries.iter().find(|e| e.name == DB_ENTRY).unwrap();
+    let mut out = std::fs::File::create(&restored_path).expect("create");
+    zip::extract(&mut cur, db_entry, &mut out).expect("extract the database");
+    drop(out);
+
     let restored = db::init(&format!("sqlite://{}", restored_path.display()))
         .await
-        .expect("the backup opens as a database");
-
-    let blocks = store::load_blocks(&restored, &item).await.expect("blocks in the backup");
+        .expect("the archived database opens");
+    let blocks = store::load_blocks(&restored, &item).await.expect("blocks");
     let texts: Vec<String> = blocks
         .iter()
         .filter_map(|b| {
@@ -112,13 +173,38 @@ async fn owner_gets_a_backup_that_actually_restores() {
         })
         .collect();
     assert_eq!(texts, vec!["content worth keeping".to_string()]);
-
-    // The journal came across too — the backup preserves the source of truth,
+    // The journal came across too — the archive preserves the source of truth,
     // not just the projection derived from it.
     assert_eq!(store::journal_len(&restored, &item).await.unwrap(), 1);
 
     restored.close().await;
     let _ = std::fs::remove_file(&restored_path);
+    let _ = std::fs::remove_dir_all(&files);
+    let _ = std::fs::remove_file(&path);
+}
+
+/// An instance where nobody has uploaded anything still produces a valid
+/// archive — the file store directory may not even exist yet.
+#[tokio::test]
+async fn an_instance_with_no_uploads_still_backs_up() {
+    let (dbp, path) = test_db().await;
+    let files = path.with_extension("nofiles");
+    let _ = std::fs::remove_dir_all(&files);
+    insert_user_role(&dbp, OWNER, "owner@x.com", "owner").await;
+    let tok = mk_session(&dbp, OWNER).await;
+    let app = app_with_files(dbp.clone(), &files);
+
+    let (status, bytes, _) = get_backup(&app, &tok).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let mut cur = Cursor::new(bytes);
+    let entries = zip::list(&mut cur).expect("archive");
+    assert!(entries.iter().any(|e| e.name == DB_ENTRY));
+    assert!(
+        !entries.iter().any(|e| e.name.starts_with(FILES_PREFIX)),
+        "no blob entries, and no error either"
+    );
+
     let _ = std::fs::remove_file(&path);
 }
 
@@ -133,7 +219,7 @@ async fn admins_and_members_are_refused() {
     for (who, id) in [("admin", ADMIN), ("member", MEMBER)] {
         let tok = mk_session(&dbp, id).await;
         let (status, _, _) = get_backup(&app, &tok).await;
-        assert_eq!(status, StatusCode::FORBIDDEN, "{who} cannot download the database");
+        assert_eq!(status, StatusCode::FORBIDDEN, "{who} cannot download the archive");
     }
 
     // Unauthenticated is refused before any role check.
@@ -148,12 +234,13 @@ async fn admins_and_members_are_refused() {
     let _ = std::fs::remove_file(&path);
 }
 
-/// The snapshot is written next to the live database; nothing may survive the
-/// request. A stale copy of the whole instance sitting in the data directory
-/// would be a quiet data-exposure bug.
+/// The archive is built next to the live database; nothing may survive the
+/// request — neither the archive nor the intermediate database snapshot. A stale
+/// copy of the whole instance sitting in the data directory would be a quiet
+/// data-exposure bug.
 #[tokio::test]
-async fn no_snapshot_is_left_behind() {
-    // Own directory, not the shared temp dir: the snapshot is written beside the
+async fn no_archive_is_left_behind() {
+    // Own directory, not the shared temp dir: the archive is written beside the
     // database, so listing a directory another test also writes into would make
     // this assertion race instead of prove anything.
     let dir = std::env::temp_dir().join(format!("hub_backup_leftovers_{}", std::process::id()));
@@ -165,7 +252,7 @@ async fn no_snapshot_is_left_behind() {
     insert_user_role(&dbp, OWNER, "owner@x.com", "owner").await;
     seed_page(&dbp, "x").await;
     let tok = mk_session(&dbp, OWNER).await;
-    let app = test_app(dbp.clone());
+    let app = app_with_files(dbp.clone(), &dir.join("files"));
 
     let (status, _, _) = get_backup(&app, &tok).await;
     assert_eq!(status, StatusCode::OK);
@@ -176,7 +263,7 @@ async fn no_snapshot_is_left_behind() {
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .filter(|n| n.contains("bramblekeep-backup-"))
         .collect();
-    assert!(leftovers.is_empty(), "temporary snapshot removed, found {leftovers:?}");
+    assert!(leftovers.is_empty(), "nothing left behind, found {leftovers:?}");
 
     dbp.close().await;
     let _ = std::fs::remove_dir_all(&dir);

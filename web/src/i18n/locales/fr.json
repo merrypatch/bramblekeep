@@ -752,8 +752,8 @@
     "backup": {
       "title": "Sauvegarde",
       "download": "Télécharger une sauvegarde",
-      "desc": "Un instantané cohérent de toute la base — pages, membres, réglages. Pris sans arrêter l'instance.",
-      "filesNote": "Les fichiers envoyés vivent hors de la base : sauvegardez le dossier files/ en même temps.",
+      "desc": "Une archive avec tout : la base entière et tous les fichiers envoyés. Prise sans arrêter l'instance.",
+      "filesNote": "Rangez-la ailleurs que sur la machine d'origine — une sauvegarde sur le disque qui lâche n'en est pas une.",
       "action": "Télécharger"
     },
     "updates": {

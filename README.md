@@ -31,7 +31,7 @@ Rust backend (Axum + SQLite) + embedded Vite/React/TypeScript frontend. The rele
 - **Sharing.** Per-page levels (read / edit / creator / admin) inherited by the subtree, workspace roles (owner / admin / member), and **public pages** — a token link readable without any account, optionally covering the subtree.
 - **Sign-in your way.** Email + password (no mail relay needed) or a magic link when SMTP is configured. Opaque sessions, no JWT — and an optional `SETUP_CODE` if the instance is exposed before you claim it.
 - **Built-in documentation**, ten chapters shipped inside the binary, so it always matches the version you run. English, French and Spanish, like the rest of the interface.
-- **Backups you can actually restore.** The owner downloads a consistent snapshot of the database from Settings while the instance keeps running — taken through SQLite itself, not a file copy of a live database. The same snapshot is written automatically before a one-click update, so a bad migration is one file away from being undone. (Uploads live in `files/`, next to the database: back the two up together.)
+- **Backups you can actually restore.** One archive, from Settings, with the instance running: the database *and* every uploaded file. The database inside it is taken through SQLite itself, not copied off a live file, so it is consistent even mid-edit. A snapshot is also written automatically before a one-click update, so a bad migration is one file away from being undone.
 - **The small things that matter**: full-text search inside content, favourites, drag & drop of the page tree, 30-day trash, per-page change history, content-addressed uploads, Markdown / PDF / CSV export, CSV and relation-preserving ZIP import, light/dark themes, and installable as a PWA.
 
 Zero telemetry, and no outbound network call unless you ask for one — update checking is opt-in.
@@ -157,11 +157,12 @@ Three things, and nothing else: the SQLite database (`bramblekeep.db`), the
 `files/` folder (uploads, addressed by content hash), and your `.env`. No external
 service to restore, no queue to drain.
 
-The owner downloads the database from **Settings → Workspace → Backup**, with the
-instance running. It goes through SQLite itself (`VACUUM INTO`), so the copy is
-consistent even mid-edit. The same snapshot is written automatically beside the
-database before a one-click update applies its migrations, named
-`bramblekeep.db.bak-<version>`.
+The owner downloads a single `.zip` from **Settings → Workspace → Backup**, with
+the instance running — `backup.json` (what it is), `bramblekeep.db` and
+`files/<hash>` for every upload. The database goes through SQLite itself
+(`VACUUM INTO`), so it is consistent even mid-edit. A plain database snapshot is
+also written beside the live one before a one-click update applies its
+migrations, named `bramblekeep.db.bak-<version>`.
 
 > **Do not `cp` a running database.** It runs in WAL mode: recent commits live in
 > `bramblekeep.db-wal`, and a plain copy catches the file mid-write — a backup
@@ -171,29 +172,33 @@ database before a one-click update applies its migrations, named
 To restore, with the instance **stopped**:
 
 ```bash
+unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
+
 # Bare binary. Deleting -wal/-shm is not optional: they belong to the database
 # you are replacing, and SQLite will happily replay them onto the restored file —
 # the server starts fine and you get a silent mixture of both.
 rm -f bramblekeep.db-wal bramblekeep.db-shm
-cp bramblekeep-backup-0.12.0-1234567890.db bramblekeep.db
+cp restore/bramblekeep.db bramblekeep.db
+cp -r restore/files/. files/
 
 # Docker — data lives in a volume, and the service runs as uid 10001.
-docker run --rm -v bramblekeep-data:/data -v "$PWD":/restore alpine sh -c '
+docker run --rm -v bramblekeep-data:/data -v "$PWD/restore":/restore alpine sh -c '
   rm -f /data/bramblekeep.db-wal /data/bramblekeep.db-shm &&
-  cp /restore/bramblekeep-backup-0.12.0-1234567890.db /data/bramblekeep.db &&
-  chown 10001:10001 /data/bramblekeep.db'
+  cp /restore/bramblekeep.db /data/bramblekeep.db &&
+  mkdir -p /data/files && cp -r /restore/files/. /data/files/ &&
+  chown -R 10001:10001 /data/bramblekeep.db /data/files'
 ```
 
-Put `files/` back too if you are recovering uploads — a page whose image is
-missing still opens, the image just shows as unavailable. Then start up again:
-migrations run at startup, so an older backup opens on a newer binary. Not the
-reverse — migrations only go forward.
+Then start up again: migrations run at startup, so an older backup opens on a
+newer binary. Not the reverse — migrations only go forward.
 
 Worth doing once, before you ever need it:
 
 ```bash
-sqlite3 your-backup.db "PRAGMA integrity_check;"   # must print: ok
-sqlite3 your-backup.db "SELECT COUNT(*) FROM items;"
+unzip -t your-backup.zip                           # must report no errors
+unzip -p your-backup.zip bramblekeep.db > /tmp/check.db
+sqlite3 /tmp/check.db "PRAGMA integrity_check;"    # must print: ok
+sqlite3 /tmp/check.db "SELECT COUNT(*) FROM items;"
 ```
 
 The full procedure, including rolling back a bad update, is in the built-in

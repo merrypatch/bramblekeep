@@ -752,8 +752,8 @@
     "backup": {
       "title": "Copia de seguridad",
       "download": "Descargar una copia de seguridad",
-      "desc": "Una instantánea coherente de toda la base de datos: páginas, miembros, ajustes. Se toma sin detener la instancia.",
-      "filesNote": "Los archivos subidos viven fuera de la base de datos: copia también la carpeta files/.",
+      "desc": "Un archivo con todo: la base entera y todos los archivos subidos. Se toma sin detener la instancia.",
+      "filesNote": "Guárdalo en otro sitio que la máquina de origen — una copia en el disco que falla no es una copia.",
       "action": "Descargar"
     },
     "updates": {

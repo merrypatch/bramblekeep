@@ -752,8 +752,8 @@
     "backup": {
       "title": "Backup",
       "download": "Download a backup",
-      "desc": "A consistent snapshot of the whole database — pages, members, settings. Taken while the instance keeps running.",
-      "filesNote": "Uploaded files live outside the database: back up the files/ directory alongside it.",
+      "desc": "One archive with everything: the whole database and every uploaded file. Taken while the instance keeps running.",
+      "filesNote": "Keep it somewhere other than the machine it came from — a backup on the failed disk is not a backup.",
       "action": "Download"
     },
     "updates": {

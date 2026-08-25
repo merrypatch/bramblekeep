@@ -30,6 +30,12 @@ impl LocalStore {
         Self { dir: dir.into() }
     }
 
+    /// Directory backing the store. Exposed for the backup archive, which has to
+    /// walk the blobs rather than address them one hash at a time.
+    pub fn dir(&self) -> &std::path::Path {
+        &self.dir
+    }
+
     /// Stores bytes, returns the id `sha256:<hex>`. Idempotent: if the content
     /// already exists (same hash), no rewrite occurs.
     pub async fn put(&self, bytes: &[u8]) -> Result<String> {

@@ -56,17 +56,24 @@ Tres cosas, y nada más:
 - la carpeta `files/` (las subidas, direccionadas por huella de contenido)
 - tu `.env`
 
-El propietario puede descargar la base desde **Ajustes → Espacio de trabajo →
-Copia de seguridad**, sin parar nada. Pasa por el propio SQLite: la copia es
-coherente incluso mientras la gente escribe.
+El propietario descarga las tres cosas en un solo `.zip` desde **Ajustes →
+Espacio de trabajo → Copia de seguridad**, sin parar nada. La base que contiene
+pasa por el propio SQLite: es coherente incluso mientras la gente escribe, y las
+subidas viajan con ella.
+
+```
+backup.json      qué es el archivo: formato, versiones, recuentos
+bramblekeep.db   la base
+files/<hash>     una entrada por archivo subido
+```
 
 **Nunca copies con `cp` una base en marcha.** Las escrituras recientes viven en
 `bramblekeep.db-wal`, al lado, y una copia sin más atrapa el archivo a medias —
 obtienes una copia a la que le faltan sus últimas transacciones, o que
 directamente se niega a abrir. Usa el botón, o para el servidor.
 
-La carpeta `files/` no está dentro de la base. Cópiala aparte, o tus páginas
-vuelven sin sus imágenes.
+Guarda el archivo en otro sitio que la máquina que lo produjo. Una copia sobre
+el disco que falla no es una copia.
 
 ## Restauración
 
@@ -85,26 +92,31 @@ acabas de restaurar: el servidor arranca sin quejarse, y te quedas con una mezcl
 de las dos — las páginas que querías deshacer, ahí siguen. Es la forma más
 silenciosa de creer que has restaurado algo que no.
 
-Binario suelto:
+Descomprime el archivo y luego pon la base en su sitio. Binario suelto:
 
 ```
+unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
 rm -f bramblekeep.db-wal bramblekeep.db-shm
-cp bramblekeep-backup-0.12.0-1234567890.db bramblekeep.db
+cp restore/bramblekeep.db bramblekeep.db
+cp -r restore/files/. files/
 ```
 
 Docker — los datos viven en un volumen, y el servicio corre con el uid `10001`:
 el archivo restaurado tiene que pertenecerle o la aplicación no podrá escribir.
 
 ```
-docker run --rm -v bramblekeep-data:/data -v "$PWD":/restore alpine sh -c '
+unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
+docker run --rm -v bramblekeep-data:/data -v "$PWD/restore":/restore alpine sh -c '
   rm -f /data/bramblekeep.db-wal /data/bramblekeep.db-shm &&
-  cp /restore/bramblekeep-backup-0.12.0-1234567890.db /data/bramblekeep.db &&
-  chown 10001:10001 /data/bramblekeep.db'
+  cp /restore/bramblekeep.db /data/bramblekeep.db &&
+  mkdir -p /data/files && cp -r /restore/files/. /data/files/ &&
+  chown -R 10001:10001 /data/bramblekeep.db /data/files'
 ```
 
-**3. Restaura también `files/`** si estás recuperando las subidas. Una página cuya
+**3. Las subidas han salido del archivo junto con la base.** Una página cuya
 imagen falta se abre igualmente — la imagen aparece simplemente como no
-disponible.
+disponible —, así que una restauración parcial se sobrevive, pero no hay motivo
+para conformarse con ella.
 
 **4. Arranca de nuevo.** Las migraciones se aplican al arrancar: una copia hecha
 en una versión anterior abre sin problema en un binario más nuevo. Al revés no:
@@ -116,11 +128,16 @@ reciente en un binario más antiguo.
 Una copia que nunca has abierto es una apuesta. Esto lleva diez segundos:
 
 ```
-sqlite3 bramblekeep-backup-0.12.0-1234567890.db "PRAGMA integrity_check;"
-sqlite3 bramblekeep-backup-0.12.0-1234567890.db "SELECT COUNT(*) FROM items;"
+unzip -t bramblekeep-backup-0.12.0-1234567890.zip
+unzip -p bramblekeep-backup-0.12.0-1234567890.zip backup.json
+unzip -p bramblekeep-backup-0.12.0-1234567890.zip bramblekeep.db > /tmp/check.db
+sqlite3 /tmp/check.db "PRAGMA integrity_check;"
+sqlite3 /tmp/check.db "SELECT COUNT(*) FROM items;"
 ```
 
-La primera debe imprimir `ok`. La segunda debe parecerse a tu instancia.
+`unzip -t` no debe señalar ningún error, `integrity_check` debe imprimir `ok`, y
+el recuento debe parecerse a tu instancia. `backup.json` te dice de qué versión y
+de qué esquema viene el archivo.
 
 ## Deshacer una actualización fallida
 
@@ -131,7 +148,9 @@ a la base, con el nombre de la versión que abandona:
 bramblekeep.db.bak-0.12.0
 ```
 
-Restaurarla es el procedimiento de arriba con ese archivo. Reinstala también la
+Esa es una base pelada, no un archivo comprimido: las migraciones solo tocan la
+base, y las subidas son inmutables — no hay nada más que deshacer. Sáltate el
+paso de descompresión y ponla en su sitio igual que arriba. Reinstala también la
 versión correspondiente del binario: esa base no ha pasado por las migraciones
 más nuevas.
 

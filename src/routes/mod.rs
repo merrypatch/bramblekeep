@@ -1481,9 +1481,10 @@ pub async fn apply_status(
 /// full-instance exfiltration by design, and admins are deliberately not enough:
 /// only the single account that owns the workspace can take one.
 ///
-/// It does NOT include `files/` (uploads are content-addressed blobs on disk,
-/// outside SQLite); restoring a complete instance means this file *and* that
-/// directory, which the documentation states next to the button.
+/// The archive holds everything: the database AND the uploaded blobs. Shipping
+/// the database alone made the note beside the button ("also copy files/") the
+/// only thing standing between an operator and a restore where every image is
+/// broken — a note read, at best, by people who do not yet need it.
 pub async fn download_backup(
     State(app): State<AppState>,
     Extension(user): Extension<User>,
@@ -1498,11 +1499,11 @@ pub async fn download_backup(
         .ok_or_else(|| Error::Io("backup needs a file-backed database".into()))?;
     let dir = db_path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
     let stamp = crate::store::now_ms();
-    let name = format!("bramblekeep-backup-{}-{stamp}.db", crate::update::current_version());
+    let name = format!("bramblekeep-backup-{}-{stamp}.zip", crate::update::current_version());
     let tmp = dir.join(format!(".{name}.part"));
     let _ = tokio::fs::remove_file(&tmp).await;
 
-    crate::store::backup_to(&app.db, &tmp).await?;
+    let manifest = crate::backup::create(&app.db, app.files.dir(), &tmp).await?;
 
     let file = tokio::fs::File::open(&tmp)
         .await
@@ -1514,15 +1515,20 @@ pub async fn download_backup(
         .len();
     // Unlink now, while the handle stays valid: the bytes keep streaming from the
     // open descriptor, and an aborted download cannot leave a copy of the whole
-    // database lying next to it. (On Windows the unlink fails and the file is
+    // instance lying next to it. (On Windows the unlink fails and the file is
     // swept on the next backup instead — hence the `.part` name.)
     let _ = tokio::fs::remove_file(&tmp).await;
 
-    tracing::info!(actor = %user.id, bytes = len, "backup downloaded");
+    tracing::info!(
+        actor = %user.id,
+        bytes = len,
+        files = manifest.file_count,
+        "backup downloaded"
+    );
     let stream = file_stream(file);
     Ok((
         [
-            (header::CONTENT_TYPE, "application/octet-stream".to_string()),
+            (header::CONTENT_TYPE, "application/zip".to_string()),
             (header::CONTENT_LENGTH, len.to_string()),
             (
                 header::CONTENT_DISPOSITION,
