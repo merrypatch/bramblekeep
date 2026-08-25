@@ -75,22 +75,36 @@ sitting on the disk that failed is not a backup.
 
 ## Restore
 
-**1. Stop the instance.**
+Stop the instance, run the command, start it again.
 
 ```
-docker compose down          # in /opt/bramblekeep
-sudo systemctl stop bramblekeep   # bare binary
+docker compose down                 # in /opt/bramblekeep
+sudo systemctl stop bramblekeep     # bare binary
+
+bramblekeep restore bramblekeep-backup-0.12.0-1234567890.zip
 ```
 
-**2. Put the database back — and delete the two side files.**
+Under Docker the binary is the image's entrypoint, so run it against the same
+volume — which also means the restored files come out owned by the service
+account rather than by root:
 
-`bramblekeep.db-wal` and `bramblekeep.db-shm` belong to the database you are
-replacing. Skip this and SQLite replays them onto the file you just restored:
-the server starts without a word of complaint, and you are left with a mixture
-of both — the pages you meant to roll back, still there. It is the quietest way
-to believe you have restored something you have not.
+```
+docker run --rm -v bramblekeep-data:/data -v "$PWD":/backup \
+  ghcr.io/merrypatch/bramblekeep:latest \
+  restore /backup/bramblekeep-backup-0.12.0-1234567890.zip --yes
+```
 
-Unpack the archive first, then put the database in place. Bare binary:
+The command checks the archive before touching anything, refuses one this binary
+is too old to read, refuses to run while the instance is still up, keeps the
+database it replaces as `bramblekeep.db.before-restore-<timestamp>`, and prints
+the one command that undoes it. Uploads are merged in: a file already on disk is
+already correct, because its name is the hash of its content.
+
+`--yes` skips the confirmation prompt, for scripted recovery.
+
+## Restoring by hand
+
+Only if you cannot run the binary at all. The steps the command takes for you:
 
 ```
 unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
@@ -99,25 +113,19 @@ cp restore/bramblekeep.db bramblekeep.db
 cp -r restore/files/. files/
 ```
 
-Docker — the data lives in a volume, and the service runs as uid `10001`, so the
-restored file has to belong to it or the app cannot write:
+**Deleting `bramblekeep.db-wal` and `bramblekeep.db-shm` is the step that
+matters.** They belong to the database you are replacing. Skip it and SQLite
+replays them onto the file you just restored: the server starts without a word of
+complaint, and you are left with a mixture of both — the pages you meant to roll
+back, still there. It is the quietest way to believe you have restored something
+you have not.
 
-```
-unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
-docker run --rm -v bramblekeep-data:/data -v "$PWD/restore":/restore alpine sh -c '
-  rm -f /data/bramblekeep.db-wal /data/bramblekeep.db-shm &&
-  cp /restore/bramblekeep.db /data/bramblekeep.db &&
-  mkdir -p /data/files && cp -r /restore/files/. /data/files/ &&
-  chown -R 10001:10001 /data/bramblekeep.db /data/files'
-```
+Under Docker, add `chown -R 10001:10001` on what you copied in: the service does
+not run as root and cannot write files that do.
 
-**3. The uploads came out of the archive with the database.** A page whose image
-is missing still opens — the image just shows as unavailable — so a partial
-restore is survivable, but there is no reason to accept one.
-
-**4. Start it back up.** Migrations run at startup, so a backup taken on an older
-version opens fine on a newer binary. The reverse does not: migrations only go
-forward, so do not restore a newer backup into an older binary.
+Migrations run at startup, so a backup taken on an older version opens fine on a
+newer binary. The reverse does not, and the command refuses it rather than let
+you find out.
 
 ## Checking a backup before you need it
 

@@ -169,33 +169,37 @@ migrations, named `bramblekeep.db.bak-<version>`.
 > missing its last transactions, or one that will not open. Use the button, or
 > stop the server first.
 
-To restore, with the instance **stopped**:
+To restore, stop the instance and hand the archive to the binary:
 
 ```bash
-unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
-
-# Bare binary. Deleting -wal/-shm is not optional: they belong to the database
-# you are replacing, and SQLite will happily replay them onto the restored file —
-# the server starts fine and you get a silent mixture of both.
-rm -f bramblekeep.db-wal bramblekeep.db-shm
-cp restore/bramblekeep.db bramblekeep.db
-cp -r restore/files/. files/
-
-# Docker — data lives in a volume, and the service runs as uid 10001.
-docker run --rm -v bramblekeep-data:/data -v "$PWD/restore":/restore alpine sh -c '
-  rm -f /data/bramblekeep.db-wal /data/bramblekeep.db-shm &&
-  cp /restore/bramblekeep.db /data/bramblekeep.db &&
-  mkdir -p /data/files && cp -r /restore/files/. /data/files/ &&
-  chown -R 10001:10001 /data/bramblekeep.db /data/files'
+docker compose down                 # or: sudo systemctl stop bramblekeep
+bramblekeep restore bramblekeep-backup-0.12.0-1234567890.zip
 ```
 
-Then start up again: migrations run at startup, so an older backup opens on a
-newer binary. Not the reverse — migrations only go forward.
+Under Docker the binary is the image's entrypoint, so run it against the same
+volume — the restored files then belong to the service account, not to root:
+
+```bash
+docker run --rm -v bramblekeep-data:/data -v "$PWD":/backup \
+  ghcr.io/merrypatch/bramblekeep:latest \
+  restore /backup/bramblekeep-backup-0.12.0-1234567890.zip --yes
+```
+
+It checks the archive first, refuses one this binary is too old to read, refuses
+to run while the instance is still up, keeps the database it replaces, and prints
+the command that undoes it. Migrations run at startup, so an older backup opens on
+a newer binary; the reverse is refused rather than half-applied.
+
+Doing it by hand is documented in the built-in *Installing and updating* chapter,
+including the one step — deleting `bramblekeep.db-wal` and `-shm` — that
+otherwise leaves SQLite replaying the old writes onto the restored file, with the
+server coming up fine and serving a silent mixture of both.
 
 Worth doing once, before you ever need it:
 
 ```bash
 unzip -t your-backup.zip                           # must report no errors
+unzip -p your-backup.zip backup.json               # which version and schema
 unzip -p your-backup.zip bramblekeep.db > /tmp/check.db
 sqlite3 /tmp/check.db "PRAGMA integrity_check;"    # must print: ok
 sqlite3 /tmp/check.db "SELECT COUNT(*) FROM items;"

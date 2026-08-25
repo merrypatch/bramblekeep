@@ -43,6 +43,7 @@ Bramblekeep — self-hosted workspace, single binary.
 
   bramblekeep                        start the server
   bramblekeep set-password <email>   set an account's password (reads it on stdin)
+  bramblekeep restore <archive.zip>  restore a backup (stop the instance first)
   bramblekeep --version              print the version
   bramblekeep help                   this message
 
@@ -51,6 +52,11 @@ forgotten password on an instance that cannot send mail. On an instance with no
 account yet, it creates the owner. The password is read from standard input, not
 from the arguments — an argument would be visible to `ps` and land in the shell
 history. Note that it IS echoed while typing.
+
+restore takes an archive downloaded from Settings → Workspace → Backup. It
+checks the archive, refuses one this binary is too old to read, keeps the
+database it replaces, and deals with the -wal/-shm files that make a hand-run
+restore fail silently. Add --yes to skip the confirmation.
 ";
 
 /// `set-password <email>`: reads the password on stdin, applies the same policy
@@ -81,6 +87,27 @@ async fn cli_set_password(config: &Config, email: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// `restore <archive.zip>`: replaces the database (and tops up the file store)
+/// from a backup archive, then reports what to do if it was the wrong one.
+async fn cli_restore(config: &Config, archive: &std::path::Path, yes: bool) -> anyhow::Result<()> {
+    let outcome = bramblekeep::backup::restore::run(config, archive, yes).await?;
+    println!("\nRestored.");
+    println!(
+        "  files: {} written, {} already present",
+        outcome.blobs_written, outcome.blobs_already_present
+    );
+    if let Some(previous) = &outcome.previous_db {
+        println!("  the database it replaced is kept at {}", previous.display());
+        println!(
+            "  changed your mind? stop nothing (it is already stopped), then:\n    mv {} {}",
+            previous.display(),
+            outcome.db_path.display()
+        );
+    }
+    println!("  start the instance again when ready.\n");
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Load .env into the process environment before any config read.
@@ -108,6 +135,13 @@ async fn main() -> anyhow::Result<()> {
                 anyhow::bail!("usage: bramblekeep set-password <email>");
             };
             return cli_set_password(&config, email).await;
+        }
+        Some("restore") => {
+            let Some(archive) = args.get(1) else {
+                anyhow::bail!("usage: bramblekeep restore <archive.zip> [--yes]");
+            };
+            let yes = args.iter().any(|a| a == "--yes" || a == "-y");
+            return cli_restore(&config, std::path::Path::new(archive), yes).await;
         }
         Some("help" | "--help" | "-h") => {
             print!("{USAGE}");

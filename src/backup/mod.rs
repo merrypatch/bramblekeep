@@ -14,6 +14,7 @@
 //! files/<hash>     — one entry per stored blob
 //! ```
 
+pub mod restore;
 pub mod zip;
 
 use std::path::{Path, PathBuf};

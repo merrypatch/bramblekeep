@@ -77,23 +77,38 @@ posée sur le disque qui lâche n'en est pas une.
 
 ## Restauration
 
-**1. Arrêtez l'instance.**
+Arrêtez l'instance, lancez la commande, redémarrez.
 
 ```
 docker compose down                 # dans /opt/bramblekeep
 sudo systemctl stop bramblekeep     # binaire nu
+
+bramblekeep restore bramblekeep-backup-0.12.0-1234567890.zip
 ```
 
-**2. Remettez la base en place — et supprimez les deux fichiers annexes.**
+Sous Docker, le binaire est le point d'entrée de l'image : lancez-le sur le même
+volume — ce qui fait aussi que les fichiers restaurés appartiennent au compte de
+service et non à root :
 
-`bramblekeep.db-wal` et `bramblekeep.db-shm` appartiennent à la base que vous
-remplacez. Sautez cette étape et SQLite les rejoue par-dessus le fichier que vous
-venez de restaurer : le serveur démarre sans broncher, et vous vous retrouvez avec
-un mélange des deux — les pages que vous vouliez annuler, toujours là. C'est la
-manière la plus silencieuse de croire avoir restauré quelque chose qui ne l'est
-pas.
+```
+docker run --rm -v bramblekeep-data:/data -v "$PWD":/backup \
+  ghcr.io/merrypatch/bramblekeep:latest \
+  restore /backup/bramblekeep-backup-0.12.0-1234567890.zip --yes
+```
 
-Décompressez l'archive, puis mettez la base en place. Binaire nu :
+La commande vérifie l'archive avant de toucher à quoi que ce soit, refuse celle
+que ce binaire est trop ancien pour lire, refuse de s'exécuter tant que l'instance
+tourne, conserve la base qu'elle remplace sous
+`bramblekeep.db.before-restore-<horodatage>`, et affiche la commande unique qui
+annule l'opération. Les envois sont fusionnés : un fichier déjà présent est déjà
+le bon, puisque son nom est l'empreinte de son contenu.
+
+`--yes` saute la confirmation, pour une reprise scriptée.
+
+## Restaurer à la main
+
+Uniquement si vous ne pouvez pas lancer le binaire du tout. Les étapes que la
+commande fait pour vous :
 
 ```
 unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
@@ -102,27 +117,19 @@ cp restore/bramblekeep.db bramblekeep.db
 cp -r restore/files/. files/
 ```
 
-Docker — les données vivent dans un volume, et le service tourne sous l'uid
-`10001` : le fichier restauré doit lui appartenir, sinon l'application ne peut
-pas écrire.
+**Supprimer `bramblekeep.db-wal` et `bramblekeep.db-shm` est l'étape qui
+compte.** Ils appartiennent à la base que vous remplacez. Sautez-la et SQLite les
+rejoue par-dessus le fichier que vous venez de restaurer : le serveur démarre sans
+broncher, et vous vous retrouvez avec un mélange des deux — les pages que vous
+vouliez annuler, toujours là. C'est la manière la plus silencieuse de croire avoir
+restauré quelque chose qui ne l'est pas.
 
-```
-unzip bramblekeep-backup-0.12.0-1234567890.zip -d restore/
-docker run --rm -v bramblekeep-data:/data -v "$PWD/restore":/restore alpine sh -c '
-  rm -f /data/bramblekeep.db-wal /data/bramblekeep.db-shm &&
-  cp /restore/bramblekeep.db /data/bramblekeep.db &&
-  mkdir -p /data/files && cp -r /restore/files/. /data/files/ &&
-  chown -R 10001:10001 /data/bramblekeep.db /data/files'
-```
+Sous Docker, ajoutez `chown -R 10001:10001` sur ce que vous avez copié : le
+service ne tourne pas en root et ne peut pas écrire des fichiers qui le sont.
 
-**3. Les envois sont sortis de l'archive avec la base.** Une page dont l'image
-manque s'ouvre quand même — l'image s'affiche simplement comme indisponible —
-donc une restauration partielle se survit, mais rien n'oblige à s'en contenter.
-
-**4. Redémarrez.** Les migrations s'appliquent au démarrage : une sauvegarde prise
-sur une version plus ancienne s'ouvre sans problème sur un binaire plus récent.
-L'inverse, non : les migrations ne vont que vers l'avant, ne restaurez pas une
-sauvegarde plus récente dans un binaire plus ancien.
+Les migrations s'appliquent au démarrage : une sauvegarde prise sur une version
+plus ancienne s'ouvre sans problème sur un binaire plus récent. L'inverse non, et
+la commande le refuse plutôt que de vous le laisser découvrir.
 
 ## Vérifier une sauvegarde avant d'en avoir besoin
 
