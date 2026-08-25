@@ -1380,12 +1380,13 @@
     "unreadable": "Cette archive n'a pas pu être lue.",
     "pages": "Pages",
     "topLevel": "Premier niveau",
-    "skipped": "Non importé : {{databases}} tableau(x), {{attachments}} pièce(s) jointe(s).",
+    "skipped": "Les tableaux ({{databases}}) ne sont pas encore importés.",
     "back": "En choisir un autre",
     "import": "Importer {{count}} pages",
     "progress": "Import {{done}} sur {{total}}…",
-    "done": "{{count}} pages importées.",
+    "done": "{{count}} pages importées, {{files}} fichier(s).",
     "donePartial": "{{count}} pages importées, {{failed}} sans leur contenu.",
-    "failed": "L'import s'est arrêté."
+    "failed": "L'import s'est arrêté.",
+    "withFiles": "{{count}} fichier(s) joint(s) seront envoyés avec les pages."
   }
 }

@@ -16,9 +16,15 @@ import { BlockNoteEditor } from "@blocknote/core";
 import { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
 
-import { createItem, getBlocks, patchItem } from "@/lib/api";
+import { createItem, fileUrl, getBlocks, patchItem, uploadFile } from "@/lib/api";
 import { editorSchema } from "@/lib/editorSchema";
-import { stripLeadingTitle, type MdPage } from "@/lib/mdImport";
+import {
+  liftTasksOutOfQuotes,
+  linksIn,
+  resolveLink,
+  stripLeadingTitle,
+  type MdPage,
+} from "@/lib/mdImport";
 import { FRAGMENT, connectSync } from "@/lib/sync";
 
 /** How long to wait for one page's socket to sync before giving up on it. */
@@ -33,8 +39,55 @@ export type ImportResult = {
   created: number;
   /** Pages that were created but whose body could not be written. */
   failed: { title: string; reason: string }[];
+  /** Attachments uploaded and pointed at from the imported pages. */
+  filesImported: number;
   rootIds: string[];
 };
+
+/** Archive path → URL it now lives at, so a file referenced from three pages is
+ * uploaded once. The store is content-addressed, so a repeat upload would be
+ * harmless — only slow, over a link that may be someone's home connection. */
+type Uploaded = Map<string, string>;
+
+/** Uploads a page's attachments and points its Markdown at them.
+ *
+ * Without this an exported image survives as a relative path to a file that
+ * exists only inside the archive — which renders as neither an image nor an
+ * error, just a stray line of filename. */
+async function absorbAttachments(
+  markdown: string,
+  pagePath: string,
+  files: Map<string, Uint8Array>,
+  uploaded: Uploaded,
+): Promise<{ markdown: string; added: number }> {
+  let out = markdown;
+  let added = 0;
+
+  for (const link of linksIn(markdown)) {
+    const entry = resolveLink(files, pagePath, link);
+    if (!entry) continue; // external, absolute, or simply not in the archive
+
+    let url = uploaded.get(entry);
+    if (!url) {
+      const bytes = files.get(entry);
+      if (!bytes) continue;
+      const name = entry.split("/").pop() ?? "file";
+      try {
+        const stored = await uploadFile(new File([bytes as BlobPart], name));
+        url = fileUrl(stored.hash);
+        uploaded.set(entry, url);
+        added += 1;
+      } catch {
+        // One attachment refused (too large, a MIME the server declines) is not
+        // a reason to drop the page it belongs to.
+        continue;
+      }
+    }
+    // Replace the target only, leaving the alt text and any title in place.
+    out = out.split(`](${link}`).join(`](${url}`);
+  }
+  return { markdown: out, added };
+}
 
 /** Writes `markdown` into the page's CRDT document, then leaves.
  *
@@ -133,13 +186,28 @@ async function confirmLanded(itemId: string): Promise<void> {
 async function importPage(
   page: MdPage,
   parentId: string | undefined,
+  files: Map<string, Uint8Array>,
+  uploaded: Uploaded,
   onProgress: (p: ImportProgress) => void,
-  state: { done: number; total: number; failed: ImportResult["failed"] },
+  state: {
+    done: number;
+    total: number;
+    failed: ImportResult["failed"];
+    filesImported: number;
+  },
 ): Promise<string> {
   const itemId = await createItem(parentId);
   await patchItem(itemId, { title: page.title });
 
-  const body = stripLeadingTitle(page.markdown, page.title);
+  // Order matters: attachments first, so the Markdown handed to the parser
+  // already points at files that exist; then the quote fix, which only moves
+  // lines around.
+  let body = stripLeadingTitle(page.markdown, page.title);
+  if (body.trim() !== "") {
+    const absorbed = await absorbAttachments(body, page.path, files, uploaded);
+    body = liftTasksOutOfQuotes(absorbed.markdown);
+    state.filesImported += absorbed.added;
+  }
   if (body.trim() !== "") {
     try {
       await writeBody(itemId, body);
@@ -157,7 +225,7 @@ async function importPage(
   onProgress({ done: state.done, total: state.total, title: page.title });
 
   for (const child of page.children) {
-    await importPage(child, itemId, onProgress, state);
+    await importPage(child, itemId, files, uploaded, onProgress, state);
   }
   return itemId;
 }
@@ -171,16 +239,28 @@ async function importPage(
  */
 export async function applyMdImport(
   roots: MdPage[],
+  files: Map<string, Uint8Array>,
   parentId: string | undefined,
   onProgress: (p: ImportProgress) => void,
 ): Promise<ImportResult> {
   const total = (pages: MdPage[]): number =>
     pages.reduce((n, p) => n + 1 + total(p.children), 0);
-  const state = { done: 0, total: total(roots), failed: [] as ImportResult["failed"] };
+  const state = {
+    done: 0,
+    total: total(roots),
+    failed: [] as ImportResult["failed"],
+    filesImported: 0,
+  };
+  const uploaded: Uploaded = new Map();
 
   const rootIds: string[] = [];
   for (const root of roots) {
-    rootIds.push(await importPage(root, parentId, onProgress, state));
+    rootIds.push(await importPage(root, parentId, files, uploaded, onProgress, state));
   }
-  return { created: state.done, failed: state.failed, rootIds };
+  return {
+    created: state.done,
+    failed: state.failed,
+    filesImported: state.filesImported,
+    rootIds,
+  };
 }

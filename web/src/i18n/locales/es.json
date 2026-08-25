@@ -1380,12 +1380,13 @@
     "unreadable": "No se ha podido leer ese archivo.",
     "pages": "Páginas",
     "topLevel": "Primer nivel",
-    "skipped": "No importado: {{databases}} tabla(s), {{attachments}} adjunto(s).",
+    "skipped": "Las tablas ({{databases}}) aún no se importan.",
     "back": "Elegir otro",
     "import": "Importar {{count}} páginas",
     "progress": "Importando {{done}} de {{total}}…",
-    "done": "{{count}} páginas importadas.",
+    "done": "{{count}} páginas importadas, {{files}} archivo(s).",
     "donePartial": "{{count}} páginas importadas, {{failed}} sin su contenido.",
-    "failed": "La importación se ha detenido."
+    "failed": "La importación se ha detenido.",
+    "withFiles": "{{count}} archivo(s) adjunto(s) se subirán con las páginas."
   }
 }

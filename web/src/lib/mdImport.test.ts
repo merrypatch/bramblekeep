@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   cleanTitle,
   hasMarkdown,
+  liftTasksOutOfQuotes,
+  linksIn,
+  resolveLink,
   planMdImport,
   stripLeadingTitle,
 } from "./mdImport";
@@ -103,7 +106,8 @@ describe("planMdImport", () => {
       }),
     );
     expect(plan.pageCount).toBe(1);
-    expect(plan.skipped).toEqual({ databases: 1, attachments: 2 });
+    expect(plan.attachments).toBe(2);
+    expect(plan.skipped).toEqual({ databases: 1 });
   });
 
   /// A page whose parent `.md` is missing would otherwise vanish with its folder.
@@ -120,7 +124,7 @@ describe("planMdImport", () => {
 
   it("has nothing to say about an empty archive", () => {
     const plan = planMdImport(archive({}));
-    expect(plan).toEqual({ roots: [], pageCount: 0, skipped: { databases: 0, attachments: 0 } });
+    expect(plan).toEqual({ roots: [], pageCount: 0, attachments: 0, skipped: { databases: 0 } });
   });
 });
 
@@ -160,7 +164,7 @@ describe("a real archive, read end to end", () => {
     const projets = plan.roots.find((p) => p.title === "Projets")!;
     expect(projets.children.map((c) => c.title)).toEqual(["Serveur"]);
     expect(projets.children[0].children.map((c) => c.title)).toEqual(["Notes 2026"]);
-    expect(plan.skipped.attachments).toBe(1);
+    expect(plan.attachments).toBe(1);
 
     // The body is the file's, minus the title heading the page already carries.
     expect(stripLeadingTitle(projets.children[0].markdown, "Serveur")).toContain("monter le Pi");
@@ -200,5 +204,85 @@ describe("titles come from the heading, not the filename", () => {
     const page = plan.roots[0];
     expect(page.title).toBe("Trip planning");
     expect(stripLeadingTitle(page.markdown, page.title)).toBe("plans");
+  });
+});
+
+describe("liftTasksOutOfQuotes", () => {
+  /// The editor's quote block is inline-only, so a quoted checkbox can only ever
+  /// be text. Lifted out, it is a checkbox again.
+  it("takes checkboxes out of a quote, splitting it where they were", () => {
+    const md = [
+      "> **Heading**",
+      ">",
+      "> Intro line",
+      ">",
+      "> - [ ]  First",
+      "> - [x]  Second",
+      ">",
+      "> Closing line",
+    ].join("\n");
+    expect(liftTasksOutOfQuotes(md).split("\n")).toEqual([
+      "> **Heading**",
+      ">",
+      "> Intro line",
+      ">",
+      "- [ ]  First",
+      "- [x]  Second",
+      ">",
+      "> Closing line",
+    ]);
+  });
+
+  it("leaves ordinary quoted lists alone", () => {
+    const md = "> - a bullet\n> 1. a number";
+    expect(liftTasksOutOfQuotes(md)).toBe(md);
+  });
+
+  it("leaves checkboxes that were never in a quote", () => {
+    const md = "- [ ] already free\n- [x] and this one";
+    expect(liftTasksOutOfQuotes(md)).toBe(md);
+  });
+
+  it("leaves prose that merely mentions brackets", () => {
+    const md = "> see [the link](http://x) and [ ] brackets";
+    expect(liftTasksOutOfQuotes(md)).toBe(md);
+  });
+});
+
+describe("resolveLink", () => {
+  const files = new Map<string, Uint8Array>([
+    ["Page/Sans titre/shot.jpg", new Uint8Array()],
+    ["Other/photo.png", new Uint8Array()],
+  ]);
+
+  it("resolves a percent-encoded path relative to the page", () => {
+    expect(resolveLink(files, "Page/Note.md", "Sans%20titre/shot.jpg")).toBe(
+      "Page/Sans titre/shot.jpg",
+    );
+  });
+
+  it("falls back to a basename match when the folder does not line up", () => {
+    expect(resolveLink(files, "Page/Note.md", "elsewhere/photo.png")).toBe("Other/photo.png");
+  });
+
+  it("leaves external and absolute targets alone", () => {
+    expect(resolveLink(files, "Page/Note.md", "https://example.test/x.png")).toBeNull();
+    expect(resolveLink(files, "Page/Note.md", "/already/served.png")).toBeNull();
+    expect(resolveLink(files, "Page/Note.md", "data:image/png;base64,AAAA")).toBeNull();
+  });
+
+  it("says so when nothing matches", () => {
+    expect(resolveLink(files, "Page/Note.md", "missing.gif")).toBeNull();
+  });
+});
+
+describe("linksIn", () => {
+  it("finds image and link targets, without repeating one", () => {
+    const md = '![a](one.png)\n\n[text](two.pdf)\n\n![b](one.png "title")';
+    expect(linksIn(md)).toEqual(["one.png", "two.pdf"]);
+  });
+
+  it("has nothing to say about prose", () => {
+    expect(linksIn("just words, and a [bracket] alone")).toEqual([]);
   });
 });

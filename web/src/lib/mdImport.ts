@@ -40,9 +40,11 @@ export type MdPlan = {
   roots: MdPage[];
   /** Total pages, at every depth. */
   pageCount: number;
-  /** Entries this import does not handle, by kind — reported rather than
-   * dropped in silence, so nobody discovers the gap after the fact. */
-  skipped: { databases: number; attachments: number };
+  /** Files that will be uploaded and pointed at from the pages. */
+  attachments: number;
+  /** Entries this import does not handle — reported rather than dropped in
+   * silence, so nobody discovers the gap after the fact. */
+  skipped: { databases: number };
 };
 
 /** A trailing run of hex, after a space, underscore or dash: how tools tag an
@@ -90,7 +92,8 @@ function splitter(paths: string[]): (path: string) => string[] {
  */
 export function planMdImport(files: Map<string, Uint8Array>): MdPlan {
   const dec = new TextDecoder();
-  const skipped = { databases: 0, attachments: 0 };
+  const skipped = { databases: 0 };
+  let attachments = 0;
   const segments = splitter([...files.keys()]);
 
   // Group every markdown file by its folder path, so a page can find the
@@ -102,7 +105,7 @@ export function planMdImport(files: Map<string, Uint8Array>): MdPlan {
     const leaf = segs[segs.length - 1];
     if (/\.md$/i.test(leaf)) mdPaths.push(name);
     else if (/\.csv$/i.test(leaf)) skipped.databases += 1;
-    else skipped.attachments += 1;
+    else attachments += 1;
   }
 
   /** Pages directly inside `prefix` (a list of segments, [] = archive root). */
@@ -161,7 +164,7 @@ export function planMdImport(files: Map<string, Uint8Array>): MdPlan {
   const count = (pages: MdPage[]): number =>
     pages.reduce((n, p) => n + 1 + count(p.children), 0);
 
-  return { roots, pageCount: count(roots), skipped };
+  return { roots, pageCount: count(roots), attachments, skipped };
 }
 
 /** Does this archive hold any Markdown at all? Used to say so plainly instead of
@@ -171,6 +174,75 @@ export function hasMarkdown(files: Map<string, Uint8Array>): boolean {
     if (/\.md$/i.test(name)) return true;
   }
   return false;
+}
+
+/** Finds the archive entry a page's relative link points at.
+ *
+ * Links in an exported page are relative to the page's own file, and commonly
+ * percent-encoded. Three attempts, narrowing: the path as written, the path
+ * decoded, and — last — any entry with that basename, which rescues links whose
+ * folder was renamed on the way out at the cost of guessing between two files
+ * of the same name. External URLs are not ours to resolve.
+ */
+export function resolveLink(
+  files: Map<string, Uint8Array>,
+  pagePath: string,
+  link: string,
+): string | null {
+  if (/^[a-z]+:\/\//i.test(link) || link.startsWith("data:") || link.startsWith("/")) return null;
+  const dir = pagePath.split("/").slice(0, -1).join("/");
+  const join = (rel: string) => (dir ? `${dir}/${rel}` : rel);
+
+  let decoded = link;
+  try {
+    decoded = decodeURIComponent(link);
+  } catch {
+    // Not an escape sequence; the raw form is all there is.
+  }
+  for (const candidate of [join(link), join(decoded), link, decoded]) {
+    if (files.has(candidate)) return candidate;
+  }
+  const base = decoded.split("/").pop();
+  if (!base) return null;
+  for (const name of files.keys()) {
+    if (name.split("/").pop() === base) return name;
+  }
+  return null;
+}
+
+/** Every distinct link a page's Markdown points at, in order of appearance. */
+export function linksIn(markdown: string): string[] {
+  const out: string[] = [];
+  // `![alt](target)` and `[text](target)` alike: an attachment can be either.
+  for (const m of markdown.matchAll(/!?\[[^\]]*\]\(([^)\s]+)[^)]*\)/g)) {
+    if (!out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+
+/** Pulls task-list items out of the blockquotes they sit in.
+ *
+ * The editor's `quote` block holds inline content only — it cannot contain a
+ * list — so a quoted `- [ ]` arrives as text that merely looks like a checkbox.
+ * Lifting the items out of the quote loses the rule down the left of those
+ * lines and keeps boxes that can actually be ticked, which is the half worth
+ * keeping: the quote is decoration, the checkbox is the content.
+ *
+ * The quote splits where the items were rather than the items moving to the
+ * end, so reading order survives. Only task items are lifted; ordinary quoted
+ * lists stay where they are, since nothing is lost by leaving them as text.
+ */
+export function liftTasksOutOfQuotes(markdown: string): string {
+  const TASK = /^\s*[-*+]\s+\[[ xX]\]\s+/;
+  return markdown
+    .split(/\r?\n/)
+    .map((line) => {
+      const quoted = /^\s*>\s?(.*)$/.exec(line);
+      if (!quoted) return line;
+      const inner = quoted[1];
+      return TASK.test(inner) ? inner : line;
+    })
+    .join("\n");
 }
 
 /** The `# H1` a file opens with, if it has one.

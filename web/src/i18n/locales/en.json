@@ -1380,12 +1380,13 @@
     "unreadable": "That archive could not be read.",
     "pages": "Pages",
     "topLevel": "Top level",
-    "skipped": "Not imported: {{databases}} table(s), {{attachments}} attachment(s).",
+    "skipped": "Tables ({{databases}}) are not imported yet.",
     "back": "Choose another",
     "import": "Import {{count}} pages",
     "progress": "Importing {{done}} of {{total}}…",
-    "done": "{{count}} pages imported.",
+    "done": "{{count}} pages imported, {{files}} file(s).",
     "donePartial": "{{count}} pages imported, {{failed}} without their content.",
-    "failed": "The import stopped."
+    "failed": "The import stopped.",
+    "withFiles": "{{count}} attached file(s) will be uploaded with the pages."
   }
 }

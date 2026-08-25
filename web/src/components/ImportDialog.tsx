@@ -50,6 +50,8 @@ export function ImportDialog({
   const { t } = useTranslation();
   const [source, setSource] = useState<Source>("markdown");
   const [plan, setPlan] = useState<MdPlan | null>(null);
+  // Kept beside the plan: attachments are uploaded at apply time, from these bytes.
+  const [archive, setArchive] = useState<Map<string, Uint8Array> | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const picker = useRef<HTMLInputElement>(null);
@@ -66,6 +68,7 @@ export function ImportDialog({
 
   const reset = () => {
     setPlan(null);
+    setArchive(null);
     setProgress(null);
     if (picker.current) picker.current.value = "";
   };
@@ -90,6 +93,7 @@ export function ImportDialog({
         return;
       }
       setPlan(p);
+      setArchive(files);
     } catch {
       toast.error(t("importDialog.unreadable"));
     } finally {
@@ -99,16 +103,18 @@ export function ImportDialog({
   };
 
   const runMarkdown = async () => {
-    if (!plan) return;
+    if (!plan || !archive) return;
     setBusy(true);
     try {
-      const result = await applyMdImport(plan.roots, itemId, setProgress);
+      const result = await applyMdImport(plan.roots, archive, itemId, setProgress);
       if (result.failed.length > 0) {
         toast.warning(
           t("importDialog.donePartial", { count: result.created, failed: result.failed.length }),
         );
       } else {
-        toast.success(t("importDialog.done", { count: result.created }));
+        toast.success(
+          t("importDialog.done", { count: result.created, files: result.filesImported }),
+        );
       }
       onImported();
       close();
@@ -196,12 +202,14 @@ export function ImportDialog({
                 {plan.roots.length > 3 && ` +${plan.roots.length - 3}`}
               </dd>
             </dl>
-            {(plan.skipped.databases > 0 || plan.skipped.attachments > 0) && (
+            {plan.attachments > 0 && (
               <p className="text-xs text-muted-foreground">
-                {t("importDialog.skipped", {
-                  databases: plan.skipped.databases,
-                  attachments: plan.skipped.attachments,
-                })}
+                {t("importDialog.withFiles", { count: plan.attachments })}
+              </p>
+            )}
+            {plan.skipped.databases > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {t("importDialog.skipped", { databases: plan.skipped.databases })}
               </p>
             )}
             <DialogFooter>
