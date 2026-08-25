@@ -53,6 +53,16 @@ export function PageHeader({
   // then the source question — same panel as the icon picker.
   const [coverSourceOpen, setCoverSourceOpen] = useState(false);
 
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  // Height follows the content. Reset to `auto` first, or the box can only ever
+  // grow — shortening a title would leave the empty rows behind.
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
+
   // Reset the local title only when switching pages (not on every meta
   // update, otherwise typing would be overwritten by the PATCH response).
   useEffect(() => {
@@ -351,7 +361,13 @@ export function PageHeader({
           </div>
         )}
 
-        <input
+        {/* A textarea, not an input: an input cannot wrap, so a long title was
+            simply cut off on screen while the full text sat in the record —
+            visible in the breadcrumb, missing from the page. It still behaves
+            like a single-line field: Enter commits rather than adding a line. */}
+        <textarea
+          ref={titleRef}
+          rows={1}
           value={title}
           readOnly={readOnly}
           onChange={(e) => setTitle(e.target.value)}
@@ -363,7 +379,7 @@ export function PageHeader({
             }
           }}
           placeholder={t("common.untitled")}
-          className="mt-9 mb-3 w-full bg-transparent text-4xl font-bold outline-none placeholder:text-muted-foreground/50"
+          className="mt-9 mb-3 w-full resize-none overflow-hidden bg-transparent text-4xl font-bold leading-tight outline-none placeholder:text-muted-foreground/50"
         />
       </div>
 
