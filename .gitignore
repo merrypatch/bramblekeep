@@ -9,6 +9,11 @@
 *.db-shm
 *.db-wal
 *.db.bak*
+# Rollback copies a restore leaves beside the database (`bramblekeep restore`,
+# and the interface path). Same rule as any local database: never a commit.
+*.db.before-restore-*
+# Archive waiting for the restart that applies it.
+restore-pending.zip
 /files
 # Upload directory of a throwaway instance (`FILES_DIR=files-scratch cargo run`):
 # its blobs are test content, never repository content.
