@@ -59,7 +59,7 @@
     "typescript-eslint": "^8.63.0",
     "vite": "^6.0.0",
     "vite-plugin-pwa": "^0.21.1",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.0"
   },
   "pnpm": {
     "//": "Security overrides: force patched versions of transitive deps flagged by the OSV audit. Every entry below is DEV-ONLY (pnpm why: vite/postcss toolchain, or the shadcn CLI and its MCP SDK) — none reaches the built bundle or the release binary. Pins are exact so an audit failure names a version we chose; re-check them on every dep bump, since a pin that was patched can itself become the flagged version.",
